@@ -149,6 +149,8 @@ section.page.visible{display:block}
 .page-head h2{font-size:clamp(1.7rem,3.8vw,2.4rem)}
 .page-head p{color:var(--muted);margin-top:12px}
 .news-thumb{height:130px;margin:-22px -22px 14px;border-radius:var(--radius) var(--radius) 0 0;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center}
+.meet .news-thumb{grid-column:1/-1}
+.social-card .art{background-size:cover;background-position:center}
 .news-thumb-icon{font-size:2.4rem;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
 .img-picker{display:grid;gap:10px}
 .img-preview{height:110px;border-radius:10px;border:1.5px solid var(--line);background:var(--field);display:flex;align-items:center;justify-content:center;background-size:cover;background-position:center}
@@ -792,19 +794,17 @@ const DB = {
     {id:6, type:"meet", title:"BPSC Last Chance County Qualifier", level:"Club", start:"2026-11-28", end:"2026-11-29", venue:"Basildon Sporting Village", closing:"", status:"open", entryUrl:"", resultsUrl:"", notes:""},
     {id:7, type:"social", title:"Summer BBQ & Fun Gala", start:"2026-08-15", blurb:"Family fun gala followed by the annual BBQ on the field. Bring the whole family — inflatables race included.", link:"#", color:"linear-gradient(135deg,#f26b21,#ffb25e)"},
     {id:8, type:"social", title:"Quiz Night Fundraiser", start:"2026-09-25", blurb:"Teams of six, bar open, proceeds towards new club timing equipment. Book your table early!", link:"#", color:"linear-gradient(135deg,#101014,#3c3c46)"},
-    {id:9, type:"social", title:"Presentation Evening", start:"2026-11-21", blurb:"Celebrating the season — trophies, awards and the famous coaches' review of the year.", link:"#", color:"linear-gradient(135deg,#d4551a,#101014)"},
+    {id:9, type:"social", title:"Presentation Evening", start:"2026-09-04", blurb:"Celebrating the season — trophies, awards and the famous coaches' review of the year.", link:"#", color:"linear-gradient(135deg,#d4551a,#101014)"},
     {id:10, type:"news", tag:"Racing", title:"Club Championships wrap-up", start:"2026-05-18", blurb:"Results, personal bests and a huge thank you to the volunteers who made the weekend happen."},
     {id:11, type:"news", tag:"Club", title:"New Academy intake open", start:"2026-07-01", blurb:"Spaces opening in our Academy squads for swimmers moving up from lessons — see Join Us for details."},
-    {id:12, type:"news", tag:"Volunteering", title:"Timekeepers needed", start:"2026-07-08", blurb:"We're short on timekeepers for the Autumn Qualifier — no experience needed, full briefing given poolside."},
     {id:13, type:"news", tag:"Trips", title:"Swim Camp 2026 — Lanzarote", start:"2026-08-20", blurb:"Places open for our warm-weather training camp at Club La Santa — intensive poolside sessions for squads moving up in level.", img:"images/WS-Spain-lanzarote-Costa-Teguise-03-Sports-Abroad.jpg"},
     {id:14, type:"news", tag:"Racing", title:"Summer Nationals", start:"2026-07-28", blurb:"Good luck to our qualified swimmers racing at Ponds Forge this summer — the whole club will be behind you.", img:"images/Ponds_Forge_Summer_Meet_2024_branding_1200x675.avif"},
     {id:15, type:"news", tag:"Volunteering", title:"Timekeepers course", start:"2026-08-05", blurb:"A free Swim England Timekeeping course is running next month — no experience needed, and it's the easiest way to start volunteering poolside.", img:"images/Timekeepers-course.webp"},
-    {id:16, type:"meet", title:"Essex Summer League — Round 3", level:"Team event", poolType:"25m Short Course", start:"2026-06-20", end:"", venue:"Southend Aquatic & Leisure Village", closing:"", status:"open", entryUrl:"", resultsUrl:"", notes:"Team event — squad selection posted on the noticeboard."},
     {id:17, type:"training", title:"No Friday training — pool maintenance", start:"2026-07-24", end:"", note:"Basildon Sporting Village pool closed for planned maintenance. All squads unaffected on other training days."},
     {id:18, type:"training", title:"Half-term altered times", start:"2026-10-26", end:"2026-10-30", note:"Squad times shift earlier during half-term week — check the noticeboard for your squad's slot."}
   ],
   coaches: [
-    {id:1, name:"Sam Carter", role:"Head Coach", quals:"Swim England Senior Coach · DBS · Safeguarding & first aid", squads:["Performance","National/Regional prep"]},
+    {id:1, name:"Doug Campbell", role:"Head Coach", quals:"Swim England Senior Coach · DBS · Safeguarding & first aid", squads:["Performance","National/Regional prep"], photo:"images/coaches/Capture.JPG"},
     {id:2, name:"Priya Shah", role:"Development Coach", quals:"Swim England Coach (Level 2) · DBS · Safeguarding", squads:["Development","County prep"]},
     {id:3, name:"Jamie Round", role:"Youth & Sprint Coach", quals:"Swim England Coach (Level 2) · DBS · Safeguarding", squads:["Youth Sprint","Transition"]},
     {id:4, name:"Ella Moore", role:"Academy Lead", quals:"Swim England Assistant Coach · DBS · Safeguarding", squads:["Academy — Green to Red hats"]}
@@ -920,7 +920,8 @@ const SCHEMAS = {
     {k:"entryFileLabel",label:"Entry file link text",type:"text"},
     {k:"officialsUrl",label:"Officials availability link (URL)",type:"text"},
     {k:"currentEntriesUrl",label:"Current entries link (URL)",type:"text"},
-    {k:"notes",label:"Notes for parents & swimmers",type:"textarea"}
+    {k:"notes",label:"Notes for parents & swimmers",type:"textarea"},
+    {k:"img",label:"Picture",type:"imagepicker"}
   ],
   coaches:[
     {k:"photo",label:"Coach photo",type:"imagepicker",swatches:false},
@@ -943,7 +944,8 @@ const SCHEMAS = {
     {k:"color",label:"Card graphic",type:"select",opts:[
       ["linear-gradient(135deg,#f26b21,#ffb25e)","Phoenix orange"],
       ["linear-gradient(135deg,#101014,#3c3c46)","Club black"],
-      ["linear-gradient(135deg,#d4551a,#101014)","Ember fade"]]}
+      ["linear-gradient(135deg,#d4551a,#101014)","Ember fade"]]},
+    {k:"img",label:"Picture (optional, replaces card graphic)",type:"imagepicker"}
   ],
   news:[
     {k:"tag",label:"Category tag (e.g. Racing, Club, Trips)",type:"text",req:1},
@@ -956,7 +958,8 @@ const SCHEMAS = {
     {k:"title",label:"What's changing",type:"text",req:1},
     {k:"start",label:"Date",type:"date",req:1},
     {k:"end",label:"End date (optional, for a range)",type:"date"},
-    {k:"note",label:"Details for parents & swimmers",type:"textarea"}
+    {k:"note",label:"Details for parents & swimmers",type:"textarea"},
+    {k:"img",label:"Picture",type:"imagepicker"}
   ],
   newsDefaults:[
     {k:"label",label:"Category name",type:"text",req:1},
@@ -986,7 +989,10 @@ function renderMeets(){
       m.officialsUrl?`Officials wanted — <a href="${esc(m.officialsUrl)}">declare your availability</a>`:"",
       m.currentEntriesUrl?`Current entries: <a href="${esc(m.currentEntriesUrl)}">View entries</a>`:""
     ].filter(Boolean).map(line=>`<div class="link-line">${line}</div>`).join("");
+    const r=resolveNewsImage(m.img);
+    const thumb=r?`<div class="news-thumb" style="background:${r.css}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
     return `<article class="card meet">
+      ${thumb}
       <div class="datebox"><div class="d">${dp.d}</div><div class="m">${dp.m}</div></div>
       <div>
         <div class="row">${pill}<span class="pill level">${esc(m.level)}</span></div>
@@ -1073,12 +1079,16 @@ function meetRowCard(m){
 function renderSocials(){
   renderCalendarGrid();
   const socials=DB.feed.filter(it=>it.type==="social").sort((a,b)=>a.start<b.start?-1:1);
-  $("#socialsList").innerHTML=socials.length?socials.map(it=>`
+  $("#socialsList").innerHTML=socials.length?socials.map(it=>{
+    const r=resolveNewsImage(it.img);
+    const artBg=r?`linear-gradient(160deg,rgba(16,16,20,.15),rgba(16,16,20,.65)),${r.css}`:it.color;
+    return `
     <article class="card social-card">
-      <div class="art" style="background:${it.color}">${esc(it.title)}</div>
+      <div class="art" style="background:${artBg}">${esc(it.title)}</div>
       <div class="body"><div class="when">${esc(fmtDate(it.start))}</div><p>${esc(it.blurb)}</p>
       ${it.link?`<div><a class="btn small" href="${esc(it.link)}">Details / tickets</a></div>`:""}</div>
-    </article>`).join(""):`<p style="color:var(--muted)">No socials scheduled yet.</p>`;
+    </article>`;
+  }).join(""):`<p style="color:var(--muted)">No socials scheduled yet.</p>`;
 
   const meets=DB.feed.filter(it=>it.type==="meet").sort((a,b)=>a.start<b.start?-1:1);
   const comps=meets.filter(m=>!isLeagueGala(m));
@@ -1124,9 +1134,9 @@ function renderNews(){
 /* Hero carousel: pulls across the whole feed (meets, socials, news) so it reads as one connected
    "what's happening" strip rather than club news alone — sorted by closeness to today's date. */
 function heroFeedContent(it){
-  if(it.type==="meet")return {tag:"Open Meet",title:it.title,blurb:`${it.venue} · ${fmtDate(it.start)}`,linkAttrs:'href="#meets" data-nav="meets"',img:null};
-  if(it.type==="social")return {tag:"Club Calendar",title:it.title,blurb:it.blurb||fmtDate(it.start),linkAttrs:'href="#socials" data-nav="socials"',img:null};
-  if(it.type==="training")return {tag:"Training change",title:it.title,blurb:it.note||fmtDate(it.start),linkAttrs:'href="#socials" data-nav="socials"',img:null};
+  if(it.type==="meet")return {tag:"Open Meet",title:it.title,blurb:`${it.venue} · ${fmtDate(it.start)}`,linkAttrs:'href="#meets" data-nav="meets"',img:it.img||null};
+  if(it.type==="social")return {tag:"Club Calendar",title:it.title,blurb:it.blurb||fmtDate(it.start),linkAttrs:'href="#socials" data-nav="socials"',img:it.img||null};
+  if(it.type==="training")return {tag:"Training change",title:it.title,blurb:it.note||fmtDate(it.start),linkAttrs:'href="#socials" data-nav="socials"',img:it.img||null};
   return {tag:`${it.tag} · Club News`,title:it.title,blurb:it.blurb,linkAttrs:'href="#info-news" data-nav="info-news"',img:it.img||null};
 }
 function renderHeroFeed(){
