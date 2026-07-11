@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk 'NR==244 || NR==245 || NR==246 || NR==247' \"/c/Users/Christoth/OneDrive/BPSC/Clud Website draft/bpsc-website-prototype \\(2\\).html\")",
+      "Bash(awk 'NR>=238 && NR<=250 {if \\(length\\($0\\)>200\\) print NR\": [long line, \"length\\($0\\)\" chars] \"substr\\($0,1,80\\); else print NR\": \"$0}' \"bpsc-website-prototype \\(2\\).html\")",
+      "Bash(awk 'NR>=240 && NR<=246 {if \\(length\\($0\\)>200\\) print NR\": [long line]\"; else print NR\": \"$0}' \"/c/Users/Christoth/OneDrive/BPSC/Clud Website draft/bpsc-website-prototype \\(2\\).html\")",
+      "WebFetch(domain:basildonswimming.org)",
+      "PowerShell(Start-Process \"C:\\\\Users\\\\Christoth\\\\OneDrive\\\\BPSC\\\\Clud Website draft\\\\bpsc-website-prototype \\(2\\).html\")"
+    ]
+  }
+}
