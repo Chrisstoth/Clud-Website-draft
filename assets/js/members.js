@@ -149,28 +149,48 @@ function renderLogin(message){
     ${message?`<div class="admin-note" style="margin-top:16px">${esc(message)}</div>`:""}
     <form class="stack" id="loginForm" style="margin-top:18px">
       <label class="f">Club email address<input type="email" name="email" required autocomplete="email" placeholder="you@phoenixbasildonsc.org"></label>
-      <div><button class="btn" type="submit">Email me a sign-in link</button></div>
+      <label class="f" id="passwordField" hidden>Password<input type="password" name="password" autocomplete="current-password"></label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn" type="submit" id="loginSubmit">Email me a sign-in link</button>
+        <button class="btn ghost" type="button" id="loginMode">Use a password instead</button>
+      </div>
     </form>
   </div></div>`;
+  let usePassword=false;
+  $("#loginMode").addEventListener("click",()=>{
+    usePassword=!usePassword;
+    $("#passwordField").hidden=!usePassword;
+    $("#passwordField").querySelector("input").required=usePassword;
+    $("#loginSubmit").textContent=usePassword?"Sign in":"Email me a sign-in link";
+    $("#loginMode").textContent=usePassword?"Email me a link instead":"Use a password instead";
+    if(usePassword)$("#passwordField").querySelector("input").focus();
+  });
   $("#loginForm").addEventListener("submit",async e=>{
     e.preventDefault();
-    const btn=e.target.querySelector("button");
-    const email=new FormData(e.target).get("email").trim();
-    btn.disabled=true;btn.textContent="Sending…";
-    /* shouldCreateUser:false — this is a closed area. Accounts are created by the webmaster
-       in the Supabase dashboard, so a stranger entering an address gets no link. */
-    const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:false,emailRedirectTo:location.href.split("#")[0]}});
-    btn.disabled=false;btn.textContent="Email me a sign-in link";
-    /* Supabase refuses unknown addresses with "Signups not allowed for otp" — true, but
-       meaningless to a volunteer who mistyped their address. */
-    if(error)return toast(/signups not allowed/i.test(error.message)
-      ?"That address isn't set up as a club editor. Check the spelling, or ask the webmaster to add you."
-      :error.message);
+    const f=new FormData(e.target),email=f.get("email").trim(),btn=$("#loginSubmit"),label=btn.textContent;
+    btn.disabled=true;btn.textContent=usePassword?"Signing in…":"Sending…";
+    const {error}=usePassword
+      ? await sb.auth.signInWithPassword({email,password:f.get("password")})
+      /* shouldCreateUser:false — this is a closed area. Accounts are created by the webmaster
+         in the Supabase dashboard, so a stranger entering an address gets no link. */
+      : await sb.auth.signInWithOtp({email,options:{shouldCreateUser:false,emailRedirectTo:location.href.split("#")[0]}});
+    btn.disabled=false;btn.textContent=label;
+    if(error)return toast(loginErrorMessage(error));
+    if(usePassword)return start();
     $("#adminBody").querySelector(".card").innerHTML=`
       <p class="eyebrow" style="color:var(--ember)">Check your inbox</p>
       <h2 class="display" style="font-size:1.6rem;margin-top:6px">Sign-in link sent</h2>
       <p style="color:var(--muted);font-size:.92rem;margin-top:10px">We've emailed a link to <strong>${esc(email)}</strong>. Open it on this device to sign in. The link expires after an hour.</p>`;
   });
+}
+/* Supabase's own wording is accurate but unhelpful to a volunteer who mistyped an address
+   or asked for one link too many. */
+function loginErrorMessage(error){
+  const m=error.message||"";
+  if(/signups not allowed/i.test(m))return "That address isn't set up as a club editor. Check the spelling, or ask the webmaster to add you.";
+  if(/rate limit|too many/i.test(m))return "Too many sign-in emails in a short time. Wait an hour, or sign in with your password instead.";
+  if(/invalid login credentials/i.test(m))return "That email and password don't match. Try again, or email yourself a sign-in link.";
+  return m;
 }
 
 function renderAdminShell(){
