@@ -389,8 +389,10 @@ if($("#joinLessons")){
 }
 
 /* ================= INIT ================= */
+const CONTENT_SLOTS="#meetsList,#teamMeetsList,#completedMeetsList,#coachesList,#rolesList,#newsList,#ttBody,#socialsList,#compList,#leagueList";
+document.querySelectorAll(CONTENT_SLOTS).forEach(el=>{el.innerHTML=`<p style="color:var(--muted)">Loading…</p>`;});
 loadContent().then(renderAllPublic).catch(e=>{
   console.error("Could not load content",e);
-  document.querySelectorAll("#meetsList,#coachesList,#rolesList,#newsList,#ttBody,#socialsList")
+  document.querySelectorAll(CONTENT_SLOTS)
     .forEach(el=>{el.innerHTML=`<p style="color:var(--muted)">Content couldn't be loaded just now. Please refresh the page.</p>`;});
 });

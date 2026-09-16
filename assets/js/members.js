@@ -161,7 +161,11 @@ function renderLogin(message){
        in the Supabase dashboard, so a stranger entering an address gets no link. */
     const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:false,emailRedirectTo:location.href.split("#")[0]}});
     btn.disabled=false;btn.textContent="Email me a sign-in link";
-    if(error)return toast(error.message);
+    /* Supabase refuses unknown addresses with "Signups not allowed for otp" — true, but
+       meaningless to a volunteer who mistyped their address. */
+    if(error)return toast(/signups not allowed/i.test(error.message)
+      ?"That address isn't set up as a club editor. Check the spelling, or ask the webmaster to add you."
+      :error.message);
     $("#adminBody").querySelector(".card").innerHTML=`
       <p class="eyebrow" style="color:var(--ember)">Check your inbox</p>
       <h2 class="display" style="font-size:1.6rem;margin-top:6px">Sign-in link sent</h2>
