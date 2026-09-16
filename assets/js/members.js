@@ -134,33 +134,45 @@ const SCHEMAS = {
 };
 
 /* ================= ADMIN ================= */
-let session=null; // {roleKey}
+/* session holds the signed-in account's permissions: which sections they may edit, and
+   for the shared feed, which kinds of item. The database enforces the same limits, so a
+   tampered page still cannot write anything this account isn't allowed to. */
+let session=null;
 let adminSection=null, editingId=null;
 
-
-function renderLogin(){
+function renderLogin(message){
   $("#whoAmI").innerHTML="";
   $("#adminBody").innerHTML=`<div class="login-wrap"><div class="card">
     <p class="eyebrow" style="color:var(--ember)">Members' area</p>
-    <h2 class="display" style="font-size:1.8rem;color:#fff;margin-top:6px">Choose your role to log in</h2>
-    <p style="color:var(--muted);font-size:.92rem;margin-top:10px">In the real build each person has their own login tied to a role. In this prototype, just pick a role to see exactly what that person can edit — and nothing else.</p>
-    <div class="role-pick" id="rolePick">
-      ${Object.entries(ROLES).map(([k,r])=>`<button data-role="${k}"><span>${r.label}<br><span class="desc">${r.desc}</span></span><span aria-hidden="true">→</span></button>`).join("")}
-    </div>
+    <h2 class="display" style="font-size:1.8rem;margin-top:6px">Sign in</h2>
+    <p style="color:var(--muted);font-size:.92rem;margin-top:10px">Enter your club email address and we'll send you a sign-in link. There's no password to remember.</p>
+    ${message?`<div class="admin-note" style="margin-top:16px">${esc(message)}</div>`:""}
+    <form class="stack" id="loginForm" style="margin-top:18px">
+      <label class="f">Club email address<input type="email" name="email" required autocomplete="email" placeholder="you@phoenixbasildonsc.org"></label>
+      <div><button class="btn" type="submit">Email me a sign-in link</button></div>
+    </form>
   </div></div>`;
-  $("#rolePick").addEventListener("click",e=>{
-    const b=e.target.closest("button[data-role]"); if(!b)return;
-    session={roleKey:b.dataset.role};
-    adminSection=ROLES[session.roleKey].sections[0];
-    renderAdminShell();
-    toast("Logged in as "+ROLES[session.roleKey].label+" (demo)");
+  $("#loginForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const btn=e.target.querySelector("button");
+    const email=new FormData(e.target).get("email").trim();
+    btn.disabled=true;btn.textContent="Sending…";
+    /* shouldCreateUser:false — this is a closed area. Accounts are created by the webmaster
+       in the Supabase dashboard, so a stranger entering an address gets no link. */
+    const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:false,emailRedirectTo:location.href.split("#")[0]}});
+    btn.disabled=false;btn.textContent="Email me a sign-in link";
+    if(error)return toast(error.message);
+    $("#adminBody").querySelector(".card").innerHTML=`
+      <p class="eyebrow" style="color:var(--ember)">Check your inbox</p>
+      <h2 class="display" style="font-size:1.6rem;margin-top:6px">Sign-in link sent</h2>
+      <p style="color:var(--muted);font-size:.92rem;margin-top:10px">We've emailed a link to <strong>${esc(email)}</strong>. Open it on this device to sign in. The link expires after an hour.</p>`;
   });
 }
 
 function renderAdminShell(){
-  const role=ROLES[session.roleKey];
-  $("#whoAmI").innerHTML=`Signed in as <strong>${role.label}</strong> · <a href="#" id="logout" style="color:var(--muted)">switch role</a>`;
-  $("#logout").addEventListener("click",e=>{e.preventDefault();session=null;renderLogin();});
+  const role=session.role;
+  $("#whoAmI").innerHTML=`Signed in as <strong>${esc(role.label)}</strong> · <a href="#" id="logout" style="color:var(--muted)">sign out</a>`;
+  $("#logout").addEventListener("click",async e=>{e.preventDefault();await sb.auth.signOut();session=null;renderLogin("You've been signed out.");});
   $("#adminBody").innerHTML=`<div class="admin-shell">
     <div class="admin-side">${role.sections.map(s=>`<button data-sec="${s}" class="${s===adminSection?"active":""}">${SECTION_META[s].name}</button>`).join("")}</div>
     <div class="admin-main" id="adminMain"></div></div>`;
@@ -192,7 +204,7 @@ function itemSummary(sec,it){
 }
 function feedItemsForRole(role){return DB.feed.filter(it=>role.feedTypes.includes(it.type));}
 function renderAdminSection(){
-  const main=$("#adminMain"),sec=adminSection,role=ROLES[session.roleKey];
+  const main=$("#adminMain"),sec=adminSection,role=session.role;
   if(sec==="enquiries"){
     main.innerHTML=`<h2>${SECTION_META.enquiries.name}</h2>
       <div class="admin-note">Read-only inbox in this draft. Enquiries submitted through the public <em>Join Us</em> form appear here instantly. In the real build these could also forward to the membership email.</div>
@@ -205,8 +217,8 @@ function renderAdminSection(){
   }
   const items=sec==="feed"?feedItemsForRole(role):DB[sec];
   const note=sec==="feed"&&role.feedTypes.length>1
-    ?"Changes here publish straight to the public page — no webmaster needed. This feed is shared across several types of item; pick the type when you add something new. (Prototype: saved on this device/browser only.)"
-    :"Changes here publish straight to the public page — no webmaster needed. (Prototype: saved on this device/browser only.)";
+    ?"Changes here publish straight to the public page — no webmaster needed. This feed is shared across several types of item; pick the type when you add something new."
+    :"Changes here publish straight to the public page — no webmaster needed.";
   const rowHtml=it=>{const s=itemSummary(sec,it);return `
       <div class="item-block" data-item-block="${it.id}">
       <div class="item-row"><div><div class="t">${esc(s.t)}</div><div class="s">${esc(s.s)}</div></div>
@@ -246,17 +258,37 @@ function renderAdminSection(){
       editingId=null;
       if(!wasOpen)showForm(sec,clickedId);
     }
-    if(del){
-      if(sec==="feed")DB.feed=DB.feed.filter(x=>x.id!==+del.dataset.del);
-      else DB[sec]=DB[sec].filter(x=>x.id!==+del.dataset.del);
-      saveDB();
-      renderAdminShell();toast("Deleted and unpublished");
-    }
+    if(del)deleteItem(sec,+del.dataset.del);
   });
 }
 
+/* Every write goes to the database, then the local copy is reloaded so the list on screen
+   matches what was actually stored (ids, defaults, anything a policy refused). */
+async function publishItem(sec,id,data){
+  const s=SECTIONS[sec];
+  const row=s.to(data);
+  const {error}=id?await sb.from(s.table).update(row).eq("id",id):await sb.from(s.table).insert(row);
+  if(error){toast(saveErrorMessage(error));return false;}
+  await loadContent();
+  renderAdminShell();
+  toast(id?"Saved — live on the public site":"Published to the public site");
+  return true;
+}
+async function deleteItem(sec,id){
+  const {error}=await sb.from(SECTIONS[sec].table).delete().eq("id",id);
+  if(error)return toast(saveErrorMessage(error));
+  await loadContent();
+  renderAdminShell();
+  toast("Deleted and unpublished");
+}
+/* Policy refusals come back as permission errors; say what that means in club terms. */
+function saveErrorMessage(error){
+  const permission=error.code==="42501"||/row-level security|permission/i.test(error.message||"");
+  return permission?"Your account isn't allowed to change that. Ask the webmaster if this looks wrong.":`Couldn't save: ${error.message}`;
+}
+
 function showFeedTypeChooser(){
-  const role=ROLES[session.roleKey];
+  const role=session.role;
   $("#formSlot").innerHTML=`<div class="card" style="margin-top:10px">
     <div class="form-title">What are you adding?</div>
     <div class="role-pick" id="feedTypePick" style="margin-top:12px">
@@ -318,19 +350,17 @@ function showSquadForm(id){
     rows.lastElementChild.querySelector('[data-k="start"]').focus();
   });
   $("#cancelForm").addEventListener("click",()=>{formTarget.innerHTML="";editingId=null;});
-  $("#adminForm").addEventListener("submit",e=>{
+  $("#adminForm").addEventListener("submit",async e=>{
     e.preventDefault();
     const rowEls=[...rows.querySelectorAll("[data-sess]")];
     const sessions=rowEls.map(r=>{const o={};r.querySelectorAll("[data-k]").forEach(i=>o[i.dataset.k]=i.value.trim());return o;});
     const bad=sessions.findIndex(s=>s.end<=s.start);
     if(bad>-1){toast("Each session's end time must be after its start time");rowEls[bad].querySelector('[data-k="end"]').focus();return;}
     const f=new FormData(e.target);
-    const data={name:f.get("name").trim(),lead:f.get("lead").trim(),sessions:sessions.sort(ttSort)};
-    if(id)Object.assign(DB.squads.find(x=>x.id===id),data);
-    else{data.id=nextId++;DB.squads.push(data);}
-    saveDB();
-    renderAdminShell();
-    toast(id?"Saved — live on the public page":"Published to the public page");
+    const submit=e.target.querySelector('button[type="submit"]');
+    submit.disabled=true;
+    await publishItem("squads",id,{name:f.get("name").trim(),lead:f.get("lead").trim(),sessions:sessions.sort(ttSort)});
+    submit.disabled=false;
   });
 }
 
@@ -396,13 +426,20 @@ function showForm(sec,id,forcedType){
     $("#imgUploadInput").addEventListener("change",async e=>{
       const file=e.target.files[0];
       if(!file)return;
+      const label=e.target.closest(".img-upload-btn");
+      const labelText=label.firstChild;
+      const original=labelText.nodeValue;
+      labelText.nodeValue="Uploading…";
       try{
-        imgHidden.value=await compressImage(file);
+        imgHidden.value=await uploadImage(file);
         formTarget.querySelectorAll(".img-swatch").forEach(b=>b.classList.remove("selected"));
         setPreview(imgHidden.value);
-        toast(`Photo ready — resized to ${dataUrlKB(imgHidden.value)}KB`);
+        toast("Photo uploaded");
       }catch(err){
-        toast(err.message);
+        toast(err.message||"Couldn't upload that photo");
+      }finally{
+        labelText.nodeValue=original;
+        e.target.value="";
       }
     });
     $("#imgClearBtn").addEventListener("click",()=>{
@@ -412,26 +449,52 @@ function showForm(sec,id,forcedType){
     });
   }
   $("#cancelForm").addEventListener("click",()=>{formTarget.innerHTML="";editingId=null;});
-  $("#adminForm").addEventListener("submit",e=>{
+  $("#adminForm").addEventListener("submit",async e=>{
     e.preventDefault();
     const data=Object.fromEntries(new FormData(e.target).entries());
     if(sec==="coaches"){data.squads=(data.squadsRaw||"").split(",").map(s=>s.trim()).filter(Boolean);delete data.squadsRaw;}
     if(isFeed)data.type=type;
-    const store=isFeed?DB.feed:DB[sec];
-    if(id){Object.assign(store.find(x=>x.id===id),data);}
-    else{
-      if(sec==="newsDefaults"){
-        let key=slugify(data.label)||"category";
-        let uniq=key,n=2;while(DB.newsDefaults.some(x=>x.key===uniq)){uniq=`${key}-${n++}`;}
-        data.key=uniq;
-        data.bg=NEW_DEFAULT_GRADIENTS[DB.newsDefaults.length%NEW_DEFAULT_GRADIENTS.length];
-      }
-      data.id=nextId++;store.push(data);
+    if(!id&&sec==="newsDefaults"){
+      const base=slugify(data.label)||"category";
+      let uniq=base,n=2;while(DB.newsDefaults.some(x=>x.key===uniq))uniq=`${base}-${n++}`;
+      data.key=uniq;
+      data.bg=NEW_DEFAULT_GRADIENTS[DB.newsDefaults.length%NEW_DEFAULT_GRADIENTS.length];
     }
-    saveDB();
-    renderAdminShell();
-    toast(id?"Saved — live on the public page":"Published to the public page");
+    const submit=e.target.querySelector('button[type="submit"]');
+    submit.disabled=true;
+    await publishItem(sec,id,data);
+    submit.disabled=false;
   });
 }
 
-renderLogin();
+/* Photos go to the shared image store, so every visitor loads the same file rather than a
+   copy embedded in each item. Compressed first — see compressImage in core.js. */
+async function uploadImage(file){
+  const dataUrl=await compressImage(file);
+  const blob=await(await fetch(dataUrl)).blob();
+  const name=`${Date.now()}-${Math.random().toString(36).slice(2,8)}.jpg`;
+  const {error}=await sb.storage.from("site-images").upload(name,blob,{contentType:"image/jpeg",cacheControl:"31536000"});
+  if(error)throw new Error(saveErrorMessage(error));
+  return sb.storage.from("site-images").getPublicUrl(name).data.publicUrl;
+}
+
+/* ================= INIT =================
+   A sign-in link lands back on this page with the session in the URL; supabase-js picks it
+   up, so just ask who is signed in, then match them to their row in the members table. */
+async function start(){
+  const {data:{session:auth}}=await sb.auth.getSession();
+  if(!auth)return renderLogin();
+  const {data:member,error}=await sb.from("members").select("*").ilike("email",auth.user.email).maybeSingle();
+  if(error)return renderLogin(`Couldn't check your account: ${error.message}`);
+  if(!member||!ROLES[member.role]){
+    await sb.auth.signOut();
+    return renderLogin(`${auth.user.email} isn't set up as a club editor yet. Ask the webmaster to add you.`);
+  }
+  const defaults=ROLES[member.role];
+  session={email:member.email,role:{...defaults,label:member.label||defaults.label,feedTypes:member.feed_types||defaults.feedTypes||[]}};
+  adminSection=session.role.sections[0];
+  try{await loadContent();}
+  catch(e){return renderLogin(`Couldn't load the club content: ${e.message}`);}
+  renderAdminShell();
+}
+start();

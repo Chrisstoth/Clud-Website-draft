@@ -369,8 +369,8 @@ $("#burger").addEventListener("click",()=>{
 function submitEnquiry(e,type,detailFn){
   e.preventDefault();
   const f=new FormData(e.target);
-  DB.enquiries.unshift({id:nextId++,parent:f.get("parent"),email:f.get("email"),swimmer:f.get("swimmer"),dob:f.get("dob"),type,detail:detailFn(f),notes:f.get("notes"),received:"Just now"});
-  saveDB();
+  DB.enquiries.unshift({id:Date.now(),parent:f.get("parent"),email:f.get("email"),swimmer:f.get("swimmer"),dob:f.get("dob"),type,detail:detailFn(f),notes:f.get("notes"),received:"Just now"});
+  saveEnquiries();
   e.target.reset();
   toast("Enquiry sent — the membership team will be in touch");
 }
@@ -389,4 +389,8 @@ if($("#joinLessons")){
 }
 
 /* ================= INIT ================= */
-renderAllPublic();
+loadContent().then(renderAllPublic).catch(e=>{
+  console.error("Could not load content",e);
+  document.querySelectorAll("#meetsList,#coachesList,#rolesList,#newsList,#ttBody,#socialsList")
+    .forEach(el=>{el.innerHTML=`<p style="color:var(--muted)">Content couldn't be loaded just now. Please refresh the page.</p>`;});
+});
