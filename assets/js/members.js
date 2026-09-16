@@ -393,16 +393,17 @@ function showForm(sec,id,forcedType){
         setPreview(imgHidden.value);
       });
     });
-    $("#imgUploadInput").addEventListener("change",e=>{
+    $("#imgUploadInput").addEventListener("change",async e=>{
       const file=e.target.files[0];
       if(!file)return;
-      const reader=new FileReader();
-      reader.onload=()=>{
-        imgHidden.value=reader.result;
+      try{
+        imgHidden.value=await compressImage(file);
         formTarget.querySelectorAll(".img-swatch").forEach(b=>b.classList.remove("selected"));
         setPreview(imgHidden.value);
-      };
-      reader.readAsDataURL(file);
+        toast(`Photo ready — resized to ${dataUrlKB(imgHidden.value)}KB`);
+      }catch(err){
+        toast(err.message);
+      }
     });
     $("#imgClearBtn").addEventListener("click",()=>{
       imgHidden.value="";

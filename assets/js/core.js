@@ -90,7 +90,10 @@ let nextId = 100;
 const STORAGE_KEY="bpsc_db_v1";
 function saveDB(){
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify({db:DB,nextId}));}
-  catch(e){console.warn("Could not save to localStorage",e);}
+  catch(e){
+    console.warn("Could not save to localStorage",e);
+    toast("Couldn't save — this browser's storage is full. Try removing an item with a large photo.");
+  }
 }
 function loadDB(){
   try{
@@ -102,6 +105,29 @@ function loadDB(){
   }catch(e){console.warn("Could not load from localStorage",e);}
 }
 loadDB();
+
+/* Photos come off phones at 3–12MB, far larger than any card displays them. Shrinking them
+   on upload keeps pages quick to load and stops one photo filling the whole storage budget.
+   JPEG (not PNG) because these are photographs, and the source may be HEIC/PNG/anything. */
+const IMG_MAX_EDGE=1600, IMG_QUALITY=0.8;
+function compressImage(file){
+  return new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{
+      const scale=Math.min(1,IMG_MAX_EDGE/Math.max(img.width,img.height));
+      const c=document.createElement("canvas");
+      c.width=Math.round(img.width*scale);
+      c.height=Math.round(img.height*scale);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg",IMG_QUALITY));
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("That file couldn't be read as an image"));};
+    img.src=url;
+  });
+}
+const dataUrlKB=s=>Math.round(s.length*0.75/1024);
 
 /* Resolves a news item's img field (real path/data-URL, "default:<key>" token, or empty) into
    a CSS background + optional icon glyph. Shared by the news grid, the hero carousel and the
