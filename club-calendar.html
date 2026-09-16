@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Basildon &amp; Phoenix Swimming Club</title>
-<meta name="description" content="Basildon &amp; Phoenix Swimming Club — Basildon's home of competitive swimming at Basildon Sporting Village, Essex.">
+<title>Club Calendar — Basildon &amp; Phoenix Swimming Club</title>
+<meta name="description" content="League galas, competitions, socials and key training changes at Basildon &amp; Phoenix SC.">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,7 +23,7 @@
 
     <nav class="main" id="mainNav" aria-label="Main">
       <a href="open-meets">Open Meets</a>
-      <a href="club-calendar">Club Calendar</a>
+      <a class="active" aria-current="page" href="club-calendar">Club Calendar</a>
       <div class="nav-dropdown" id="infoDropdown">
         <button type="button" class="nav-dropdown-toggle" id="infoToggle" aria-haspopup="true" aria-expanded="false">Club Info <span class="caret">▾</span></button>
         <div class="nav-dropdown-menu" id="infoMenu">
@@ -61,47 +61,53 @@
 </div>
 
 <main>
-<section class="page" id="page-home">
-  <div class="hero">
-    <div class="container hero-grid">
-      <a class="live-results" href="open-meets"><span class="live-dot"></span>Live Results</a>
-      <div>
-        <p class="eyebrow" style="color:var(--ink)">Basildon Sporting Village · Essex</p>
-        <h1 class="display" id="heroTitle" role="button" tabindex="0" aria-live="polite" style="cursor:pointer" data-text-a="Basildon&rsquo;s home of competitive swimming" data-text-b="A friendly, well-coached swimming club for Basildon &mdash; from first strokes to first races">Basildon&rsquo;s home of competitive swimming</h1>
-        <div class="lane-rope on-dark"></div>
-      </div>
-      <aside class="next-meet" id="nextMeetCard" aria-label="Next Basildon meet"></aside>
+<section class="page" id="page-socials">
+  <div class="container">
+    <div class="page-head">
+      <p class="eyebrow">More than swimming</p>
+      <h2 class="display">Club Calendar</h2>
+      <div class="lane-rope"></div>
+      <p>Everything coming up in one place — league galas, competitions, socials and key training changes. For full meet entry details see Open Meets.</p>
     </div>
-  </div>
-  <div class="hero-photo-strip" id="heroPhotoStrip" aria-roledescription="carousel" aria-label="Club news, swipeable">
-    <div class="hero-carousel-inner">
-      <div class="hero-slides" id="heroSlides"></div>
-      <button class="hero-arrow prev" id="heroPrev" aria-label="Previous story">‹</button>
-      <button class="hero-arrow next" id="heroNext" aria-label="Next story">›</button>
-      <div class="hero-dots" id="heroDots"></div>
-    </div>
-  </div>
-  <div class="hero-bottom-bar"></div>
 
-  <div class="container" style="padding-top:56px">
-    <div class="grid cols-3">
-      <div class="card feature">
-        <p class="eyebrow">Swim with us</p>
-        <h3 class="display" style="font-size:1.35rem;margin-top:6px">Join us</h3>
-        <p style="margin:10px 0 16px;font-size:.95rem">Two routes in: our Academy for swimmers coming through lessons, or a squad trial for competitive swimmers — including transfers from other clubs.</p>
-        <a class="btn small black" href="join">Start here</a>
+    <div class="cal-card">
+      <div class="cal-head">
+        <button class="cal-nav-btn" id="calPrev" aria-label="Previous month">‹</button>
+        <h3 id="calMonthLabel"></h3>
+        <button class="cal-nav-btn" id="calNext" aria-label="Next month">›</button>
       </div>
-      <div class="card">
-        <p class="eyebrow">Racing</p>
-        <h3 class="display" style="font-size:1.35rem;margin-top:6px">Open meets &amp; galas</h3>
-        <p style="margin:10px 0 16px;color:var(--muted);font-size:.95rem">Entry packs, closing dates and results for licensed meets, club championships and Essex League rounds — all in one place.</p>
-        <a class="btn small ghost" href="open-meets">See the calendar</a>
+      <div class="cal-legend">
+        <span><i class="cal-dot comp"></i>Competitions</span>
+        <span><i class="cal-dot league"></i>League galas</span>
+        <span><i class="cal-dot social"></i>Socials</span>
+        <span><i class="cal-dot training"></i>Key training changes</span>
       </div>
-      <div class="card">
-        <p class="eyebrow">Get involved</p>
-        <h3 class="display" style="font-size:1.35rem;margin-top:6px">Volunteer with BPSC</h3>
-        <p style="margin:10px 0 16px;color:var(--muted);font-size:.95rem">Clubs run on volunteers. Timekeeping, officiating, team managing — find a role that fits, with training provided.</p>
-        <a class="btn small ghost" href="volunteering">Explore roles</a>
+      <div class="cal-dow"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+
+    <div class="cat-row-wrap">
+      <h3 class="display">Socials</h3>
+      <div class="cat-row-scroll">
+        <button class="cat-arrow prev" data-row="socialsList" aria-label="Scroll socials left">‹</button>
+        <div class="cat-row" id="socialsList"></div>
+        <button class="cat-arrow next" data-row="socialsList" aria-label="Scroll socials right">›</button>
+      </div>
+    </div>
+    <div class="cat-row-wrap">
+      <h3 class="display">Competitions</h3>
+      <div class="cat-row-scroll">
+        <button class="cat-arrow prev" data-row="compList" aria-label="Scroll competitions left">‹</button>
+        <div class="cat-row" id="compList"></div>
+        <button class="cat-arrow next" data-row="compList" aria-label="Scroll competitions right">›</button>
+      </div>
+    </div>
+    <div class="cat-row-wrap">
+      <h3 class="display">League Galas</h3>
+      <div class="cat-row-scroll">
+        <button class="cat-arrow prev" data-row="leagueList" aria-label="Scroll league galas left">‹</button>
+        <div class="cat-row" id="leagueList"></div>
+        <button class="cat-arrow next" data-row="leagueList" aria-label="Scroll league galas right">›</button>
       </div>
     </div>
   </div>

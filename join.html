@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Basildon &amp; Phoenix Swimming Club</title>
-<meta name="description" content="Basildon &amp; Phoenix Swimming Club — Basildon's home of competitive swimming at Basildon Sporting Village, Essex.">
+<title>Join Us — Basildon &amp; Phoenix Swimming Club</title>
+<meta name="description" content="Join Basildon &amp; Phoenix SC — Academy entry from swim lessons or a squad trial for competitive swimmers.">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,7 +38,7 @@
         </div>
       </div>
       <a href="welfare">Welfare</a>
-      <a href="join" class="cta">Join Us</a>
+      <a href="join" class="cta active" aria-current="page">Join Us</a>
     </nav>
     <div class="nav-cta">
       <button class="theme-toggle" id="themeToggle" title="Switch theme" aria-label="Switch between light and dark theme" aria-pressed="true">
@@ -61,49 +61,63 @@
 </div>
 
 <main>
-<section class="page" id="page-home">
-  <div class="hero">
-    <div class="container hero-grid">
-      <a class="live-results" href="open-meets"><span class="live-dot"></span>Live Results</a>
-      <div>
-        <p class="eyebrow" style="color:var(--ink)">Basildon Sporting Village · Essex</p>
-        <h1 class="display" id="heroTitle" role="button" tabindex="0" aria-live="polite" style="cursor:pointer" data-text-a="Basildon&rsquo;s home of competitive swimming" data-text-b="A friendly, well-coached swimming club for Basildon &mdash; from first strokes to first races">Basildon&rsquo;s home of competitive swimming</h1>
-        <div class="lane-rope on-dark"></div>
-      </div>
-      <aside class="next-meet" id="nextMeetCard" aria-label="Next Basildon meet"></aside>
+<section class="page" id="page-join">
+  <div class="container">
+    <div class="page-head">
+      <p class="eyebrow">Start here</p>
+      <h2 class="display">Join Us</h2>
+      <div class="lane-rope"></div>
+      <p>There are two routes into the club. Pick the one that fits your swimmer and our membership team will get back to you about next steps.</p>
     </div>
-  </div>
-  <div class="hero-photo-strip" id="heroPhotoStrip" aria-roledescription="carousel" aria-label="Club news, swipeable">
-    <div class="hero-carousel-inner">
-      <div class="hero-slides" id="heroSlides"></div>
-      <button class="hero-arrow prev" id="heroPrev" aria-label="Previous story">‹</button>
-      <button class="hero-arrow next" id="heroNext" aria-label="Next story">›</button>
-      <div class="hero-dots" id="heroDots"></div>
+    <div class="grid cols-2" style="max-width:820px;margin-bottom:30px">
+      <button class="card path-card" data-path="lessons" type="button">
+        <p class="eyebrow">Coming through lessons</p>
+        <h3 class="display" style="font-size:1.25rem;margin-top:6px">Academy (swim lesson stage)</h3>
+        <p style="margin-top:10px;color:var(--muted);font-size:.93rem">For swimmers currently in a learn-to-swim programme, ready to move into club swimming through our Academy hat groups.</p>
+      </button>
+      <button class="card path-card" data-path="competitive" type="button">
+        <p class="eyebrow">Already competing</p>
+        <h3 class="display" style="font-size:1.25rem;margin-top:6px">Competitive swimmer</h3>
+        <p style="margin-top:10px;color:var(--muted);font-size:.93rem">For swimmers with club experience — including transfers — looking to trial for one of our competitive squads.</p>
+      </button>
     </div>
-  </div>
-  <div class="hero-bottom-bar"></div>
 
-  <div class="container" style="padding-top:56px">
-    <div class="grid cols-3">
-      <div class="card feature">
-        <p class="eyebrow">Swim with us</p>
-        <h3 class="display" style="font-size:1.35rem;margin-top:6px">Join us</h3>
-        <p style="margin:10px 0 16px;font-size:.95rem">Two routes in: our Academy for swimmers coming through lessons, or a squad trial for competitive swimmers — including transfers from other clubs.</p>
-        <a class="btn small black" href="join">Start here</a>
-      </div>
-      <div class="card">
-        <p class="eyebrow">Racing</p>
-        <h3 class="display" style="font-size:1.35rem;margin-top:6px">Open meets &amp; galas</h3>
-        <p style="margin:10px 0 16px;color:var(--muted);font-size:.95rem">Entry packs, closing dates and results for licensed meets, club championships and Essex League rounds — all in one place.</p>
-        <a class="btn small ghost" href="open-meets">See the calendar</a>
-      </div>
-      <div class="card">
-        <p class="eyebrow">Get involved</p>
-        <h3 class="display" style="font-size:1.35rem;margin-top:6px">Volunteer with BPSC</h3>
-        <p style="margin:10px 0 16px;color:var(--muted);font-size:.95rem">Clubs run on volunteers. Timekeeping, officiating, team managing — find a role that fits, with training provided.</p>
-        <a class="btn small ghost" href="volunteering">Explore roles</a>
-      </div>
-    </div>
+    <form class="stack join-form" id="joinLessons" hidden>
+      <div class="form-title" style="font-weight:800">Academy enquiry — swim lesson stage</div>
+      <label class="f">Parent / guardian name<input required name="parent" autocomplete="name"></label>
+      <label class="f">Email<input required type="email" name="email" autocomplete="email"></label>
+      <label class="f">Swimmer's name<input required name="swimmer"></label>
+      <label class="f">Swimmer's date of birth<input required type="date" name="dob"></label>
+      <label class="f">Current swim lesson stage
+        <select name="stage">
+          <option>Stage 5</option><option selected>Stage 6</option><option>Stage 7</option>
+          <option>Stage 8</option><option>Stage 9</option><option>Stage 10</option>
+        </select>
+      </label>
+      <p class="hint">Stage 6 is the realistic minimum for the Academy — and the older the swimmer, the higher the stage we'd expect them to be at. The Academy takes swimmers up to <strong>12 years old</strong>; older swimmers are trialled directly for our other squads instead, so do still get in touch.</p>
+      <label class="f">Anything else we should know? <textarea name="notes" rows="3" placeholder="Where they swim now, availability…"></textarea></label>
+      <div><button class="btn" type="submit">Send enquiry</button></div>
+    </form>
+
+    <form class="stack join-form" id="joinCompetitive" hidden>
+      <div class="form-title" style="font-weight:800">Squad trial enquiry — competitive swimmer</div>
+      <label class="f">Parent / guardian name<input required name="parent" autocomplete="name"></label>
+      <label class="f">Email<input required type="email" name="email" autocomplete="email"></label>
+      <label class="f">Swimmer's name<input required name="swimmer"></label>
+      <label class="f">Swimmer's date of birth<input required type="date" name="dob"></label>
+      <label class="f">Swim England number (SE No.)<input required name="seNo" placeholder="e.g. 1234567" inputmode="numeric"></label>
+      <label class="f">Current level
+        <select name="level">
+          <option>Club / fitness</option>
+          <option>County</option>
+          <option>Regional</option>
+          <option>National</option>
+        </select>
+      </label>
+      <label class="f">Anything else we should know? <textarea name="notes" rows="3" placeholder="Current club, best events &amp; times, availability…"></textarea></label>
+      <div><button class="btn" type="submit">Send enquiry</button></div>
+    </form>
+    <p class="hint" id="joinHint">In this draft, enquiries land in the Membership team's inbox in the members' area — try it, then log in as Membership to see it arrive.</p>
   </div>
 </section>
 </main>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Members' Area — Basildon &amp; Phoenix Swimming Club</title>
+<meta name="description" content="Members' area for Basildon &amp; Phoenix SC volunteers.">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body class="theme-dark">
+<script>try{if(localStorage.getItem("bpsc_theme")==="light")document.body.classList.remove("theme-dark")}catch(e){}</script>
+<div id="admin" role="dialog" aria-label="Members area">
+  <div class="admin-top">
+    <a class="brand" href="#" onclick="return false" style="pointer-events:none">
+      <span class="name">Members' Area <small style="color:var(--ember)">Role-based editing · prototype</small></span>
+    </a>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span class="who" id="whoAmI"></span>
+      <button class="theme-toggle" title="Switch theme" aria-label="Switch between light and dark theme" aria-pressed="true">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+      </button>
+      <a class="btn small ghost" href="./">Back to site</a>
+    </div>
+  </div>
+  <div id="adminBody"></div>
+</div>
+
+<div id="toast" role="status"></div>
+<script src="assets/js/core.js"></script>
+<script src="assets/js/members.js"></script>
+</body>
+</html>

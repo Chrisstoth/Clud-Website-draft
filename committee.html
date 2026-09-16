@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Basildon &amp; Phoenix Swimming Club</title>
-<meta name="description" content="Basildon &amp; Phoenix Swimming Club — Basildon's home of competitive swimming at Basildon Sporting Village, Essex.">
+<title>Club Committee — Basildon &amp; Phoenix Swimming Club</title>
+<meta name="description" content="The volunteer committee that runs Basildon &amp; Phoenix Swimming Club.">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,11 +25,11 @@
       <a href="open-meets">Open Meets</a>
       <a href="club-calendar">Club Calendar</a>
       <div class="nav-dropdown" id="infoDropdown">
-        <button type="button" class="nav-dropdown-toggle" id="infoToggle" aria-haspopup="true" aria-expanded="false">Club Info <span class="caret">▾</span></button>
+        <button type="button" class="nav-dropdown-toggle active" id="infoToggle" aria-haspopup="true" aria-expanded="false">Club Info <span class="caret">▾</span></button>
         <div class="nav-dropdown-menu" id="infoMenu">
           <a href="coaches">Coaches &amp; Squads</a>
           <a href="timetables">Squad Timetables</a>
-          <a href="committee">Club Committee</a>
+          <a class="active" aria-current="page" href="committee">Club Committee</a>
           <a href="volunteering">Volunteering</a>
           <a href="policies">Club Policies</a>
           <a href="history">Mission &amp; Club History</a>
@@ -61,49 +61,23 @@
 </div>
 
 <main>
-<section class="page" id="page-home">
-  <div class="hero">
-    <div class="container hero-grid">
-      <a class="live-results" href="open-meets"><span class="live-dot"></span>Live Results</a>
-      <div>
-        <p class="eyebrow" style="color:var(--ink)">Basildon Sporting Village · Essex</p>
-        <h1 class="display" id="heroTitle" role="button" tabindex="0" aria-live="polite" style="cursor:pointer" data-text-a="Basildon&rsquo;s home of competitive swimming" data-text-b="A friendly, well-coached swimming club for Basildon &mdash; from first strokes to first races">Basildon&rsquo;s home of competitive swimming</h1>
-        <div class="lane-rope on-dark"></div>
-      </div>
-      <aside class="next-meet" id="nextMeetCard" aria-label="Next Basildon meet"></aside>
+<section class="page" id="page-info-committee">
+  <div class="container">
+    <div class="page-head">
+      <p class="eyebrow">Who runs the club</p>
+      <h2 class="display">Club Committee</h2>
+      <div class="lane-rope"></div>
+      <p>BPSC is run by volunteers elected at the AGM. (Placeholder roster below — replace with the current committee.)</p>
     </div>
-  </div>
-  <div class="hero-photo-strip" id="heroPhotoStrip" aria-roledescription="carousel" aria-label="Club news, swipeable">
-    <div class="hero-carousel-inner">
-      <div class="hero-slides" id="heroSlides"></div>
-      <button class="hero-arrow prev" id="heroPrev" aria-label="Previous story">‹</button>
-      <button class="hero-arrow next" id="heroNext" aria-label="Next story">›</button>
-      <div class="hero-dots" id="heroDots"></div>
-    </div>
-  </div>
-  <div class="hero-bottom-bar"></div>
-
-  <div class="container" style="padding-top:56px">
     <div class="grid cols-3">
-      <div class="card feature">
-        <p class="eyebrow">Swim with us</p>
-        <h3 class="display" style="font-size:1.35rem;margin-top:6px">Join us</h3>
-        <p style="margin:10px 0 16px;font-size:.95rem">Two routes in: our Academy for swimmers coming through lessons, or a squad trial for competitive swimmers — including transfers from other clubs.</p>
-        <a class="btn small black" href="join">Start here</a>
-      </div>
-      <div class="card">
-        <p class="eyebrow">Racing</p>
-        <h3 class="display" style="font-size:1.35rem;margin-top:6px">Open meets &amp; galas</h3>
-        <p style="margin:10px 0 16px;color:var(--muted);font-size:.95rem">Entry packs, closing dates and results for licensed meets, club championships and Essex League rounds — all in one place.</p>
-        <a class="btn small ghost" href="open-meets">See the calendar</a>
-      </div>
-      <div class="card">
-        <p class="eyebrow">Get involved</p>
-        <h3 class="display" style="font-size:1.35rem;margin-top:6px">Volunteer with BPSC</h3>
-        <p style="margin:10px 0 16px;color:var(--muted);font-size:.95rem">Clubs run on volunteers. Timekeeping, officiating, team managing — find a role that fits, with training provided.</p>
-        <a class="btn small ghost" href="volunteering">Explore roles</a>
-      </div>
+      <div class="card"><h3 style="font-size:1rem">Chair</h3><p style="color:var(--muted);font-size:.9rem;margin-top:4px">Vacant — TBC</p></div>
+      <div class="card"><h3 style="font-size:1rem">Secretary</h3><p style="color:var(--muted);font-size:.9rem;margin-top:4px">Vacant — TBC</p></div>
+      <div class="card"><h3 style="font-size:1rem">Treasurer</h3><p style="color:var(--muted);font-size:.9rem;margin-top:4px">Vacant — TBC</p></div>
+      <div class="card"><h3 style="font-size:1rem">Membership Secretary</h3><p style="color:var(--muted);font-size:.9rem;margin-top:4px">Vacant — TBC</p></div>
+      <div class="card"><h3 style="font-size:1rem">Welfare Officer</h3><p style="color:var(--muted);font-size:.9rem;margin-top:4px">See the <a href="welfare">Welfare</a> page</p></div>
+      <div class="card"><h3 style="font-size:1rem">Volunteer Coordinator</h3><p style="color:var(--muted);font-size:.9rem;margin-top:4px">Vacant — TBC</p></div>
     </div>
+    <p class="hint" style="margin-top:14px">Club constitution and AGM minutes — links to come.</p>
   </div>
 </section>
 </main>
