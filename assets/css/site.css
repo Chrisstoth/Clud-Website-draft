@@ -385,7 +385,11 @@ section.page{padding:52px 0 72px}
 .pill.level::before{background:var(--ink)}
 
 /* meets */
-.meet{display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:18px}
+/* align-items:start -- without it, CSS Grid's default stretch makes the short .datebox column
+   match the row's full height (set by .meet-main's often-much-taller content: pills, title,
+   venue, notes, closing date, accordion), so the date badge and its own text end up stretched
+   or vertically centred down a tall dark column instead of sitting compactly at the top. */
+.meet{display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:18px;align-items:start}
 .meets-heading{font-size:1.4rem;margin:0 0 14px}
 .meets-heading:not(:first-of-type){margin-top:44px}
 .meets-sub{color:var(--muted);font-size:.92rem;margin:-6px 0 14px;max-width:70ch}
@@ -448,9 +452,10 @@ body.theme-dark .meet.ours .datebox .m{color:#3a1c00}
    = --slant-ratio), just drawn directly with clip-path rather than a skewed fill -- there's no
    room on a card this size for the padding a skewX fill would need to stay legible.
    .meet uses ::after (its ::before is already the entries-open glow); the calendar cards use
-   ::before since they already spend ::after on their own skewed fill (see above). */
+   ::before purely by convention (comp-card/social-card own ::after too, but keep the flag off
+   it in case it's ever needed elsewhere). */
 @media(max-width:640px){
-  .meet,.comp-card,.social-card{position:relative}
+  .meet{position:relative}
   .meet::after,.comp-card::before,.social-card::before{
     content:"";position:absolute;top:0;left:0;z-index:1;width:18px;height:50px;
     background:linear-gradient(180deg,var(--flame),var(--flame-dark));
@@ -520,41 +525,31 @@ body.theme-dark .meet.ours .datebox .m{color:#3a1c00}
 .cat-row::-webkit-scrollbar{display:none}
 .cat-row>*{flex:0 0 300px}
 
-/* the homepage's card shape, carried onto the calendar: a solid panel behind the content
-   leans at the site's one --slant-deg (same technique as .pointed-card/.next-meet — only the
-   ::after fill skews, the real text stays upright in normal flow, protected by side padding
-   sized to the card's own min-height so the lean matches --slant-ratio). Uses ::after (not
-   ::before) because .entries-open already owns ::before for its glow ring on these same cards;
-   z-index keeps both behind the real content, fill furthest back so it never paints over the
-   glow. Photos (.social-card .art) are never inside the skewed layer -- transforms would
-   distort a photo -- so they stay plain rectangles inset within the padding instead. */
+/* the homepage's card shape, carried onto the calendar: the card's own box is clipped to a
+   parallelogram at the site's one --slant-deg, rather than an inner layer skewing behind a
+   still-rectangular box -- clip-path removes the corner the skewX version left behind (which
+   showed the page background through as an odd notch), and it means a border/box-shadow put on
+   the card itself (e.g. .entries-open below) automatically hugs the real, visible edge instead
+   of tracing a rectangle around a leaning shape. --lean is a fixed px, not computed from the
+   element's live height, because clip-path can't reference layout the way a transform can --
+   it's tuned to this card's own min-height. Side padding clears the cut corners; a photo
+   (.social-card .art) sits well inside that padding, so it's never itself clipped. */
 .comp-card,.social-card{
-  position:relative;z-index:0;background:none;border:none;box-shadow:none;border-radius:0;
-  min-height:190px;padding:22px 62px;display:flex;flex-direction:column;gap:8px;
+  --lean:66px;position:relative;z-index:0;
+  background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:0;
+  clip-path:polygon(var(--lean) 0,100% 0,calc(100% - var(--lean)) 100%,0 100%);
+  min-height:190px;padding:22px 72px;display:flex;flex-direction:column;gap:8px;
 }
-.comp-card::after,.social-card::after{
-  content:"";position:absolute;inset:0;z-index:-2;background:var(--card);
-  border:1px solid var(--line);box-shadow:var(--shadow);
-  transform:skewX(calc(-1 * var(--slant-deg)));
-}
-/* our own hosted meets get a warm tint on the fill so they read as "ours" even scrolled past
-   quickly -- paired with the .pill.hosted ribbon (added inside .comp-top by site.js) */
-.comp-card.ours::after{background:linear-gradient(160deg,rgba(245,132,31,.14),var(--card) 55%)}
-body.theme-dark .comp-card.ours::after{background:linear-gradient(160deg,rgba(245,132,31,.22),var(--card) 55%)}
-/* .entries-open's border/glow are built for a rectangular box (the meet cards on Open Meets
-   still use them as-is); here the real box stays a plain rectangle while the visible shape is
-   the skewed ::after, so the border has to move onto that same skewed layer to trace the
-   actual parallelogram instead of drawing a rectangle around a leaning card. The animated
-   conic trace assumes rectangular geometry too, so it's dropped here in favour of a steady
-   flame border + glow -- the .meet cards keep the full animated version. Its own ::before is
-   never touched by the entries-open rule above (see the :not(.comp-card) there), so the mobile
-   corner flag below still shows on entries-open cards too. */
-.comp-card.entries-open{border:none;box-shadow:none}
-.comp-card.entries-open::after{border:2px solid var(--flame);box-shadow:0 0 0 1px rgba(245,132,31,.15),0 0 14px rgba(245,132,31,.35)}
+/* our own hosted meets get a warm tint so they read as "ours" even scrolled past quickly --
+   paired with the .pill.hosted ribbon (added inside .comp-top by site.js) */
+.comp-card.ours{background:linear-gradient(160deg,rgba(245,132,31,.14),var(--card) 55%)}
+body.theme-dark .comp-card.ours{background:linear-gradient(160deg,rgba(245,132,31,.22),var(--card) 55%)}
+/* the .meet cards on Open Meets keep the full animated conic-trace glow (see :not(.comp-card)
+   above); here a steady flame border + glow is enough, and it now traces the clipped shape. */
+.comp-card.entries-open{border:2px solid var(--flame);box-shadow:0 0 0 1px rgba(245,132,31,.15),0 0 14px rgba(245,132,31,.35)}
 @media(max-width:640px){
   .cat-row>*{flex:0 0 260px}
-  .comp-card,.social-card{padding:18px 20px;min-height:0}
-  .comp-card::after,.social-card::after{transform:none;border-radius:var(--radius)}
+  .comp-card,.social-card{padding:18px 20px;min-height:0;clip-path:none;border-radius:var(--radius)}
 }
 .cat-arrow{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.92);backdrop-filter:blur(4px);border:1px solid var(--line);color:var(--ink);font-size:1.3rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(16,16,20,.16);z-index:2;padding:0;transition:opacity .2s,background .2s,border-color .2s}
 .cat-arrow:hover{background:#fff;border-color:var(--flame);color:var(--flame-dark)}
