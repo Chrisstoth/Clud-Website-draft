@@ -3,14 +3,18 @@ const meetHasEntry=m=>m.type!=="teamMeet"&&!meetDone(m)&&m.status==="open"&&!!m.
 function renderMeets(){
   const all=DB.feed.filter(isMeet).sort((a,b)=>a.start<b.start?-1:1);
   const upcoming=all.filter(m=>!meetDone(m)),completed=all.filter(meetDone).reverse();
+  /* BPSC-hosted galas get their own section, first, on Open Meets -- meets we're just entering
+     stay in date order below rather than interleaved, so an urgent external closing date is
+     still easy to spot without our own galas getting lost among them. */
   const upcomingOpen=upcoming.filter(m=>m.type!=="teamMeet"),upcomingTeam=upcoming.filter(m=>m.type==="teamMeet");
+  const upcomingOurs=upcomingOpen.filter(m=>m.type==="meet"),upcomingOthers=upcomingOpen.filter(m=>m.type==="externalMeet");
   const extLink=(url,label,cls="big ghost")=>`<a class="btn ${cls}" href="${esc(url)}" target="_blank" rel="noopener">${label}</a>`;
   const meetCard=m=>{
-    const done=meetDone(m),team=m.type==="teamMeet";
+    const done=meetDone(m),team=m.type==="teamMeet",ours=m.type==="meet";
     const dp=dateParts(m.start);
     const pills=[
       done?'<span class="pill closed">Completed</span>':team?"":m.status==="open"?'<span class="pill open">Entries open</span>':'<span class="pill closed">Entries closed</span>',
-      team?`<span class="pill results">${esc(m.league||"Team meet")}</span>`:m.type==="meet"?'<span class="pill results">BPSC hosted</span>':"",
+      team?`<span class="pill results">${esc(m.league||"Team meet")}</span>`:ours?'<span class="pill hosted">BPSC hosted</span>':"",
       m.level&&!team?`<span class="pill level">${esc(m.level)}</span>`:""
     ].join("");
     let actions;
@@ -28,7 +32,7 @@ function renderMeets(){
     ].filter(Boolean).map(line=>`<div class="link-line">${line}</div>`).join("");
     const r=resolveNewsImage(m.img);
     const thumb=r?`<div class="news-thumb" style="background:${r.css}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
-    return `<article class="card meet${done?" done":""}${meetHasEntry(m)?" entries-open":""}">
+    return `<article class="card meet${done?" done":""}${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
       ${thumb}
       <div class="datebox"><div class="d">${dp.d}</div><div class="m">${dp.m}</div></div>
       <div class="meet-main">
@@ -44,7 +48,8 @@ function renderMeets(){
       ${actions?`<div class="meet-actions">${actions}</div>`:""}</article>`;
   };
   if($("#meetsList")){
-    $("#meetsList").innerHTML=upcomingOpen.length?upcomingOpen.map(meetCard).join(""):`<p style="color:var(--muted)">No upcoming open meets yet — check back soon.</p>`;
+    $("#meetsList").innerHTML=upcomingOurs.length?upcomingOurs.map(meetCard).join(""):`<p style="color:var(--muted)">No Basildon-hosted galas confirmed yet — check back soon.</p>`;
+    $("#otherMeetsList").innerHTML=upcomingOthers.length?upcomingOthers.map(meetCard).join(""):`<p style="color:var(--muted)">No other open meets listed yet.</p>`;
     $("#teamMeetsList").innerHTML=upcomingTeam.length?upcomingTeam.map(meetCard).join(""):`<p style="color:var(--muted)">No team meets scheduled yet.</p>`;
     $("#completedMeetsList").innerHTML=completed.length?completed.map(meetCard).join(""):`<p style="color:var(--muted)">No completed galas yet.</p>`;
   }
@@ -183,12 +188,13 @@ function renderCalendarGrid(){
 }
 /* Compact calendar card: date + title share the top line; open entries get a pulsing orange edge instead of a pill. */
 function meetRowCard(m){
-  const dp=dateParts(m.start),open=m.status==="open";
-  return `<article class="card comp-card${meetHasEntry(m)?" entries-open":""}">
+  const dp=dateParts(m.start),open=m.status==="open",ours=m.type==="meet";
+  return `<article class="card comp-card${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
     <div class="comp-top">
       <div class="comp-date"><span class="d">${dp.d}</span><span class="m">${dp.m}</span></div>
       <h3>${esc(m.title)}</h3>
     </div>
+    ${ours?'<div><span class="pill hosted">BPSC hosted</span></div>':""}
     <div class="comp-meta">${esc(m.venue||"Venue TBC")}${m.poolType?` · ${esc(m.poolType)}`:""}</div>
     <div class="comp-foot">
       <span class="comp-status">${m.type==="teamMeet"?esc(m.league||"Team meet"):meetHasEntry(m)?"":open?"Entry pack soon":"Entries closed"}</span>
@@ -425,7 +431,7 @@ if($("#joinLessons")){
 }
 
 /* ================= INIT ================= */
-const CONTENT_SLOTS="#meetsList,#teamMeetsList,#completedMeetsList,#coachesList,#rolesList,#newsList,#ttBody,#socialsList,#compList,#leagueList";
+const CONTENT_SLOTS="#meetsList,#otherMeetsList,#teamMeetsList,#completedMeetsList,#coachesList,#rolesList,#newsList,#ttBody,#socialsList,#compList,#leagueList";
 document.querySelectorAll(CONTENT_SLOTS).forEach(el=>{el.innerHTML=`<p style="color:var(--muted)">Loading…</p>`;});
 loadContent().then(renderAllPublic).catch(e=>{
   console.error("Could not load content",e);

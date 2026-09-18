@@ -345,11 +345,20 @@ section.page{padding:52px 0 72px}
   .pointed-card::before{transform:none;border-radius:4px;border:1px solid var(--line);box-shadow:var(--shadow)}
   .pointed-card.feature::before{border-color:var(--flame)}
 }
-.pill{display:inline-block;font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:4px 10px;border-radius:999px}
-.pill.open{background:#e6f4ec;color:var(--ok)}
-.pill.closed{background:#f2f2f0;color:var(--muted)}
-.pill.results{background:#fdeee2;color:var(--flame-dark)}
-.pill.level{background:var(--ink);color:#fff}
+/* Every small status badge is a slanted ribbon rather than a rounded pill -- at this size the
+   true --slant-deg angle costs nothing (a few px), so it's the one card-adjacent element that
+   can carry the lean at any screen width, phones included. Same ::before-fill technique as the
+   bigger skewed shapes: the fill leans, the label text stays upright. */
+.pill{position:relative;z-index:0;display:inline-block;font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:4px 12px}
+.pill::before{content:"";position:absolute;inset:0;z-index:-1;transform:skewX(calc(-1 * var(--slant-deg)))}
+.pill.open{color:var(--ok)}
+.pill.open::before{background:#e6f4ec}
+.pill.closed{color:var(--muted)}
+.pill.closed::before{background:#f2f2f0}
+.pill.results{color:var(--flame-dark)}
+.pill.results::before{background:#fdeee2}
+.pill.level{color:#fff}
+.pill.level::before{background:var(--ink)}
 
 /* meets */
 .meet{display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:18px}
@@ -376,13 +385,15 @@ section.page{padding:52px 0 72px}
 .comp-date .m{font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ember);margin-top:3px}
 .comp-top h3{font-size:1rem;line-height:1.25;font-weight:800}
 .comp-meta{font-size:.84rem;color:var(--muted)}
-.comp-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:auto;font-size:.84rem;font-weight:700}
+.comp-foot{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 10px;margin-top:auto;font-size:.84rem;font-weight:700}
 .comp-status{color:var(--muted);font-weight:600}
 .comp-foot a{text-decoration:none;white-space:nowrap}
 @property --trace{syntax:'<angle>';initial-value:0deg;inherits:false}
 /* open entries (calendar competition cards + Open Meets page): orange edge with a highlight tracing round it every 3s */
 .entries-open{position:relative;border:2px solid var(--flame);box-shadow:0 0 0 1px rgba(245,132,31,.15),0 0 14px rgba(245,132,31,.35)}
-.entries-open::before{content:"";position:absolute;inset:-2px;border-radius:inherit;padding:3px;pointer-events:none;
+/* :not(.comp-card) -- comp-card spends its own ::before on the mobile corner flag (see below),
+   and gives entries-open a steady border+glow on ::after instead (see the comp-card rules) */
+.entries-open:not(.comp-card)::before{content:"";position:absolute;inset:-2px;z-index:-1;border-radius:inherit;padding:3px;pointer-events:none;
   background:conic-gradient(from var(--trace),transparent 0deg 290deg,var(--flame) 335deg,#ffe2bd 356deg,transparent 360deg);
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
   mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
@@ -391,6 +402,14 @@ section.page{padding:52px 0 72px}
 .meet .datebox{background:var(--ink);color:#fff;border-radius:12px;text-align:center;padding:12px 6px;height:fit-content}
 .meet .datebox .d{font-family:'Montserrat',sans-serif;font-weight:700;font-size:1.9rem;line-height:1}
 .meet .datebox .m{font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ember);margin-top:3px}
+/* BPSC-hosted galas (as opposed to meets we just attend): the date badge takes the brand
+   colour instead of ink, and the "BPSC hosted" pill becomes a small skewed ribbon -- same
+   --slant-deg accent as the eyebrow tabs, sized small enough that the angle costs nothing. */
+.meet.ours .datebox{background:linear-gradient(150deg,var(--flame) 0%,var(--flame-dark) 100%)}
+.meet.ours .datebox .m{color:#3a1c00}
+.pill.hosted{color:#fff}
+.pill.hosted::before{background:linear-gradient(100deg,var(--flame) 0%,var(--flame-dark) 100%)}
+body.theme-dark .meet.ours .datebox .m{color:#3a1c00}
 .meet h3{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.35rem;line-height:1.15;margin:6px 0 4px;letter-spacing:-.01em}
 .meet .venue{color:var(--muted);font-size:.94rem}
 .meet .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -398,6 +417,23 @@ section.page{padding:52px 0 72px}
 .meet .closing{font-size:.88rem;color:var(--muted);margin-top:10px}
 .meet .closing strong{color:var(--text)}
 @media(max-width:520px){.meet{grid-template-columns:58px minmax(0,1fr);gap:14px}.meet .datebox{padding:9px 4px}.meet .datebox .d{font-size:1.4rem}.meet h3{font-size:1.15rem}}
+/* Mobile corner flag: once a card flattens to a plain rectangle (too tall to skew the whole
+   shape without eating the readable width -- see .pointed-card above), the lean survives as a
+   small triangular flame flag in the top-left corner instead. Its two short edges are sized so
+   the diagonal lands on the exact same --slant-deg as every skewed shape elsewhere (edge ratio
+   = --slant-ratio), just drawn directly with clip-path rather than a skewed fill -- there's no
+   room on a card this size for the padding a skewX fill would need to stay legible.
+   .meet uses ::after (its ::before is already the entries-open glow); the calendar cards use
+   ::before since they already spend ::after on their own skewed fill (see above). */
+@media(max-width:640px){
+  .meet,.comp-card,.social-card{position:relative}
+  .meet::after,.comp-card::before,.social-card::before{
+    content:"";position:absolute;top:0;left:0;z-index:1;width:18px;height:50px;
+    background:linear-gradient(180deg,var(--flame),var(--flame-dark));
+    clip-path:polygon(0 0,100% 0,0 100%);pointer-events:none;
+  }
+  .meet.ours::after{width:26px;height:64px}
+}
 
 /* coaches */
 .coach{text-align:left}
@@ -417,9 +453,9 @@ section.page{padding:52px 0 72px}
 .role-card p{font-size:.95rem;color:var(--body2)}
 
 /* socials */
-.social-card{padding:0;overflow:hidden;display:flex;flex-direction:column}
-.social-card .art{height:130px;display:flex;align-items:flex-end;padding:14px;color:#fff;font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.35rem;letter-spacing:-.01em;line-height:1;text-shadow:0 1px 6px rgba(0,0,0,.35)}
-.social-card .body{padding:18px 20px 20px;display:flex;flex-direction:column;gap:10px;flex:1}
+.social-card{display:flex;flex-direction:column}
+.social-card .art{height:110px;border-radius:9px;margin:0 0 14px;display:flex;align-items:flex-end;padding:12px;color:#fff;font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.2rem;letter-spacing:-.01em;line-height:1.15;text-shadow:0 1px 6px rgba(0,0,0,.35)}
+.social-card .body{padding:0;display:flex;flex-direction:column;gap:10px;flex:1}
 .social-card .when{font-weight:700;color:var(--flame-dark);font-size:.9rem;text-transform:uppercase;letter-spacing:.06em}
 .social-card p{font-size:.94rem;color:var(--body2);flex:1}
 
@@ -449,11 +485,53 @@ section.page{padding:52px 0 72px}
 
 /* club calendar category rows */
 .cat-row-wrap{margin-top:34px}
-.cat-row-wrap h3{font-size:1.2rem}
+.cat-row-wrap h3{font-size:1.2rem;position:relative;padding-left:16px}
+/* the same tick the nav dropdown and partner strip use to mark a section start, at the one
+   site-wide --slant-deg -- cheap on a 4px-wide element, so it stays true even where a whole
+   card can't afford to */
+.cat-row-wrap h3::before{content:"";position:absolute;left:0;top:3px;bottom:3px;width:5px;
+  background:linear-gradient(180deg,var(--flame),var(--flame-dark));transform:skewX(calc(-1 * var(--slant-deg)))}
 .cat-row-scroll{position:relative}
 .cat-row{display:flex;gap:16px;overflow-x:auto;overflow-y:hidden;padding:14px 46px 16px;scroll-behavior:smooth;scrollbar-width:none;-ms-overflow-style:none}
 .cat-row::-webkit-scrollbar{display:none}
-.cat-row>*{flex:0 0 260px}
+.cat-row>*{flex:0 0 300px}
+
+/* the homepage's card shape, carried onto the calendar: a solid panel behind the content
+   leans at the site's one --slant-deg (same technique as .pointed-card/.next-meet — only the
+   ::after fill skews, the real text stays upright in normal flow, protected by side padding
+   sized to the card's own min-height so the lean matches --slant-ratio). Uses ::after (not
+   ::before) because .entries-open already owns ::before for its glow ring on these same cards;
+   z-index keeps both behind the real content, fill furthest back so it never paints over the
+   glow. Photos (.social-card .art) are never inside the skewed layer -- transforms would
+   distort a photo -- so they stay plain rectangles inset within the padding instead. */
+.comp-card,.social-card{
+  position:relative;z-index:0;background:none;border:none;box-shadow:none;border-radius:0;
+  min-height:190px;padding:22px 62px;display:flex;flex-direction:column;gap:8px;
+}
+.comp-card::after,.social-card::after{
+  content:"";position:absolute;inset:0;z-index:-2;background:var(--card);
+  border:1px solid var(--line);box-shadow:var(--shadow);
+  transform:skewX(calc(-1 * var(--slant-deg)));
+}
+/* our own hosted meets get a warm tint on the fill so they read as "ours" even scrolled past
+   quickly -- paired with the .pill.hosted ribbon (added inside .comp-top by site.js) */
+.comp-card.ours::after{background:linear-gradient(160deg,rgba(245,132,31,.14),var(--card) 55%)}
+body.theme-dark .comp-card.ours::after{background:linear-gradient(160deg,rgba(245,132,31,.22),var(--card) 55%)}
+/* .entries-open's border/glow are built for a rectangular box (the meet cards on Open Meets
+   still use them as-is); here the real box stays a plain rectangle while the visible shape is
+   the skewed ::after, so the border has to move onto that same skewed layer to trace the
+   actual parallelogram instead of drawing a rectangle around a leaning card. The animated
+   conic trace assumes rectangular geometry too, so it's dropped here in favour of a steady
+   flame border + glow -- the .meet cards keep the full animated version. Its own ::before is
+   never touched by the entries-open rule above (see the :not(.comp-card) there), so the mobile
+   corner flag below still shows on entries-open cards too. */
+.comp-card.entries-open{border:none;box-shadow:none}
+.comp-card.entries-open::after{border:2px solid var(--flame);box-shadow:0 0 0 1px rgba(245,132,31,.15),0 0 14px rgba(245,132,31,.35)}
+@media(max-width:640px){
+  .cat-row>*{flex:0 0 260px}
+  .comp-card,.social-card{padding:18px 20px;min-height:0}
+  .comp-card::after,.social-card::after{transform:none;border-radius:var(--radius)}
+}
 .cat-arrow{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.92);backdrop-filter:blur(4px);border:1px solid var(--line);color:var(--ink);font-size:1.3rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(16,16,20,.16);z-index:2;padding:0;transition:opacity .2s,background .2s,border-color .2s}
 .cat-arrow:hover{background:#fff;border-color:var(--flame);color:var(--flame-dark)}
 .cat-arrow.prev{left:2px}
@@ -646,10 +724,13 @@ body.theme-dark .burger{color:#fff;border-color:rgba(255,255,255,.3)}
 body.theme-dark .theme-toggle{color:#fff;border-color:rgba(255,255,255,.3)}
 body.theme-dark .eyebrow{color:var(--ember)}
 body.theme-dark .lane-rope{background:repeating-linear-gradient(90deg,var(--flame) 0 16px,transparent 16px 22px,#fff 22px 38px,transparent 38px 44px)}
-body.theme-dark .pill.open{background:rgba(31,138,76,.2);color:#5fce93}
-body.theme-dark .pill.closed{background:#26262e;color:#a5a3a0}
-body.theme-dark .pill.results{background:rgba(245,132,31,.16);color:var(--ember)}
-body.theme-dark .pill.level{border:1px solid #31313a}
+body.theme-dark .pill.open{color:#5fce93}
+body.theme-dark .pill.open::before{background:rgba(31,138,76,.2)}
+body.theme-dark .pill.closed{color:#a5a3a0}
+body.theme-dark .pill.closed::before{background:#26262e}
+body.theme-dark .pill.results{color:var(--ember)}
+body.theme-dark .pill.results::before{background:rgba(245,132,31,.16)}
+body.theme-dark .pill.level::before{border:1px solid #31313a}
 body.theme-dark .meet .datebox{border:1px solid #31313a}
 body.theme-dark .tag{background:#0f0f14}
 body.theme-dark .tt-chip.active,body.theme-dark .tt-views button.active{color:#101014}
