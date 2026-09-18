@@ -58,7 +58,7 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 .nav-cta{display:flex;gap:8px;align-items:center}
 
 /* ---------- desktop nav: slanted highlight + diagonal dividers ---------- */
-@media(min-width:901px){
+@media(min-width:1024px){
   nav.main{height:44px;gap:16px}
   nav.main a{z-index:0;padding:0 18px}
   /* the toggle button lives one level deeper than the plain links (nested for the
@@ -111,6 +111,18 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
   }
   nav.main a.cta:hover{filter:brightness(1.08)}
 }
+/* the full bar wants ~1050px of header. between the burger's cut-off and that, the brand and
+   the link padding tighten so a landscape tablet still gets the real nav instead of a header
+   that quietly pushes the whole page sideways. */
+@media(min-width:1024px) and (max-width:1159px){
+  .brand img{width:84px;height:84px}
+  .brand{gap:11px}
+  .brand .name{font-size:1.02rem}
+  nav.main{gap:11px}
+  nav.main a,.nav-dropdown-toggle{padding:0 12px}
+  nav.main a.cta{padding:0 15px}
+  nav.main>a:not(.cta):not(:has(+.cta))::after,.nav-dropdown::after{right:-6px}
+}
 
 .theme-toggle{display:flex;align-items:center;justify-content:center;width:42px;height:42px;background:none;border:1.5px solid rgba(16,16,20,.25);color:var(--ink);border-radius:50%;cursor:pointer;padding:0}
 .theme-toggle:hover{border-color:var(--flame);color:var(--flame-dark)}
@@ -145,26 +157,53 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 }
 :focus-visible{outline:3px solid var(--ember);outline-offset:2px}
 
-@media(max-width:900px){
+/* ---------- mobile nav drawer: the same lean, stacked ----------
+   a drawer row is ~46px tall, so a skewed fill leans only ~8px either side -- the 10px inset
+   swallows that, which means the angle here is exactly the same --slant-deg as the desktop
+   bar rather than a watered-down version for small screens. (a full-width CARD can't do this:
+   at 250px tall the identical skew would eat ~90px of a 390px screen, which is why the cards
+   further down carry the lean in their accents instead of their outline.) */
+@media(max-width:1023px){
   .burger{display:block}
-  nav.main{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;flex-direction:column;align-items:stretch;padding:10px 16px 16px;border-bottom:3px solid var(--flame);box-shadow:0 12px 24px rgba(16,16,20,.12)}
+  nav.main{display:none;position:absolute;top:100%;left:0;right:0;background:#fff;flex-direction:column;align-items:stretch;padding:12px 14px 16px;border-bottom:3px solid var(--flame);box-shadow:0 12px 24px rgba(16,16,20,.12);
+    max-height:var(--drawer-max,calc(100dvh - 100%));overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   nav.main.open{display:flex}
-  /* plain stacked pills here -- no slant, no divider, no gradient fill: the diagonal cuts
-     only make sense as a horizontal bar, so mobile falls back to the original straight design */
-  nav.main a{padding:14px 15px;margin-bottom:7px;border-radius:9px;border:1.5px solid var(--line);background:#fff}
-  nav.main a:hover{border-color:var(--flame);color:var(--flame-dark);background:#fff6ec}
-  nav.main a.active{background:var(--flame);border-color:var(--flame);color:#fff;text-shadow:none}
-  nav.main a.cta{background:var(--flame);border-color:var(--flame);color:#fff;clip-path:none;margin-left:0}
-  nav.main a.cta:hover{background:var(--flame-dark);border-color:var(--flame-dark);filter:none}
+  nav.main a,.nav-dropdown-toggle{
+    position:relative;z-index:0;justify-content:flex-start;gap:12px;font-size:.95rem;
+    padding:15px 22px;margin-bottom:6px;border:none;border-radius:0;background:none;
+  }
+  nav.main a::before,.nav-dropdown-toggle::before{
+    content:"";position:absolute;inset:0 10px;z-index:-1;
+    background:#f3f1ec;border:1.5px solid var(--line);
+    transform:skewX(calc(-1 * var(--slant-deg)));
+    transition:background .18s,border-color .18s;
+  }
+  /* touch has no hover, so :active is what gives a press its feedback */
+  nav.main a:active::before,.nav-dropdown-toggle:active::before{background:#fff6ec;border-color:var(--flame)}
+  /* an open Club Info is filled the same way the desktop bar fills it -- which also keeps the
+     row legible when it is both open AND the current section */
+  nav.main a.active,nav.main a.cta,.nav-dropdown-toggle.active,
+  .nav-dropdown.open .nav-dropdown-toggle{color:#fff;font-weight:700;text-shadow:none}
+  nav.main a.active::before,nav.main a.cta::before,.nav-dropdown-toggle.active::before,
+  .nav-dropdown.open .nav-dropdown-toggle::before{
+    background:linear-gradient(100deg,var(--flame) 0%,var(--flame-dark) 100%);border-color:transparent;
+  }
+  nav.main a.cta{margin:4px 0 0;justify-content:center;clip-path:none;filter:none}
   .nav-dropdown{width:100%}
-  .nav-dropdown-toggle{width:100%;justify-content:space-between;padding:14px 15px;margin-bottom:7px;border-radius:9px;border:1.5px solid var(--line);background:#fff}
-  .nav-dropdown-toggle:hover{border-color:var(--flame);color:var(--flame-dark);background:#fff6ec}
-  .nav-dropdown.open .nav-dropdown-toggle{border-color:var(--flame);color:var(--flame-dark)}
-  .nav-dropdown-toggle.active{background:var(--flame);border-color:var(--flame);color:#fff;text-shadow:none}
-  .nav-dropdown-menu{position:static;display:none;flex-direction:column;box-shadow:none;border:none;background:none;padding:0 0 0 14px;margin-bottom:2px}
+  .nav-dropdown-toggle{width:100%;justify-content:space-between}
+  .nav-dropdown .caret{font-size:1.2em;opacity:1;color:var(--flame)}
+  /* on a filled row the flame caret would vanish into the fill */
+  .nav-dropdown-toggle.active .caret,.nav-dropdown.open .caret{color:inherit}
+  .nav-dropdown-menu{position:static;display:none;flex-direction:column;box-shadow:none;border:none;background:none;padding:0 0 2px 16px;margin-bottom:2px}
   .nav-dropdown.open .nav-dropdown-menu{display:flex}
-  .nav-dropdown-menu a{padding:12px 15px;margin-bottom:4px}
-  .nav-dropdown-menu a:hover{background:#fff6ec;color:var(--flame-dark)}
+  nav.main .nav-dropdown-menu a{padding:12px 18px;margin-bottom:5px;font-size:.9rem;border-radius:0}
+  nav.main .nav-dropdown-menu a::before{inset:0 8px}
+  /* the leading tick the desktop dropdown already uses, so sub-items read as one family */
+  nav.main .nav-dropdown-menu a::after{
+    content:"";order:-1;flex:0 0 auto;width:4px;height:15px;background:var(--flame);
+    transform:skewX(calc(-1 * var(--slant-deg)));transition:background .18s;
+  }
+  nav.main .nav-dropdown-menu a.active::after{background:#fff}
 }
 /* phones: shrink the brand block so logo, name, theme toggle and menu button all fit on screen */
 @media(max-width:560px){
@@ -213,16 +252,19 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 .hero-arrow:hover{background:rgba(16,16,20,.65)}
 .hero-arrow:disabled{opacity:0;pointer-events:none}
 .hero-dots{position:absolute;left:0;right:0;bottom:14px;display:flex;justify-content:center;gap:7px;z-index:3}
-.hero-dot{width:22px;height:4px;border-radius:2px;background:rgba(255,255,255,.35);border:none;padding:0;cursor:pointer;transition:background .2s}
+/* even the dots take the lean -- at 4px tall the skew is invisible across the bar itself,
+   but it cuts both ends at --slant-deg, which is the whole read */
+.hero-dot{width:24px;height:4px;background:rgba(255,255,255,.35);border:none;padding:0;cursor:pointer;transition:background .2s;transform:skewX(calc(-1 * var(--slant-deg)))}
 .hero-dot.active{background:var(--ember)}
 .hero-bottom-bar{height:34px;background:var(--flame);position:relative;box-shadow:0 -8px 16px -6px rgba(16,16,20,.4);z-index:1}
 @media(max-width:820px){.hero-slide{flex-basis:86vw}}
 @media(max-width:600px){
   .hero-photo-strip{height:340px}
-  .hero-slide{clip-path:none}
+  /* a photo can't take a 20deg cut at this height without losing a third of the frame, so the
+     slides stay square on phones and the strip's lean is carried by the card and dots instead.
+     a fixed narrow peek reads as "there is another slide" rather than as a dead black band. */
+  .hero-slide{clip-path:none;flex-basis:calc(100% - 30px)}
   .hero-slide+.hero-slide{margin-left:0}
-  .hero-news-card{max-width:none;margin:0 16px 46px;padding:18px 22px}
-  .hero-news-card::before{transform:none;border-radius:var(--radius)}
   .hero-arrow{width:32px;height:32px;font-size:1.1rem}
 }
 .live-results{position:absolute;top:0;right:20px;display:inline-flex;align-items:center;gap:7px;background:#c81e2c;color:#fff;font-family:'Montserrat',sans-serif;font-weight:700;font-size:.78rem;letter-spacing:.03em;text-transform:uppercase;padding:9px 16px;border-radius:999px;text-decoration:none;box-shadow:0 4px 14px rgba(16,16,20,.28);z-index:2;animation:live-pulse 1.8s ease-in-out infinite}
@@ -247,7 +289,7 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 .next-meet .meta{color:#5c5c63;font-size:.92rem;margin-top:10px}
 .next-meet .meta div{margin-top:3px}
 @media(max-width:820px){.hero-grid{grid-template-columns:1fr}.hero{padding:42px 0 50px}}
-@media(max-width:640px){.next-meet{padding:24px}.next-meet::before{transform:none;border-radius:var(--radius)}}
+@media(max-width:640px){.next-meet{padding:22px}.next-meet::before{transform:none;border-radius:4px}}
 
 /* ---------- sections & cards ---------- */
 main{min-height:60vh}
@@ -299,8 +341,8 @@ section.page{padding:52px 0 72px}
 .pointed-card.feature::before{background:var(--flame)}
 .pointed-card.feature .eyebrow{color:#101014}
 @media(max-width:640px){
-  .pointed-card{padding:22px}
-  .pointed-card::before{transform:none;border-radius:var(--radius);border:1px solid var(--line);box-shadow:var(--shadow)}
+  .pointed-card{padding:22px;min-height:0}
+  .pointed-card::before{transform:none;border-radius:4px;border:1px solid var(--line);box-shadow:var(--shadow)}
   .pointed-card.feature::before{border-color:var(--flame)}
 }
 .pill{display:inline-block;font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:4px 10px;border-radius:999px}
@@ -575,25 +617,30 @@ body.theme-dark .brand{color:#fff}
 body.theme-dark .brand .name .line-two{color:var(--ember)}
 /* dark desktop nav: the flame fill reads fine on the dark bar unchanged -- only the
    plain (non-active) text colors need to shift for the dark background */
-@media(min-width:901px){
+@media(min-width:1024px){
   body.theme-dark nav.main a{color:#dcdad4}
   body.theme-dark .nav-dropdown-toggle{color:#dcdad4}
   body.theme-dark .nav-dropdown-menu{background:#16161c;border-color:#31313a}
   body.theme-dark .nav-dropdown-menu a{color:#e4e2de}
 }
-/* dark mobile nav: same stacked-pill fallback as light mode, just recolored */
-@media(max-width:900px){
-  body.theme-dark nav.main a{background:#16161c;border-color:#31313a;color:#e4e2de}
-  body.theme-dark nav.main a:hover{background:#1e1e26;border-color:var(--flame);color:var(--ember)}
-  body.theme-dark nav.main a.active{background:var(--flame);border-color:var(--flame);color:#101014}
-  body.theme-dark nav.main a.cta{background:var(--flame);border-color:var(--flame);color:#101014}
-  body.theme-dark nav.main a.cta:hover{background:var(--flame-dark);border-color:var(--flame-dark)}
-  body.theme-dark .nav-dropdown-toggle{background:#16161c;border-color:#31313a;color:#e4e2de}
-  body.theme-dark .nav-dropdown-toggle:hover,body.theme-dark .nav-dropdown.open .nav-dropdown-toggle{background:#1e1e26;border-color:var(--flame);color:var(--ember)}
-  body.theme-dark .nav-dropdown-toggle.active{background:var(--flame);border-color:var(--flame);color:#101014}
-  body.theme-dark .nav-dropdown-menu{background:#16161c;border-color:#31313a}
-  body.theme-dark .nav-dropdown-menu a{color:#e4e2de}
-  body.theme-dark .nav-dropdown-menu a:hover{background:#1e1e26;color:var(--ember)}
+/* dark mobile drawer: same skewed panels, just recolored -- only the resting panel and the
+   plain text need shifting, the flame fill reads correctly on either ground */
+@media(max-width:1023px){
+  body.theme-dark nav.main{background:#111116;box-shadow:0 12px 24px rgba(0,0,0,.45)}
+  body.theme-dark nav.main a,body.theme-dark .nav-dropdown-toggle{color:#e4e2de}
+  body.theme-dark nav.main a::before,body.theme-dark .nav-dropdown-toggle::before{background:#16161c;border-color:#31313a}
+  body.theme-dark nav.main a:active::before,body.theme-dark .nav-dropdown-toggle:active::before{background:#221c16;border-color:var(--flame)}
+  /* the resting-panel rule above outranks the light theme's fill selectors, so the filled
+     states have to be restated here or the current page and the CTA come out blank */
+  body.theme-dark nav.main a.active::before,
+  body.theme-dark nav.main a.cta::before,
+  body.theme-dark .nav-dropdown-toggle.active::before,
+  body.theme-dark .nav-dropdown.open .nav-dropdown-toggle::before{
+    background:linear-gradient(100deg,var(--flame) 0%,var(--flame-dark) 100%);border-color:transparent;
+  }
+  body.theme-dark nav.main a.active,body.theme-dark nav.main a.cta,
+  body.theme-dark .nav-dropdown-toggle.active,body.theme-dark .nav-dropdown.open .nav-dropdown-toggle{color:#101014}
+  body.theme-dark nav.main .nav-dropdown-menu a.active::after{background:#101014}
 }
 body.theme-dark .burger{color:#fff;border-color:rgba(255,255,255,.3)}
 body.theme-dark .theme-toggle{color:#fff;border-color:rgba(255,255,255,.3)}
@@ -615,6 +662,41 @@ body.theme-dark .btn.dark{background:#fff;color:#101014}
 body.theme-dark .btn.dark:hover{background:#e8e6e2}
 body.theme-dark .path-card.sel{box-shadow:0 0 0 3px rgba(245,132,31,.28)}
 body.theme-dark label.f input:focus,body.theme-dark label.f select:focus,body.theme-dark label.f textarea:focus{box-shadow:0 0 0 3px rgba(245,132,31,.3)}
+
+/* ---------- phones: where the lean lives when there is no room to lean ----------
+   a 20deg edge needs height to travel: over a 46px drawer row it costs 8px of width, but over
+   a 250px-tall card it costs ~90px -- a quarter of a 390px screen, and the leftover text column
+   is too narrow to read. so on phones the cards keep their full width and go square-edged, and
+   the lean moves into accents that are short enough to carry it at the real --slant-deg: the
+   eyebrow sits on a skewed tab, and separators become skewed ticks. same angle, same family,
+   none of the width cost. this block sits last in the file so it also lands over the dark
+   theme's own .eyebrow colour. */
+@media(max-width:640px){
+  .hero-news-card{max-width:none;margin:0 16px 46px;padding:18px 22px}
+  .hero-news-card::before{transform:none;border-radius:4px}
+
+  .pointed-card .eyebrow,.next-meet .eyebrow,.hero-news-card .eyebrow,
+  body.theme-dark .pointed-card .eyebrow,body.theme-dark .next-meet .eyebrow,body.theme-dark .hero-news-card .eyebrow{
+    position:relative;z-index:0;display:inline-block;
+    padding:5px 15px;margin:0 0 4px;color:#101014;font-size:.78rem;
+  }
+  .pointed-card .eyebrow::before,.next-meet .eyebrow::before,.hero-news-card .eyebrow::before{
+    content:"";position:absolute;inset:0;z-index:-1;
+    background:linear-gradient(100deg,var(--flame) 0%,var(--flame-dark) 100%);
+    transform:skewX(calc(-1 * var(--slant-deg)));
+  }
+  /* the feature card is already flame, so its tab inverts to stay legible on it */
+  .pointed-card.feature .eyebrow,body.theme-dark .pointed-card.feature .eyebrow{color:#fff}
+  .pointed-card.feature .eyebrow::before{background:linear-gradient(100deg,#101014 0%,#2a2a32 100%)}
+}
+/* the partners row wraps on phones, which left the trailing separators dangling at the end of
+   each line -- a LEADING tick can't dangle, and reads as the same diagonal either way */
+@media(max-width:760px){
+  .partners .logos a::before{
+    content:"";display:inline-block;width:3px;height:13px;margin-right:9px;vertical-align:-1px;
+    background:var(--flame);opacity:.85;transform:skewX(calc(-1 * var(--slant-deg)));
+  }
+}
 
 /* toast + badges */
 #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:12px 22px;border-radius:999px;border:1.5px solid var(--flame);font-weight:600;font-size:.92rem;opacity:0;pointer-events:none;transition:all .25s;z-index:200}

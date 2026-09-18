@@ -360,10 +360,22 @@ infoToggle.addEventListener("click",e=>{
 document.addEventListener("click",e=>{
   if(infoDropdown.classList.contains("open") && !infoDropdown.contains(e.target)) closeInfoMenu();
 });
+/* The drawer hangs off a sticky header that may sit below the prototype banner, so how much
+   room it actually has is only knowable at open time -- a pure-CSS cap has to assume the header
+   is already pinned to the top, which on a short phone pushes "Join Us" off the bottom. */
+const mainNav=$("#mainNav");
+function sizeDrawer(){
+  if(!mainNav.classList.contains("open"))return;
+  const top=mainNav.getBoundingClientRect().top;
+  mainNav.style.setProperty("--drawer-max",Math.max(200,window.innerHeight-top-10)+"px");
+}
 $("#burger").addEventListener("click",()=>{
-  const n=$("#mainNav");n.classList.toggle("open");
-  $("#burger").setAttribute("aria-expanded",n.classList.contains("open"));
+  mainNav.classList.toggle("open");
+  $("#burger").setAttribute("aria-expanded",mainNav.classList.contains("open"));
+  sizeDrawer();
 });
+window.addEventListener("resize",sizeDrawer);
+window.addEventListener("scroll",sizeDrawer,{passive:true});
 
 /* ================= JOIN FORM → INBOX ================= */
 function submitEnquiry(e,type,detailFn){
