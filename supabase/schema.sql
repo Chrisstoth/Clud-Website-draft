@@ -39,10 +39,18 @@ create table if not exists public.feed (
   tag                  text,
   note                 text,
   img                  text,
+  -- full article view (news & socials): a photo gallery for the article's slideshow, and a
+  -- rich (sanitized-HTML) body. "blurb" stays the short summary used in cards and the home feed.
+  photos               jsonb not null default '[]'::jsonb,
+  body                 text,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now()
 );
 create index if not exists feed_type_start_idx on public.feed (type, start_date);
+
+-- Safe to re-run against a database created before these columns existed.
+alter table public.feed add column if not exists photos jsonb not null default '[]'::jsonb;
+alter table public.feed add column if not exists body text;
 
 create table if not exists public.coaches (
   id          bigint generated always as identity primary key,

@@ -206,7 +206,8 @@ function renderSocials(){
     <article class="card social-card">
       <div class="art" style="background:${artBg}">${esc(it.title)}</div>
       <div class="body"><div class="when">${esc(fmtDate(it.start))}</div><p>${esc(it.blurb)}</p>
-      ${it.link?`<div><a class="btn small" href="${esc(it.link)}">Details / tickets</a></div>`:""}</div>
+      ${it.link?`<div><a class="btn small" href="${esc(it.link)}">Details / tickets</a></div>`:""}
+      <div><a class="btn small ghost" href="article?id=${it.id}">Read more →</a></div></div>
     </article>`;
   }).join(""):`<p style="color:var(--muted)">No socials scheduled yet.</p>`;
 
@@ -252,16 +253,16 @@ function renderNews(){
   $("#newsList").innerHTML=list.map(n=>{
     const r=resolveNewsImage(n.img);
     const thumb=r?`<div class="news-thumb" style="background:${r.css}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
-    return `<div class="card">${thumb}<p class="eyebrow">${esc(n.tag)}</p><h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3><p style="color:var(--muted);font-size:.9rem;margin-top:8px">${esc(n.blurb)}</p></div>`;
+    return `<div class="card">${thumb}<p class="eyebrow">${esc(n.tag)}</p><h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3><p style="color:var(--muted);font-size:.9rem;margin-top:8px">${esc(n.blurb)}</p><div style="margin-top:14px"><a class="btn small ghost" href="article?id=${n.id}">Read more →</a></div></div>`;
   }).join("");
 }
 /* Hero carousel: pulls across the whole feed (meets, socials, news) so it reads as one connected
    "what's happening" strip rather than club news alone — sorted by closeness to today's date. */
 function heroFeedContent(it){
   if(isMeet(it))return {tag:it.type==="teamMeet"?"Team Meet":"Open Meet",title:it.title,blurb:`${it.venue||"Venue TBC"} · ${fmtDate(it.start)}`,linkAttrs:'href="open-meets"',img:it.img||null};
-  if(it.type==="social")return {tag:"Club Calendar",title:it.title,blurb:it.blurb||fmtDate(it.start),linkAttrs:'href="club-calendar"',img:it.img||null};
+  if(it.type==="social")return {tag:"Club Calendar",title:it.title,blurb:it.blurb||fmtDate(it.start),linkAttrs:`href="article?id=${it.id}"`,img:it.img||null};
   if(it.type==="training")return {tag:"Training change",title:it.title,blurb:it.note||fmtDate(it.start),linkAttrs:'href="club-calendar"',img:it.img||null};
-  return {tag:`${it.tag} · Club News`,title:it.title,blurb:it.blurb,linkAttrs:'href="news"',img:it.img||null};
+  return {tag:`${it.tag} · Club News`,title:it.title,blurb:it.blurb,linkAttrs:`href="article?id=${it.id}"`,img:it.img||null};
 }
 function renderHeroFeed(){
   if(!$("#heroSlides"))return;
@@ -347,7 +348,30 @@ if($("#heroPhotoStrip")){
   });
   resetAutoSwap();
 })();
-function renderAllPublic(){renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();}
+/* Single article page (article.html?id=…): news & socials only — meets have their own detail
+   page (Open Meets) and don't go through here. */
+function renderArticle(){
+  const view=$("#articleView");
+  if(!view)return;
+  const id=+(new URLSearchParams(location.search).get("id"));
+  const it=DB.feed.find(x=>x.id===id&&(x.type==="news"||x.type==="social"));
+  if(!it){
+    view.innerHTML=`<div class="page-head">
+      <p class="eyebrow">Not found</p>
+      <h2 class="display">Article not found</h2>
+      <p style="color:var(--muted);margin-top:10px">It may have been removed, or the link is out of date.</p>
+      <div style="margin-top:18px"><a class="btn small" href="news">Back to Club News</a></div>
+    </div>`;
+    return;
+  }
+  document.title=`${it.title} — Basildon & Phoenix Swimming Club`;
+  const back=it.type==="social"?{href:"club-calendar",label:"← Back to Club Calendar"}:{href:"news",label:"← Back to Club News"};
+  view.innerHTML=articleContentHtml(it)
+    +(it.link?`<div style="margin-top:18px"><a class="btn small" href="${esc(it.link)}" target="_blank" rel="noopener">Details / tickets →</a></div>`:"")
+    +`<div style="margin-top:28px"><a class="btn small ghost" href="${back.href}">${back.label}</a></div>`;
+  wireArticleGallery((it.photos||[]).length);
+}
+function renderAllPublic(){renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();}
 
 /* ================= NAV ================= */
 const infoDropdown=$("#infoDropdown"), infoToggle=$("#infoToggle");

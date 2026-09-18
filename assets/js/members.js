@@ -104,20 +104,24 @@ const SCHEMAS = {
   social:[
     {k:"title",label:"Event name",type:"text",req:1},
     {k:"start",label:"Date",type:"date",req:1},
-    {k:"blurb",label:"Details",type:"textarea"},
+    {k:"blurb",label:"Summary (shown on the card and homepage)",type:"textarea",req:1},
     {k:"link",label:"Tickets / sign-up link (URL)",type:"text"},
     {k:"color",label:"Card graphic",type:"select",opts:[
       ["linear-gradient(135deg,#f26b21,#ffb25e)","Phoenix orange"],
       ["linear-gradient(135deg,#101014,#3c3c46)","Club black"],
       ["linear-gradient(135deg,#d4551a,#101014)","Ember fade"]]},
-    {k:"img",label:"Picture (optional, replaces card graphic)",type:"imagepicker"}
+    {k:"img",label:"Picture (optional, replaces card graphic)",type:"imagepicker"},
+    {k:"photos",label:"Photo gallery (shown as a slideshow on the article page)",type:"gallery"},
+    {k:"body",label:"Full write-up (shown on the article page)",type:"richtext"}
   ],
   news:[
     {k:"tag",label:"Category tag (e.g. Racing, Club, Trips)",type:"text",req:1},
     {k:"title",label:"Headline",type:"text",req:1},
     {k:"start",label:"Date",type:"date",req:1},
-    {k:"blurb",label:"Summary",type:"textarea",req:1},
-    {k:"img",label:"Picture",type:"imagepicker"}
+    {k:"blurb",label:"Summary (shown in the news list and homepage)",type:"textarea",req:1},
+    {k:"img",label:"Picture (thumbnail; used as the cover if there's no gallery yet)",type:"imagepicker"},
+    {k:"photos",label:"Photo gallery (shown as a slideshow on the article page)",type:"gallery"},
+    {k:"body",label:"Article content",type:"richtext"}
   ],
   training:[
     {k:"title",label:"What's changing",type:"text",req:1},
@@ -421,12 +425,39 @@ function showForm(sec,id,forcedType){
         <input type="hidden" name="${f.k}" id="imgHiddenInput" value="${val}">
       </div>`;
     }
+    if(f.type==="gallery"){
+      return `<div class="f">${f.label}
+        <div class="gallery-picker">
+          <div class="gallery-thumbs" id="galleryThumbs"></div>
+          <label class="img-upload-btn">Add photos<input type="file" accept="image/*" multiple id="galleryAddInput" style="display:none"></label>
+          <p class="hint" style="margin-top:2px">Photos are compressed automatically. The first photo doubles as the card thumbnail. Use × to remove one.</p>
+        </div>
+      </div>`;
+    }
+    if(f.type==="richtext"){
+      return `<div class="f">${f.label}
+        <div class="rte-toolbar" id="rteToolbar">
+          <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+          <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
+          <button type="button" data-cmd="formatBlock" data-val="&lt;h3&gt;" title="Subheading">H3</button>
+          <button type="button" data-cmd="formatBlock" data-val="&lt;p&gt;" title="Paragraph">¶</button>
+          <button type="button" data-cmd="insertUnorderedList" title="Bullet list">•⁠—</button>
+          <button type="button" data-cmd="insertOrderedList" title="Numbered list">1.—</button>
+          <button type="button" data-cmd="createLink" title="Insert link">🔗</button>
+          <label class="rte-img-btn" title="Insert photo">🖼️ Photo<input type="file" accept="image/*" id="rteImgInput" style="display:none"></label>
+        </div>
+        <div class="rte-editor article-body" id="rteEditor" contenteditable="true">${sanitizeArticleHtml(it[f.k])}</div>
+        <p class="hint" style="margin-top:6px">This box shows exactly how the article text will look on the page.</p>
+      </div>`;
+    }
     return `<label class="f">${f.label}<input type="${f.type}" name="${f.k}" value="${val}" ${f.req?"required":""}></label>`;
   }).join("");
   const titleLabel=isFeed?FEED_TYPE_META[type].label:SECTION_META[sec].name;
+  const canPreview=isFeed&&(type==="news"||type==="social");
   const formTarget=id?document.getElementById("editSlot-"+id):$("#formSlot");
   formTarget.innerHTML=`<form class="stack" id="adminForm" style="margin-top:10px">
     <div class="form-title">${id?"Edit item":"Add new"} — ${titleLabel}</div>
+    ${canPreview?`<button type="button" class="btn small ghost" id="previewBtn" style="justify-self:start">Preview as article page</button>`:""}
     ${fields}
     <div style="display:flex;gap:10px"><button class="btn" type="submit">${id?"Save & publish":"Publish"}</button>
     <button class="btn ghost" type="button" id="cancelForm">Cancel</button></div></form>`;
@@ -472,12 +503,79 @@ function showForm(sec,id,forcedType){
       setPreview("");
     });
   }
+  const galleryField=SCHEMAS[schemaKey].find(f=>f.type==="gallery");
+  let galleryPhotos=galleryField?[...(it.photos||[])]:null;
+  if(galleryField){
+    const renderGalleryThumbs=()=>{
+      $("#galleryThumbs").innerHTML=galleryPhotos.length?galleryPhotos.map((url,i)=>
+        `<div class="gallery-thumb"><img src="${esc(url)}" alt=""><button type="button" class="gallery-thumb-del" data-i="${i}" aria-label="Remove this photo">×</button></div>`).join("")
+        :`<p class="hint" style="margin:0">No photos yet.</p>`;
+    };
+    renderGalleryThumbs();
+    $("#galleryThumbs").addEventListener("click",e=>{
+      const b=e.target.closest("[data-i]");if(!b)return;
+      galleryPhotos.splice(+b.dataset.i,1);
+      renderGalleryThumbs();
+    });
+    $("#galleryAddInput").addEventListener("change",async e=>{
+      const files=[...e.target.files];
+      if(!files.length)return;
+      const label=e.target.closest("label"),original=label.firstChild.nodeValue;
+      for(const file of files){
+        label.firstChild.nodeValue="Uploading…";
+        try{galleryPhotos.push(await uploadImage(file));renderGalleryThumbs();}
+        catch(err){toast(err.message||"Couldn't upload that photo");}
+      }
+      label.firstChild.nodeValue=original;
+      e.target.value="";
+    });
+  }
+  const rteEditor=$("#rteEditor");
+  if(rteEditor){
+    $("#rteToolbar").addEventListener("click",e=>{
+      const b=e.target.closest("[data-cmd]");if(!b)return;
+      rteEditor.focus();
+      if(b.dataset.cmd==="createLink"){
+        const url=prompt("Link URL (https://…)");
+        if(url)document.execCommand("createLink",false,url);
+        return;
+      }
+      document.execCommand(b.dataset.cmd,false,b.dataset.val||null);
+    });
+    $("#rteImgInput").addEventListener("change",async e=>{
+      const file=e.target.files[0];
+      if(!file)return;
+      try{
+        const url=await uploadImage(file);
+        rteEditor.focus();
+        document.execCommand("insertHTML",false,`<img src="${url}" alt="">`);
+      }catch(err){toast(err.message||"Couldn't upload that photo");}
+      e.target.value="";
+    });
+    /* Pasting from Word/Docs/etc drags in fonts, colours and classes the sanitizer would strip
+       anyway — inserting as plain text keeps the editor honest about what will actually publish. */
+    rteEditor.addEventListener("paste",e=>{
+      e.preventDefault();
+      document.execCommand("insertText",false,(e.clipboardData||window.clipboardData).getData("text/plain"));
+    });
+  }
+  $("#previewBtn")?.addEventListener("click",()=>{
+    const liveData=Object.fromEntries(new FormData(formTarget.querySelector("#adminForm")).entries());
+    liveData.type=type;
+    liveData.id=it.id;
+    if(galleryField)liveData.photos=galleryPhotos;
+    if(rteEditor)liveData.body=sanitizeArticleHtml(rteEditor.innerHTML);
+    showArticlePreview(liveData);
+  });
   $("#cancelForm").addEventListener("click",()=>{formTarget.innerHTML="";editingId=null;});
   $("#adminForm").addEventListener("submit",async e=>{
     e.preventDefault();
     const data=Object.fromEntries(new FormData(e.target).entries());
     if(sec==="coaches"){data.squads=(data.squadsRaw||"").split(",").map(s=>s.trim()).filter(Boolean);delete data.squadsRaw;}
     if(isFeed)data.type=type;
+    if(galleryField)data.photos=galleryPhotos;
+    if(rteEditor)data.body=sanitizeArticleHtml(rteEditor.innerHTML);
+    if(galleryField&&galleryPhotos.length)data.img=galleryPhotos[0];
     if(!id&&sec==="newsDefaults"){
       const base=slugify(data.label)||"category";
       let uniq=base,n=2;while(DB.newsDefaults.some(x=>x.key===uniq))uniq=`${base}-${n++}`;
@@ -489,6 +587,30 @@ function showForm(sec,id,forcedType){
     await publishItem(sec,id,data);
     submit.disabled=false;
   });
+}
+
+/* "Preview as article page" renders the in-progress form through the exact same markup as the
+   public article page (articleContentHtml, in core.js), so what an admin sees here is what
+   publishes — not a stand-in. */
+function showArticlePreview(it){
+  let overlay=document.getElementById("articlePreviewOverlay");
+  if(!overlay){
+    overlay=document.createElement("div");
+    overlay.id="articlePreviewOverlay";
+    overlay.className="preview-overlay";
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click",e=>{if(e.target===overlay)overlay.classList.remove("open");});
+  }
+  overlay.innerHTML=`<div class="preview-overlay-inner">
+    <div class="preview-overlay-bar">
+      <span>Preview — exactly how this will appear on the site</span>
+      <button type="button" class="btn small ghost" id="previewClose">Close</button>
+    </div>
+    <div class="preview-overlay-body"><div class="container article-container">${articleContentHtml(it)}</div></div>
+  </div>`;
+  overlay.classList.add("open");
+  document.getElementById("previewClose").addEventListener("click",()=>overlay.classList.remove("open"));
+  wireArticleGallery((it.photos||[]).length);
 }
 
 /* Photos go to the shared image store, so every visitor loads the same file rather than a

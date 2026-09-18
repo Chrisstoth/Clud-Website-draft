@@ -17,7 +17,7 @@ const DB={feed:[],coaches:[],squads:[],roles:[],newsDefaults:[],enquiries:[]};
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",leagueUrl:"league_url",conditionsUrl:"conditions_url",conditionsLabel:"conditions_label",entryFileUrl:"entry_file_url",entryFileLabel:"entry_file_label",currentEntriesUrl:"current_entries_url",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",leagueUrl:"league_url",conditionsUrl:"conditions_url",conditionsLabel:"conditions_label",entryFileUrl:"entry_file_url",entryFileLabel:"entry_file_label",currentEntriesUrl:"current_entries_url",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body"};
 const FEED_TYPE_TO_ROW={meet:"meet",externalMeet:"external_meet",teamMeet:"team_meet",social:"social",news:"news",training:"training"};
 const FEED_TYPE_FROM_ROW=Object.fromEntries(Object.entries(FEED_TYPE_TO_ROW).map(([k,v])=>[v,k]));
 
@@ -104,6 +104,81 @@ function resolveNewsImage(img){
     return d.img?{css:`url('${esc(d.img)}') center/cover no-repeat`,icon:null}:{css:d.bg,icon:d.icon};
   }
   return {css:`url('${esc(img)}') center/cover no-repeat`,icon:null};
+}
+
+/* ================= ARTICLES (news & socials) =================
+   Article bodies are written with a WYSIWYG editor in the members' area (members.js) and stored
+   as HTML. Sanitized again here on the way out, in case a row was ever edited by hand in the
+   database — DOMPurify is only loaded on the pages that actually render or edit article bodies
+   (article.html, members.html), so this is a no-op everywhere else. */
+const ARTICLE_TAGS=["p","br","strong","b","em","i","u","h3","ul","ol","li","a","img","blockquote"];
+const ARTICLE_ATTR=["href","src","alt"];
+if(window.DOMPurify){
+  DOMPurify.addHook("afterSanitizeAttributes",node=>{
+    if(node.tagName==="A"){node.setAttribute("target","_blank");node.setAttribute("rel","noopener noreferrer");}
+  });
+}
+function sanitizeArticleHtml(html){
+  return window.DOMPurify?DOMPurify.sanitize(html||"",{ALLOWED_TAGS:ARTICLE_TAGS,ALLOWED_ATTR:ARTICLE_ATTR}):"";
+}
+
+/* Gallery + body markup, shared by the public article page (site.js) and the admin "preview as
+   article page" (members.js) so an admin sees exactly what will publish. */
+function articleGalleryHtml(photos){
+  if(!photos||!photos.length)return "";
+  return `<div class="article-gallery">
+    <div class="article-gallery-track" id="agTrack">
+      ${photos.map(p=>`<div class="article-gallery-slide"><img src="${esc(p)}" alt=""></div>`).join("")}
+    </div>
+    ${photos.length>1?`
+    <button type="button" class="gallery-arrow prev" id="agPrev" aria-label="Previous photo">‹</button>
+    <button type="button" class="gallery-arrow next" id="agNext" aria-label="Next photo">›</button>
+    <div class="gallery-dots" id="agDots">${photos.map((_,i)=>`<button type="button" class="gallery-dot${i===0?" active":""}" data-i="${i}" aria-label="Photo ${i+1} of ${photos.length}"></button>`).join("")}</div>`:""}
+  </div>`;
+}
+/* Wires up whichever gallery was just inserted into the DOM (there is only ever one on screen
+   at a time — the public article page, or the admin preview overlay). */
+function wireArticleGallery(n){
+  const track=document.getElementById("agTrack");
+  if(!track||!n||n<2)return;
+  let idx=0;
+  const dots=()=>document.querySelectorAll(".gallery-dot");
+  const update=()=>{
+    dots().forEach((d,i)=>d.classList.toggle("active",i===idx));
+    const prev=document.getElementById("agPrev"),next=document.getElementById("agNext");
+    if(prev)prev.disabled=idx===0;
+    if(next)next.disabled=idx===n-1;
+  };
+  const go=i=>{idx=Math.max(0,Math.min(i,n-1));track.scrollTo({left:track.clientWidth*idx,behavior:"smooth"});update();};
+  document.getElementById("agPrev")?.addEventListener("click",()=>go(idx-1));
+  document.getElementById("agNext")?.addEventListener("click",()=>go(idx+1));
+  document.getElementById("agDots")?.addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(b)go(+b.dataset.i);});
+  let scrollTimer;
+  track.addEventListener("scroll",()=>{
+    clearTimeout(scrollTimer);
+    scrollTimer=setTimeout(()=>{idx=Math.round(track.scrollLeft/track.clientWidth);update();},80);
+  },{passive:true});
+  update();
+}
+/* Full article view: eyebrow/title/date, gallery (falls back to the single cover picture used
+   elsewhere on the site when there's no gallery yet), then the rich body (or the summary, for an
+   article that hasn't had a body written yet). */
+function articleContentHtml(it){
+  const photos=it.photos||[];
+  const cover=!photos.length?resolveNewsImage(it.img):null;
+  const dateLabel=it.start?fmtDate(it.start):"";
+  const eyebrow=it.type==="news"?(it.tag||"Club News"):"Club Calendar · Social";
+  const media=photos.length?articleGalleryHtml(photos)
+    :(cover?`<div class="article-cover" style="background:${cover.css}">${cover.icon?`<span class="news-thumb-icon">${cover.icon}</span>`:""}</div>`:"");
+  const bodyHtml=sanitizeArticleHtml(it.body||"")||`<p>${esc(it.blurb||"")}</p>`;
+  return `<div class="page-head">
+      <p class="eyebrow">${esc(eyebrow)}</p>
+      <h2 class="display">${esc(it.title||"Untitled")}</h2>
+      <div class="lane-rope"></div>
+      ${dateLabel?`<p style="color:var(--muted)">${esc(dateLabel)}</p>`:""}
+    </div>
+    ${media}
+    <div class="article-body">${bodyHtml}</div>`;
 }
 
 /* ================= HELPERS ================= */

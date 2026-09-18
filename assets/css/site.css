@@ -512,7 +512,7 @@ form.stack{display:grid;gap:16px;max-width:560px}
 .f{display:grid;gap:6px;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 label.f input,label.f select,label.f textarea{font:inherit;font-size:1rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text);padding:11px 13px;border:1.5px solid var(--line);border-radius:10px;background:var(--field)}
 label.f input:focus,label.f select:focus,label.f textarea:focus{border-color:var(--flame);outline:none;box-shadow:0 0 0 3px rgba(242,107,33,.18)}
-.hint{font-size:.85rem;color:var(--muted)}
+.hint{font-size:.85rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:normal}
 
 /* info accordions */
 details.info{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:0;margin-bottom:12px;overflow:hidden;transition:border-color .15s}
@@ -697,6 +697,65 @@ body.theme-dark label.f input:focus,body.theme-dark label.f select:focus,body.th
     background:var(--flame);opacity:.85;transform:skewX(calc(-1 * var(--slant-deg)));
   }
 }
+
+/* ---------- article page & admin article preview ---------- */
+.article-container{max-width:760px}
+/* Typography shared verbatim between the public article page and the rich-text editor in the
+   members' area (members.js gives the editor this same class), so an admin sees the real thing
+   while writing, not a stand-in. */
+.article-body{font-size:1.02rem;line-height:1.7;color:var(--body2)}
+.article-body>*+*{margin-top:14px}
+.article-body h3{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.2rem;color:var(--text);margin-top:26px}
+.article-body ul,.article-body ol{padding-left:1.3em}
+.article-body li+li{margin-top:6px}
+.article-body a{color:var(--flame-dark);text-decoration:underline;text-underline-offset:2px}
+body.theme-dark .article-body a{color:var(--ember)}
+.article-body img{display:block;max-width:100%;border-radius:var(--radius);margin:18px auto}
+.article-cover{height:260px;border-radius:var(--radius);background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;margin-bottom:28px}
+.article-cover .news-thumb-icon{font-size:3.4rem}
+
+.article-gallery{position:relative;margin-bottom:28px;border-radius:var(--radius);overflow:hidden;background:#000;box-shadow:var(--shadow)}
+.article-gallery-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-ms-overflow-style:none}
+.article-gallery-track::-webkit-scrollbar{display:none}
+.article-gallery-slide{flex:0 0 100%;scroll-snap-align:center;aspect-ratio:16/10}
+.article-gallery-slide img{width:100%;height:100%;object-fit:cover;display:block;border-radius:0;margin:0}
+@media(max-width:640px){.article-gallery-slide{aspect-ratio:4/3}}
+.gallery-arrow{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;background:rgba(16,16,20,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:1.3rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:3;transition:opacity .2s,background .2s}
+.gallery-arrow:hover{background:rgba(16,16,20,.65)}
+.gallery-arrow:disabled{opacity:0;pointer-events:none}
+.gallery-arrow.prev{left:10px}
+.gallery-arrow.next{right:10px}
+.gallery-dots{position:absolute;left:0;right:0;bottom:12px;display:flex;justify-content:center;gap:7px;z-index:3}
+.gallery-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.4);border:none;padding:0;cursor:pointer;transition:background .2s,transform .2s}
+.gallery-dot.active{background:#fff;transform:scale(1.2)}
+
+/* rich text editor (members' area) */
+.rte-toolbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.rte-toolbar button,.rte-img-btn{background:var(--field);border:1.5px solid var(--line);color:var(--text);font:inherit;font-size:.85rem;font-weight:700;text-transform:none;letter-spacing:0;border-radius:8px;padding:6px 11px;cursor:pointer;line-height:1.3;display:inline-flex;align-items:center;gap:4px}
+.rte-toolbar button:hover,.rte-img-btn:hover{border-color:var(--flame)}
+.rte-editor{min-height:200px;border:1.5px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--field);
+  /* .f (the label wrapper) sets uppercase/bold/tracked type for field labels, which would
+     otherwise leak into the editable text by inheritance and break the WYSIWYG match with the
+     public article page, which has no such ancestor. */
+  font-weight:400;text-transform:none;letter-spacing:normal}
+.rte-editor:focus{outline:none;border-color:var(--flame);box-shadow:0 0 0 3px rgba(242,107,33,.18)}
+.rte-editor img{max-height:220px;object-fit:cover}
+
+/* photo gallery picker (members' area) */
+.gallery-picker{display:grid;gap:10px}
+.gallery-thumbs{display:flex;flex-wrap:wrap;gap:10px}
+.gallery-thumb{position:relative;width:76px;height:76px;border-radius:9px;overflow:hidden;border:1.5px solid var(--line)}
+.gallery-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.gallery-thumb-del{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(16,16,20,.7);color:#fff;border:none;font-size:.9rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.gallery-thumb-del:hover{background:var(--warn)}
+
+/* "Preview as article page" overlay */
+.preview-overlay{position:fixed;inset:0;z-index:300;background:rgba(10,10,12,.7);display:none;overflow-y:auto;padding:20px 0 60px}
+.preview-overlay.open{display:block}
+.preview-overlay-inner{max-width:800px;margin:0 auto;background:var(--paper);border-radius:var(--radius);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.preview-overlay-bar{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;background:var(--ink);color:#fff;font-size:.85rem;font-weight:700}
+.preview-overlay-body{padding:32px 0 40px}
+@media(max-width:640px){.preview-overlay{padding:0}.preview-overlay-inner{border-radius:0;min-height:100vh}}
 
 /* toast + badges */
 #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:12px 22px;border-radius:999px;border:1.5px solid var(--flame);font-weight:600;font-size:.92rem;opacity:0;pointer-events:none;transition:all .25s;z-index:200}
