@@ -143,17 +143,41 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 .partners{background:var(--ink);padding:13px 0}
 .partners-wrap{max-width:1120px;margin:0 auto;padding:0 20px;display:flex;align-items:center;gap:26px;flex-wrap:wrap}
 .partners .label{font-family:'Montserrat',sans-serif;font-weight:700;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ember);flex:0 0 auto}
+/* .logos-scroll > .logos-track holds two copies of the same .logos list (the second,
+   aria-hidden, is real markup in every page -- see index.html). On desktop both are inert
+   (display:contents all the way down) and the duplicate copy is hidden, so nothing changes
+   from before. On phones .logos-scroll becomes the marquee's clipped viewport and .logos-track
+   -- the single element holding BOTH copies side by side -- is what actually animates:
+   translateX(-50%) on the TRACK moves it by exactly one copy's width (since the percentage is
+   relative to the track's own width, which is two copies), so copy two lands exactly where
+   copy one started and the loop is seamless. (Animating each .logos copy individually instead
+   would move each by 50% of its OWN width and visibly desync -- it has to be the shared track.) */
+.logos-scroll,.logos-track{display:contents}
+.logos-scroll .logos[aria-hidden]{display:none}
 .partners .logos{display:flex;align-items:center;flex:1;justify-content:space-between;gap:20px;flex-wrap:wrap;min-width:0}
 .partners .logos a{position:relative;font-family:'Montserrat',sans-serif;font-weight:800;font-size:.95rem;letter-spacing:-.01em;color:#fff;text-decoration:none;opacity:.82;transition:opacity .15s,color .15s}
 .partners .logos a:hover{opacity:1;color:var(--ember)}
-.partners .logos a:not(:last-child)::after{
+.partners .logos a::after{
   content:"";position:absolute;top:-6px;bottom:-6px;right:-13px;width:2px;
   background:var(--flame);opacity:.8;transform:skewX(calc(-1 * var(--slant-deg)));pointer-events:none;
 }
-/* once the row wraps, the separators dangle at the end of each line -- drop them there */
+.partners .logos a:last-child::after{display:none}
 @media(max-width:760px){
-  .partners .logos{justify-content:flex-start;gap:8px 22px}
-  .partners .logos a::after{display:none}
+  @keyframes partners-marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .logos-scroll{
+    display:block;flex:1;min-width:0;overflow:hidden;
+    -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);
+    mask-image:linear-gradient(90deg,transparent 0,#000 24px,#000 calc(100% - 24px),transparent 100%);
+  }
+  .logos-track{display:flex;width:max-content;animation:partners-marquee 16s linear infinite}
+  .logos-scroll .logos{flex:0 0 auto;flex-wrap:nowrap;justify-content:flex-start;gap:22px;padding-right:22px}
+  .logos-scroll .logos[aria-hidden]{display:flex}
+  /* the tick separators are normally hidden after each list's last item (see .partners .logos
+     a:last-child::after above) -- in the marquee the two copies sit end to end, so the first
+     copy's last item needs its tick back too, or the seam between loops reads as a bare gap
+     next to every other, ticked gap */
+  .logos-scroll .logos a:last-child::after{display:block}
+  @media(hover:hover){.logos-scroll:hover .logos-track{animation-play-state:paused}}
 }
 :focus-visible{outline:3px solid var(--ember);outline-offset:2px}
 
