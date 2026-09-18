@@ -22,6 +22,13 @@
      silently change angle every time the content changed. */
   --slant-deg:20deg;
   --slant-ratio:.364;
+  /* The bevel used by the cards that can't afford a full parallelogram (Club Calendar rows,
+     Open Meets). --cut is the horizontal run of the corner cut, --rise its vertical run, and
+     --rise = --cut / --slant-ratio, so the cut edge sits at exactly --slant-deg NO MATTER how
+     tall the card grows. That is what a fixed "lean the whole card" offset could not do: the
+     same px lean on a 200px card and a 460px card reads as two different angles. */
+  --cut:34px;
+  --rise:93px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -389,7 +396,15 @@ section.page{padding:52px 0 72px}
    match the row's full height (set by .meet-main's often-much-taller content: pills, title,
    venue, notes, closing date, accordion), so the date badge and its own text end up stretched
    or vertically centred down a tall dark column instead of sitting compactly at the top. */
-.meet{display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:18px;align-items:start}
+/* The same bevel as the Club Calendar cards (--cut/--rise in :root), so a full-width gala card
+   leans at the same --slant-deg as everything else. These stack vertically and the cut edges
+   are parallel, so the 18px grid gap stays a uniform diagonal channel between neighbours.
+   Side padding clears the cut: --cut at the bottom-right, a little less at the top-left where
+   the first text line sits part-way down the cut. */
+.meet{display:grid;grid-template-columns:86px minmax(0,1fr) auto;gap:18px;align-items:start;
+  border-radius:0;padding:22px 44px 22px 36px;
+  clip-path:polygon(var(--cut) 0,100% 0,100% calc(100% - var(--rise)),calc(100% - var(--cut)) 100%,0 100%,0 var(--rise))}
+.meet .news-thumb{margin-left:-36px;margin-right:-44px}
 .meets-heading{font-size:1.4rem;margin:0 0 14px}
 .meets-heading:not(:first-of-type){margin-top:44px}
 .meets-sub{color:var(--muted);font-size:.92rem;margin:-6px 0 14px;max-width:70ch}
@@ -416,17 +431,25 @@ section.page{padding:52px 0 72px}
 .comp-foot{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 10px;margin-top:auto;font-size:.84rem;font-weight:700}
 .comp-status{color:var(--muted);font-weight:600}
 .comp-foot a{text-decoration:none;white-space:nowrap}
-@property --trace{syntax:'<angle>';initial-value:0deg;inherits:false}
-/* open entries (calendar competition cards + Open Meets page): orange edge with a highlight tracing round it every 3s */
-.entries-open{position:relative;border:2px solid var(--flame);box-shadow:0 0 0 1px rgba(245,132,31,.15),0 0 14px rgba(245,132,31,.35)}
-/* :not(.comp-card) -- comp-card spends its own ::before on the mobile corner flag (see below),
-   and gives entries-open a steady border+glow on ::after instead (see the comp-card rules) */
-.entries-open:not(.comp-card)::before{content:"";position:absolute;inset:-2px;z-index:-1;border-radius:inherit;padding:3px;pointer-events:none;
-  background:conic-gradient(from var(--trace),transparent 0deg 290deg,var(--flame) 335deg,#ffe2bd 356deg,transparent 360deg);
-  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
-  mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
-  filter:drop-shadow(0 0 6px var(--flame));animation:edge-trace 3s linear infinite}
-@keyframes edge-trace{0%{--trace:0deg;opacity:1}60%{--trace:360deg;opacity:1}70%,100%{--trace:360deg;opacity:0}}
+/* Open entries (calendar competition cards + Open Meets page). A border or box-shadow is drawn
+   on the element's RECTANGLE and only then clipped, so on a bevelled card it stopped dead at
+   the cut corners -- an outline simply cannot follow a clip-path. filter:drop-shadow() can: it
+   works off the rendered alpha, so the glow hugs the real, visible silhouette whatever shape
+   the card takes. So the highlight is now a warm background wash plus a slow breathing glow,
+   which also reads as "live" on mobile where the card flattens back to a rectangle.
+   (The global prefers-reduced-motion rule near the top stops the animation.) */
+.entries-open,.comp-card.entries-open{
+  position:relative;
+  background:linear-gradient(150deg,rgba(245,132,31,.20),var(--card) 62%);
+  animation:entries-pulse 2.8s ease-in-out infinite;
+}
+body.theme-dark .entries-open,body.theme-dark .comp-card.entries-open{
+  background:linear-gradient(150deg,rgba(245,132,31,.30),var(--card) 62%);
+}
+@keyframes entries-pulse{
+  0%,100%{filter:drop-shadow(0 0 2px rgba(245,132,31,.25))}
+  50%{filter:drop-shadow(0 0 11px rgba(245,132,31,.7))}
+}
 .meet .datebox{background:var(--ink);color:#fff;border-radius:12px;text-align:center;padding:12px 6px;height:fit-content}
 .meet .datebox .d{font-family:'Montserrat',sans-serif;font-weight:700;font-size:1.9rem;line-height:1}
 .meet .datebox .m{font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ember);margin-top:3px}
@@ -451,11 +474,11 @@ body.theme-dark .meet.ours .datebox .m{color:#3a1c00}
    the diagonal lands on the exact same --slant-deg as every skewed shape elsewhere (edge ratio
    = --slant-ratio), just drawn directly with clip-path rather than a skewed fill -- there's no
    room on a card this size for the padding a skewX fill would need to stay legible.
-   .meet uses ::after (its ::before is already the entries-open glow); the calendar cards use
-   ::before purely by convention (comp-card/social-card own ::after too, but keep the flag off
-   it in case it's ever needed elsewhere). */
+   The card's own clip-path has to go first: the flag lives in exactly the corner the bevel
+   cuts away, so the two cannot both be on. */
 @media(max-width:640px){
-  .meet{position:relative}
+  .meet{position:relative;clip-path:none;border-radius:var(--radius);padding:22px}
+  .meet .news-thumb{margin-left:-22px;margin-right:-22px}
   .meet::after,.comp-card::before,.social-card::before{
     content:"";position:absolute;top:0;left:0;z-index:1;width:18px;height:50px;
     background:linear-gradient(180deg,var(--flame),var(--flame-dark));
@@ -525,28 +548,23 @@ body.theme-dark .meet.ours .datebox .m{color:#3a1c00}
 .cat-row::-webkit-scrollbar{display:none}
 .cat-row>*{flex:0 0 300px}
 
-/* the homepage's card shape, carried onto the calendar: the card's own box is clipped to a
-   parallelogram at the site's one --slant-deg, rather than an inner layer skewing behind a
-   still-rectangular box -- clip-path removes the corner the skewX version left behind (which
-   showed the page background through as an odd notch), and it means a border/box-shadow put on
-   the card itself (e.g. .entries-open below) automatically hugs the real, visible edge instead
-   of tracing a rectangle around a leaning shape. --lean is a fixed px, not computed from the
-   element's live height, because clip-path can't reference layout the way a transform can --
-   it's tuned to this card's own min-height. Side padding clears the cut corners; a photo
-   (.social-card .art) sits well inside that padding, so it's never itself clipped. */
+/* Bevelled corners, not a full parallelogram (see --cut/--rise on .slanted above): a leaning
+   card wide enough to stay readable needs ~2x66px of side padding, which is what made these
+   cards feel cramped and left a huge wedge of empty page between neighbours in a row. The
+   bevel keeps the sides vertical, so the 16px row gap is the gap you actually see. */
 .comp-card,.social-card{
-  --lean:66px;position:relative;z-index:0;
+  position:relative;z-index:0;
   background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:0;
-  clip-path:polygon(var(--lean) 0,100% 0,calc(100% - var(--lean)) 100%,0 100%);
-  min-height:190px;padding:22px 72px;display:flex;flex-direction:column;gap:8px;
+  clip-path:polygon(var(--cut) 0,100% 0,100% calc(100% - var(--rise)),calc(100% - var(--cut)) 100%,0 100%,0 var(--rise));
+  min-height:200px;padding:22px 38px 22px 34px;display:flex;flex-direction:column;gap:8px;
 }
 /* our own hosted meets get a warm tint so they read as "ours" even scrolled past quickly --
    paired with the .pill.hosted ribbon (added inside .comp-top by site.js) */
 .comp-card.ours{background:linear-gradient(160deg,rgba(245,132,31,.14),var(--card) 55%)}
 body.theme-dark .comp-card.ours{background:linear-gradient(160deg,rgba(245,132,31,.22),var(--card) 55%)}
-/* the .meet cards on Open Meets keep the full animated conic-trace glow (see :not(.comp-card)
-   above); here a steady flame border + glow is enough, and it now traces the clipped shape. */
-.comp-card.entries-open{border:2px solid var(--flame);box-shadow:0 0 0 1px rgba(245,132,31,.15),0 0 14px rgba(245,132,31,.35)}
+/* a gala that is both ours and taking entries: the open-entries wash is the stronger signal */
+.comp-card.ours.entries-open{background:linear-gradient(150deg,rgba(245,132,31,.20),var(--card) 62%)}
+body.theme-dark .comp-card.ours.entries-open{background:linear-gradient(150deg,rgba(245,132,31,.30),var(--card) 62%)}
 @media(max-width:640px){
   .cat-row>*{flex:0 0 260px}
   .comp-card,.social-card{padding:18px 20px;min-height:0;clip-path:none;border-radius:var(--radius)}
@@ -610,6 +628,8 @@ form.stack{display:grid;gap:16px;max-width:560px}
 label.f input,label.f select,label.f textarea{font:inherit;font-size:1rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text);padding:11px 13px;border:1.5px solid var(--line);border-radius:10px;background:var(--field)}
 label.f input:focus,label.f select:focus,label.f textarea:focus{border-color:var(--flame);outline:none;box-shadow:0 0 0 3px rgba(242,107,33,.18)}
 .hint{font-size:.85rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:normal}
+label.f.checkbox-f{display:flex;align-items:center;gap:10px}
+label.f.checkbox-f input{all:revert;width:18px;height:18px;accent-color:var(--flame)}
 
 /* info accordions */
 details.info{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:0;margin-bottom:12px;overflow:hidden;transition:border-color .15s}
