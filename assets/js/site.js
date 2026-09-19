@@ -1,5 +1,22 @@
 /* Orange edge only when entries can actually be made: an open meet, upcoming, status open, and an entry pack link set. */
 const meetHasEntry=m=>m.type!=="teamMeet"&&!meetDone(m)&&m.status==="open"&&!!m.entryUrl;
+/* The results archive runs back to 2024 and only grows, so showing every completed gala as a
+   card leaves a wall of them between the reader and the one they came for. The most recent
+   season's galas stay as ordinary cards; each earlier year folds into one expandable bar.
+   "Most recent season" is whichever year has the newest results, not the calendar year, so
+   there is always something on show -- in January, last year's galas are still the latest. */
+function completedByYear(completed,card){
+  if(!completed.length)return `<p style="color:var(--muted)">No completed galas yet.</p>`;
+  const years=new Map();
+  completed.forEach(m=>{const y=m.start.slice(0,4);(years.get(y)||years.set(y,[]).get(y)).push(m);});
+  /* completed is already newest-first, so the first key is the season to leave open. */
+  return [...years].map(([year,meets],i)=>{
+    const cards=meets.map(card).join("");
+    if(i===0)return cards;
+    return `<details class="year-group"><summary>${year}<span class="year-count">${meets.length} gala${meets.length===1?"":"s"}</span></summary>
+      <div class="year-body">${cards}</div></details>`;
+  }).join("");
+}
 function renderMeets(){
   const all=DB.feed.filter(isMeet).sort((a,b)=>a.start<b.start?-1:1);
   const upcoming=all.filter(m=>!meetDone(m)),completed=all.filter(meetDone).reverse();
@@ -9,10 +26,13 @@ function renderMeets(){
   const upcomingOpen=upcoming.filter(m=>m.type!=="teamMeet"),upcomingTeam=upcoming.filter(m=>m.type==="teamMeet");
   const upcomingOurs=upcomingOpen.filter(m=>m.type==="meet"),upcomingOthers=upcomingOpen.filter(m=>m.type==="externalMeet");
   const extLink=(url,label,cls="big ghost")=>`<a class="btn ${cls}" href="${esc(url)}" target="_blank" rel="noopener">${label}</a>`;
+  /* Live results are published by the poolside laptop to a separate host, so this is always an external link. */
+  const liveLink=url=>`<a class="btn big live" href="${esc(url)}" target="_blank" rel="noopener"><span class="live-dot"></span>Live results</a>`;
   const meetCard=m=>{
     const done=meetDone(m),team=m.type==="teamMeet",ours=m.type==="meet";
     const dp=dateParts(m.start);
     const pills=[
+      meetLive(m)?'<span class="pill live"><span class="live-dot"></span>Live now</span>':"",
       done?'<span class="pill closed">Completed</span>':team?"":m.status==="open"?'<span class="pill open">Entries open</span>':'<span class="pill closed">Entries closed</span>',
       team?`<span class="pill results">${esc(m.league||"Team meet")}</span>`:ours?'<span class="pill hosted">BPSC hosted</span>':"",
       m.level&&!team?`<span class="pill level">${esc(m.level)}</span>`:""
@@ -24,15 +44,18 @@ function renderMeets(){
       +(m.officialsUrl?extLink(m.officialsUrl,"Officials sign-up"):"")
       +(m.volunteerUrl?extLink(m.volunteerUrl,"Volunteer here")
         :m.type==="meet"?`<a class="btn big ghost" href="volunteering">Volunteer here</a>`:"");
+    /* A gala in progress leads with its live-results button, whatever else the card offers. */
+    if(meetLive(m))actions=liveLink(m.liveUrl)+actions;
     const dates=m.end?`${fmtDate(m.start)} – ${fmtDate(m.end)}`:fmtDate(m.start);
     const extraLinks=[
       m.conditionsUrl?`Meet conditions &amp; details: <a href="${esc(m.conditionsUrl)}">${esc(m.conditionsLabel||"View conditions")}</a>`:"",
       m.entryFileUrl?`Sports Systems entry file: <a href="${esc(m.entryFileUrl)}">${esc(m.entryFileLabel||"Download entry file")}</a>`:"",
+      m.resultsFileUrl?`Sports Systems results file: <a href="${esc(m.resultsFileUrl)}">${esc(m.resultsFileLabel||"Download results file")}</a>`:"",
       m.currentEntriesUrl?`Current entries: <a href="${esc(m.currentEntriesUrl)}">View entries</a>`:""
     ].filter(Boolean).map(line=>`<div class="link-line">${line}</div>`).join("");
     const r=resolveNewsImage(m.img);
     const thumb=r?`<div class="news-thumb" style="background:${r.css}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
-    return `<article class="card meet${done?" done":""}${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
+    return `<article class="card meet${meetLive(m)?" live":""}${done?" done":""}${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
       ${thumb}
       <div class="datebox"><div class="d">${dp.d}</div><div class="m">${dp.m}</div></div>
       <div class="meet-main">
@@ -51,8 +74,16 @@ function renderMeets(){
     $("#meetsList").innerHTML=upcomingOurs.length?upcomingOurs.map(meetCard).join(""):`<p style="color:var(--muted)">No Basildon-hosted galas confirmed yet — check back soon.</p>`;
     $("#otherMeetsList").innerHTML=upcomingOthers.length?upcomingOthers.map(meetCard).join(""):`<p style="color:var(--muted)">No other open meets listed yet.</p>`;
     $("#teamMeetsList").innerHTML=upcomingTeam.length?upcomingTeam.map(meetCard).join(""):`<p style="color:var(--muted)">No team meets scheduled yet.</p>`;
-    $("#completedMeetsList").innerHTML=completed.length?completed.map(meetCard).join(""):`<p style="color:var(--muted)">No completed galas yet.</p>`;
+    $("#completedMeetsList").innerHTML=completedByYear(completed,meetCard);
   }
+  /* The hero's red LIVE pill only shows while a gala with a live-results link is actually running.
+     A button that pulses permanently and goes nowhere just trains people to ignore it. */
+  const livePill=$("#liveResultsPill"),liveNow=all.find(meetLive);
+  if(livePill){
+    if(liveNow){livePill.href=liveNow.liveUrl;livePill.hidden=false;livePill.title="Live results — "+liveNow.title;}
+    else livePill.hidden=true;
+  }
+
   if(!$("#nextMeetCard"))return;
   const isHome=m=>/basildon/i.test(m.venue||"");
   const clubUpcoming=upcoming.filter(m=>m.type==="meet");
@@ -65,18 +96,27 @@ function renderMeets(){
     :`<p class="eyebrow">Next Basildon meet</p><h3>Dates coming soon</h3>
     <div class="meta"><div>The next season's meets will be published here once confirmed.</div></div>`;
 }
+/* The Academy coaches get their own block under the squad coaches; coaches.html holds the
+   heading, which stays hidden while nobody carries the "Academy Coach" role. */
+function coachCard(c){
+  const ini=c.name.split(" ").map(w=>w[0]).slice(0,2).join("");
+  const squads=(c.squads||[]).map(s=>`<span class="tag">${esc(s)}</span>`).join("");
+  const photoStyle=c.photo?`background-image:url('${esc(c.photo)}')`:"";
+  return `<article class="card coach">
+    <div class="coach-photo" style="${photoStyle}">${c.photo?"":`<span class="avatar">${esc(ini)}</span>`}</div>
+    <h3>${esc(c.name)}</h3><div class="role">${esc(c.role)}</div>
+    ${c.quals?`<div class="quals">${esc(c.quals)}</div>`:""}
+    <div class="squads">${squads}</div></article>`;
+}
 function renderCoaches(){
   if(!$("#coachesList"))return;
-  $("#coachesList").innerHTML=DB.coaches.map(c=>{
-    const ini=c.name.split(" ").map(w=>w[0]).slice(0,2).join("");
-    const squads=(c.squads||[]).map(s=>`<span class="tag">${esc(s)}</span>`).join("");
-    const photoStyle=c.photo?`background-image:url('${esc(c.photo)}')`:"";
-    return `<article class="card coach">
-      <div class="coach-photo" style="${photoStyle}">${c.photo?"":`<span class="avatar">${esc(ini)}</span>`}</div>
-      <h3>${esc(c.name)}</h3><div class="role">${esc(c.role)}</div>
-      <div class="quals">${esc(c.quals)}</div>
-      <div class="squads">${squads}</div></article>`;
-  }).join("");
+  const academy=DB.coaches.filter(c=>c.role==="Academy Coach");
+  const squad=DB.coaches.filter(c=>c.role!=="Academy Coach");
+  $("#coachesList").innerHTML=squad.map(coachCard).join("");
+  if($("#academyCoachesList")){
+    $("#academyCoachesList").innerHTML=academy.map(coachCard).join("");
+    $("#academyCoachesHead").hidden=!academy.length;
+  }
 }
 function renderRoles(){
   if(!$("#rolesList"))return;
@@ -87,6 +127,10 @@ function renderRoles(){
         <span><strong>Training</strong>${esc(r.training)}</span>
       </div>
       <p>${esc(r.blurb)}</p></article>`).join("");
+}
+function renderWelfare(){
+  if(!$("#welfareBody"))return;
+  $("#welfareBody").innerHTML=sanitizeArticleHtml(DB.welfare[0]?.body||WELFARE_DEFAULT_BODY);
 }
 
 /* ================= SQUAD TIMETABLES =================
@@ -181,7 +225,7 @@ function renderCalendarGrid(){
       iso=`${y}-${String(m+1).padStart(2,"0")}-${String(dayNum).padStart(2,"0")}`;
       dayItems=items.filter(it=>it.start===iso||(it.end&&it.start<=iso&&iso<=it.end));
     }
-    const chips=dayItems.map(it=>{const c=calCatInfo(it);return `<div class="cal-chip ${c.cls}" title="${esc(c.label)}: ${esc(it.title)}">${esc(it.title)}</div>`;}).join("");
+    const chips=dayItems.map(it=>{const c=calCatInfo(it);return `<div class="cal-chip ${c.cls}" title="${esc(c.label)}: ${esc(it.title)}"><span class="cal-chip-label">${esc(it.title)}</span></div>`;}).join("");
     html+=`<div class="cal-day${inMonth?"":" out"}${iso&&iso===todayIso?" today":""}"><div class="cal-daynum">${inMonth?dayNum:""}</div>${chips}</div>`;
   }
   $("#calGrid").innerHTML=html;
@@ -253,15 +297,30 @@ const HERO_SLIDE_BG=[
   "linear-gradient(160deg,rgba(16,16,20,.5),rgba(16,16,20,.1) 65%),repeating-linear-gradient(120deg,rgba(255,255,255,.05) 0 3px,transparent 3px 6px),linear-gradient(135deg,#5a4a3a,#2c1c1c)"
 ];
 let heroIndex=0;
+let newsTagFilter=null;
 function renderNews(){
   if(!$("#newsList"))return;
-  const list=DB.feed.filter(it=>it.type==="news").sort((a,b)=>a.start<b.start?-1:1);
+  const all=DB.feed.filter(it=>it.type==="news").sort((a,b)=>a.start<b.start?-1:1);
+  const tags=[...new Set(all.map(n=>n.tag).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  if(newsTagFilter&&!tags.includes(newsTagFilter))newsTagFilter=null;
+  if($("#newsTagChips")){
+    $("#newsTagChips").innerHTML=[`<button type="button" class="news-tag-chip${newsTagFilter?"":" active"}" data-tag="">All</button>`]
+      .concat(tags.map(t=>`<button type="button" class="news-tag-chip${t===newsTagFilter?" active":""}" data-tag="${esc(t)}">${esc(t)}</button>`)).join("");
+  }
+  const list=newsTagFilter?all.filter(n=>n.tag===newsTagFilter):all;
   $("#newsList").innerHTML=list.map(n=>{
     const r=resolveNewsImage(n.img);
     const thumb=r?`<div class="news-thumb" style="background:${r.css}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
-    return `<div class="card">${thumb}<p class="eyebrow">${esc(n.tag)}</p><h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3><p style="color:var(--muted);font-size:.9rem;margin-top:8px">${esc(n.blurb)}</p><div style="margin-top:14px"><a class="btn small ghost" href="article?id=${n.id}">Read more →</a></div></div>`;
+    return `<article class="card news-card">${thumb}<p class="eyebrow">${esc(n.tag)}</p><h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3><p style="color:var(--muted);font-size:.9rem;margin-top:8px">${esc(n.blurb)}</p><div style="margin-top:14px"><a class="btn small ghost" href="article?id=${n.id}">Read more →</a></div></article>`;
   }).join("");
+  if(!list.length)$("#newsList").innerHTML=`<p style="color:var(--muted)">No news articles tagged "${esc(newsTagFilter)}" yet.</p>`;
 }
+document.addEventListener("click",e=>{
+  const chip=e.target.closest("#newsTagChips .news-tag-chip");
+  if(!chip)return;
+  newsTagFilter=chip.dataset.tag||null;
+  renderNews();
+});
 /* Hero carousel: pulls across the whole feed (meets, socials, news) so it reads as one connected
    "what's happening" strip rather than club news alone — sorted by closeness to today's date. */
 function heroFeedContent(it){
@@ -377,7 +436,7 @@ function renderArticle(){
     +`<div style="margin-top:28px"><a class="btn small ghost" href="${back.href}">${back.label}</a></div>`;
   wireArticleGallery((it.photos||[]).length);
 }
-function renderAllPublic(){renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();}
+function renderAllPublic(){renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();}
 
 /* ================= NAV ================= */
 const infoDropdown=$("#infoDropdown"), infoToggle=$("#infoToggle");
@@ -431,9 +490,13 @@ if($("#joinLessons")){
 }
 
 /* ================= INIT ================= */
-const CONTENT_SLOTS="#meetsList,#otherMeetsList,#teamMeetsList,#completedMeetsList,#coachesList,#rolesList,#newsList,#ttBody,#socialsList,#compList,#leagueList";
+const CONTENT_SLOTS="#meetsList,#otherMeetsList,#teamMeetsList,#completedMeetsList,#coachesList,#academyCoachesList,#rolesList,#newsList,#ttBody,#socialsList,#compList,#leagueList";
 document.querySelectorAll(CONTENT_SLOTS).forEach(el=>{el.innerHTML=`<p style="color:var(--muted)">Loading…</p>`;});
-loadContent().then(renderAllPublic).catch(e=>{
+loadContent().then(()=>{
+  /* Admins can hide a meet from the public site (without deleting it) by unticking "Show on
+     the website" in the members' area; members.js keeps the full list, but nothing here should. */
+  DB.feed=DB.feed.filter(it=>it.visible!==false);
+}).then(renderAllPublic).catch(e=>{
   console.error("Could not load content",e);
   document.querySelectorAll(CONTENT_SLOTS)
     .forEach(el=>{el.innerHTML=`<p style="color:var(--muted)">Content couldn't be loaded just now. Please refresh the page.</p>`;});

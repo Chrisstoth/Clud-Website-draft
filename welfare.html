@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=10">
+<link rel="stylesheet" href="assets/css/site.css?v=31">
 </head>
 <body class="theme-dark">
 <script>try{if(localStorage.getItem("bpsc_theme")==="light")document.body.classList.remove("theme-dark")}catch(e){}</script>
@@ -24,6 +24,7 @@
     <nav class="main" id="mainNav" aria-label="Main">
       <a href="open-meets">Open Meets</a>
       <a href="club-calendar">Club Calendar</a>
+      <a href="news">Club News</a>
       <div class="nav-dropdown" id="infoDropdown">
         <button type="button" class="nav-dropdown-toggle" id="infoToggle" aria-haspopup="true" aria-expanded="false">Club Info <span class="caret">▾</span></button>
         <div class="nav-dropdown-menu" id="infoMenu">
@@ -34,7 +35,6 @@
           <a href="policies">Club Policies</a>
           <a href="history">Mission &amp; Club History</a>
           <a href="contact">Contact Us</a>
-          <a href="news">Club News</a>
         </div>
       </div>
       <a class="active" aria-current="page" href="welfare">Welfare</a>
@@ -77,26 +77,28 @@
       <p class="eyebrow">Every swimmer. Every time.</p>
       <h2 class="display">Welfare &amp; Safeguarding</h2>
       <div class="lane-rope"></div>
-      <p>Safeguarding is everyone's responsibility. This page is a placeholder — real content couldn't be pulled in automatically from basildonswimming.org/welfare, so replace the text below with the current policy and contacts.</p>
+      <p>Safeguarding is everyone's responsibility. Here's what to do if you have a concern, who to contact, and where our policies live.</p>
     </div>
-    <div class="grid cols-2" style="max-width:900px">
-      <div class="card">
-        <p class="eyebrow" style="color:var(--ok)">Report a concern</p>
-        <h3 style="font-size:1.1rem;margin-top:6px">Talk to our Welfare Officer</h3>
-        <p style="color:var(--muted);font-size:.92rem;margin-top:8px">If you have a concern about a child or adult at risk at the club, contact the Welfare Officer directly — you don't need to go through your coach or the committee first.</p>
-        <p style="margin-top:10px"><a href="mailto:welfare@phoenixbasildonsc.org">welfare@phoenixbasildonsc.org</a></p>
-      </div>
-      <div class="card">
-        <p class="eyebrow">In an emergency</p>
-        <h3 style="font-size:1.1rem;margin-top:6px">If a child is in immediate danger</h3>
-        <p style="color:var(--muted);font-size:.92rem;margin-top:8px">Call 999. For non-emergency concerns you can also contact the NSPCC or Swim England's Wavepower safeguarding team — links to come.</p>
-      </div>
-    </div>
-    <div style="max-width:760px;margin-top:8px">
-      <details class="info"><summary>Our safeguarding policy</summary><div class="body">Wavepower safeguarding policy and club-specific procedures — document link to come.</div></details>
-      <details class="info"><summary>Codes of conduct</summary><div class="body">See <a href="policies">Club Policies</a> for codes of conduct covering swimmers, parents/carers and coaches.</div></details>
-      <details class="info"><summary>DBS &amp; coach checks</summary><div class="body">All coaches and regularly-attending volunteers are DBS-checked and safeguarding trained — see <a href="coaches">Coaches &amp; Squads</a>.</div></details>
-    </div>
+    <div class="article-body article-container" id="welfareBody" style="max-width:760px"><p><strong>If you believe a child or adult to be in immediate danger, call 999</strong>, then notify our Welfare Officer for further advice. If no immediate danger is apparent, contact our Welfare Officer directly — you don't need to go through your coach or the committee first.</p>
+<h3>Club Welfare Officers</h3>
+<ul>
+<li>Katie Doel — BPSC Welfare Officer — <a href="mailto:welfare@phoenixbasildonsc.org">welfare@phoenixbasildonsc.org</a></li>
+<li>Kathy Morey — BPSC Welfare Officer — <a href="mailto:welfare@phoenixbasildonsc.org">welfare@phoenixbasildonsc.org</a></li>
+</ul>
+<h3>Swim England contacts</h3>
+<ul>
+<li>Cheryl Ellis — Essex Welfare Officer — <a href="mailto:welfare@essexswimming.org">welfare@essexswimming.org</a></li>
+<li>Fran Vesztrocy — East Region Welfare Officer — <a href="mailto:eastwelfare@swimming.org">eastwelfare@swimming.org</a></li>
+</ul>
+<h3>Safeguarding policy</h3>
+<p>Swim England's Wavepower child safeguarding policy manual sets out our safeguarding procedures — see the <a href="https://www.swimming.org/swimengland/wavepower-child-safeguarding-for-clubs/">Wavepower policy manual</a>. See also <a href="policies">Club Policies</a> for our codes of conduct, and <a href="coaches">Coaches &amp; Squads</a> for DBS checks and safeguarding training.</p>
+<h3>Other safeguarding organisations and resources</h3>
+<p>Recommended by Swim England — the full list is <a href="https://www.swimming.org/swimengland/other-safeguarding-organisations-resources/">here</a>.</p>
+<ul>
+<li><a href="https://www.escb.co.uk/working-with-children/concerns-about-the-welfare-of-a-child/">Essex Safeguarding Children Board</a></li>
+<li><a href="https://www.essex.gov.uk/adult-social-care-and-health/report-concern-about-adult/report-concern-about-child">Essex County Council — Children's Social Care</a></li>
+<li><a href="https://www.activeessex.org/dealing-with-a-concern/">Active Essex — Dealing with a concern</a></li>
+</ul></div>
   </div>
 </section>
 </main>
@@ -134,7 +136,8 @@
 
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
-<script src="assets/js/core.js?v=10"></script>
-<script src="assets/js/site.js?v=10"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.15/purify.min.js"></script>
+<script src="assets/js/core.js?v=12"></script>
+<script src="assets/js/site.js?v=15"></script>
 </body>
 </html>

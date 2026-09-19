@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=10">
+<link rel="stylesheet" href="assets/css/site.css?v=31">
 </head>
 <body class="theme-dark">
 <script>try{if(localStorage.getItem("bpsc_theme")==="light")document.body.classList.remove("theme-dark")}catch(e){}</script>
@@ -24,6 +24,7 @@
     <nav class="main" id="mainNav" aria-label="Main">
       <a href="open-meets">Open Meets</a>
       <a href="club-calendar">Club Calendar</a>
+      <a href="news">Club News</a>
       <div class="nav-dropdown" id="infoDropdown">
         <button type="button" class="nav-dropdown-toggle" id="infoToggle" aria-haspopup="true" aria-expanded="false">Club Info <span class="caret">▾</span></button>
         <div class="nav-dropdown-menu" id="infoMenu">
@@ -34,7 +35,6 @@
           <a href="policies">Club Policies</a>
           <a href="history">Mission &amp; Club History</a>
           <a href="contact">Contact Us</a>
-          <a href="news">Club News</a>
         </div>
       </div>
       <a href="welfare">Welfare</a>
@@ -74,7 +74,7 @@
 <section class="page" id="page-home">
   <div class="hero">
     <div class="container hero-grid">
-      <a class="live-results" href="open-meets"><span class="live-dot"></span>Live Results</a>
+      <a class="live-results" id="liveResultsPill" href="open-meets" target="_blank" rel="noopener" hidden><span class="live-dot"></span>Live Results</a>
       <div>
         <p class="eyebrow" style="color:var(--ink)">Basildon Sporting Village · Essex</p>
         <h1 class="display" id="heroTitle" role="button" tabindex="0" aria-live="polite" style="cursor:pointer" data-text-a="Basildon&rsquo;s home of competitive swimming" data-text-b="A friendly, well-coached swimming club for Basildon &mdash; from first strokes to first races">Basildon&rsquo;s home of competitive swimming</h1>
@@ -151,7 +151,7 @@
 
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
-<script src="assets/js/core.js?v=10"></script>
-<script src="assets/js/site.js?v=10"></script>
+<script src="assets/js/core.js?v=12"></script>
+<script src="assets/js/site.js?v=15"></script>
 </body>
 </html>

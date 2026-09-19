@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=10">
+<link rel="stylesheet" href="assets/css/site.css?v=31">
 </head>
 <body class="theme-dark">
 <script>try{if(localStorage.getItem("bpsc_theme")==="light")document.body.classList.remove("theme-dark")}catch(e){}</script>
@@ -24,6 +24,7 @@
     <nav class="main" id="mainNav" aria-label="Main">
       <a class="active" aria-current="page" href="open-meets">Open Meets</a>
       <a href="club-calendar">Club Calendar</a>
+      <a href="news">Club News</a>
       <div class="nav-dropdown" id="infoDropdown">
         <button type="button" class="nav-dropdown-toggle" id="infoToggle" aria-haspopup="true" aria-expanded="false">Club Info <span class="caret">▾</span></button>
         <div class="nav-dropdown-menu" id="infoMenu">
@@ -34,7 +35,6 @@
           <a href="policies">Club Policies</a>
           <a href="history">Mission &amp; Club History</a>
           <a href="contact">Contact Us</a>
-          <a href="news">Club News</a>
         </div>
       </div>
       <a href="welfare">Welfare</a>
@@ -90,6 +90,7 @@
     <p class="meets-sub">Arena League, Essex League and other team galas. Teams are selected by the coaches — there's no individual entry.</p>
     <div class="grid" id="teamMeetsList"></div>
     <h3 class="display meets-heading" id="completed-galas">Completed galas</h3>
+    <p class="meets-sub">Results from every gala we've hosted. This season's are listed below &mdash; open a year to see earlier ones.</p>
     <div class="grid" id="completedMeetsList"></div>
   </div>
 </section>
@@ -128,7 +129,7 @@
 
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
-<script src="assets/js/core.js?v=10"></script>
-<script src="assets/js/site.js?v=10"></script>
+<script src="assets/js/core.js?v=12"></script>
+<script src="assets/js/site.js?v=15"></script>
 </body>
 </html>

@@ -13,11 +13,11 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const TT_LOC={lc:"BSV Long Course",deep:"BSV Short Course – Deep End",shallow:"BSV Short Course – Shallow End",bill:"Billericay Pool",land:"BSV Meeting Room"};
 
 /* In-memory copy of what is published, filled by loadContent() on every page load. */
-const DB={feed:[],coaches:[],squads:[],roles:[],newsDefaults:[],enquiries:[]};
+const DB={feed:[],coaches:[],squads:[],roles:[],newsDefaults:[],welfare:[],enquiries:[]};
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",leagueUrl:"league_url",conditionsUrl:"conditions_url",conditionsLabel:"conditions_label",entryFileUrl:"entry_file_url",entryFileLabel:"entry_file_label",currentEntriesUrl:"current_entries_url",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",conditionsUrl:"conditions_url",conditionsLabel:"conditions_label",entryFileUrl:"entry_file_url",entryFileLabel:"entry_file_label",resultsFileUrl:"results_file_url",resultsFileLabel:"results_file_label",currentEntriesUrl:"current_entries_url",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body",visible:"visible"};
 const FEED_TYPE_TO_ROW={meet:"meet",externalMeet:"external_meet",teamMeet:"team_meet",social:"social",news:"news",training:"training"};
 const FEED_TYPE_FROM_ROW=Object.fromEntries(Object.entries(FEED_TYPE_TO_ROW).map(([k,v])=>[v,k]));
 
@@ -29,6 +29,9 @@ function feedFromRow(row){
 function feedToRow(it){
   const row={type:FEED_TYPE_TO_ROW[it.type]};
   for(const [key,col] of Object.entries(FEED_FIELDS))if(key!=="type")row[col]=it[key]===""||it[key]===undefined?null:it[key];
+  /* "visible" is a not-null column; types whose form has no visibility checkbox never set it,
+     so treat "not provided" as visible rather than writing a null the database would reject. */
+  if(row.visible===null)row.visible=true;
   return row;
 }
 const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads:r.squads||[],photo:r.photo||""});
@@ -39,6 +42,8 @@ const roleFromRow=r=>({id:r.id,title:r.title,commitment:r.commitment||"",trainin
 const roleToRow=r=>({title:r.title,commitment:r.commitment||null,training:r.training||null,blurb:r.blurb});
 const pictureFromRow=r=>({id:r.id,key:r.key,label:r.label,icon:r.icon||"",bg:r.bg||"",img:r.img||""});
 const pictureToRow=p=>({key:p.key,label:p.label,icon:p.icon||null,bg:p.bg||null,img:p.img||null});
+const welfareFromRow=r=>({id:r.id,body:r.body||""});
+const welfareToRow=w=>({body:w.body||""});
 
 /* Each members'-area section, and the table and translation it reads and writes. */
 const SECTIONS={
@@ -46,7 +51,8 @@ const SECTIONS={
   coaches:{table:"coaches",from:coachFromRow,to:coachToRow,order:"sort_order"},
   squads:{table:"squads",from:squadFromRow,to:squadToRow,order:"sort_order"},
   roles:{table:"volunteer_roles",from:roleFromRow,to:roleToRow,order:"sort_order"},
-  newsDefaults:{table:"news_defaults",from:pictureFromRow,to:pictureToRow,order:"id"}
+  newsDefaults:{table:"news_defaults",from:pictureFromRow,to:pictureToRow,order:"id"},
+  welfare:{table:"welfare_page",from:welfareFromRow,to:welfareToRow,order:"id"}
 };
 
 async function loadContent(){
@@ -104,6 +110,43 @@ function resolveNewsImage(img){
     return d.img?{css:`url('${esc(d.img)}') center/cover no-repeat`,icon:null}:{css:d.bg,icon:d.icon};
   }
   return {css:`url('${esc(img)}') center/cover no-repeat`,icon:null};
+}
+
+/* Shown on the Welfare & Safeguarding page (and in its admin editor) until the welfare_page
+   row loads or if it's ever emptied out — the real content is normally in the database, kept
+   here only as a fallback so the page is never blank. */
+const WELFARE_DEFAULT_BODY=`<p><strong>If you believe a child or adult to be in immediate danger, call 999</strong>, then notify our Welfare Officer for further advice. If no immediate danger is apparent, contact our Welfare Officer directly — you don't need to go through your coach or the committee first.</p>
+<h3>Club Welfare Officers</h3>
+<ul>
+<li>Katie Doel — BPSC Welfare Officer — <a href="mailto:welfare@phoenixbasildonsc.org">welfare@phoenixbasildonsc.org</a></li>
+<li>Kathy Morey — BPSC Welfare Officer — <a href="mailto:welfare@phoenixbasildonsc.org">welfare@phoenixbasildonsc.org</a></li>
+</ul>
+<h3>Swim England contacts</h3>
+<ul>
+<li>Cheryl Ellis — Essex Welfare Officer — <a href="mailto:welfare@essexswimming.org">welfare@essexswimming.org</a></li>
+<li>Fran Vesztrocy — East Region Welfare Officer — <a href="mailto:eastwelfare@swimming.org">eastwelfare@swimming.org</a></li>
+</ul>
+<h3>Safeguarding policy</h3>
+<p>Swim England's Wavepower child safeguarding policy manual sets out our safeguarding procedures — see the <a href="https://www.swimming.org/swimengland/wavepower-child-safeguarding-for-clubs/">Wavepower policy manual</a>. See also <a href="policies">Club Policies</a> for our codes of conduct, and <a href="coaches">Coaches &amp; Squads</a> for DBS checks and safeguarding training.</p>
+<h3>Other safeguarding organisations and resources</h3>
+<p>Recommended by Swim England — the full list is <a href="https://www.swimming.org/swimengland/other-safeguarding-organisations-resources/">here</a>.</p>
+<ul>
+<li><a href="https://www.escb.co.uk/working-with-children/concerns-about-the-welfare-of-a-child/">Essex Safeguarding Children Board</a></li>
+<li><a href="https://www.essex.gov.uk/adult-social-care-and-health/report-concern-about-adult/report-concern-about-child">Essex County Council — Children's Social Care</a></li>
+<li><a href="https://www.activeessex.org/dealing-with-a-concern/">Active Essex — Dealing with a concern</a></li>
+</ul>`;
+
+/* Full public Welfare & Safeguarding page markup, shared by the page itself (site.js, body
+   only — the page-head there is static HTML) and the admin "preview as welfare page" (members.js,
+   whole thing) so an admin sees exactly what will publish. */
+function welfarePageHtml(body){
+  return `<div class="page-head">
+      <p class="eyebrow">Every swimmer. Every time.</p>
+      <h2 class="display">Welfare &amp; Safeguarding</h2>
+      <div class="lane-rope"></div>
+      <p>Safeguarding is everyone's responsibility. Here's what to do if you have a concern, who to contact, and where our policies live.</p>
+    </div>
+    <div class="article-body article-container" style="max-width:760px">${sanitizeArticleHtml(body||WELFARE_DEFAULT_BODY)}</div>`;
 }
 
 /* ================= ARTICLES (news & socials) =================
@@ -191,6 +234,12 @@ function dateParts(iso){const d=new Date(iso+"T12:00:00");return{d:d.getDate(),m
 /* A meet moves to "Completed galas" automatically once its last day (end, or start for one-day meets) has passed. */
 function isoToday(){const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`;}
 const meetDone=m=>(m.end||m.start)<isoToday();
+
+/* A meet is "running" from its first day to its last day inclusive -- that's the window in which the
+   live results feed from the poolside laptop is worth pointing people at. meetLive() also needs a
+   liveUrl, because a gala with no results page set up has nothing to show. */
+const meetRunning=m=>{const t=isoToday();return m.start<=t&&t<=(m.end||m.start);};
+const meetLive=m=>!!m.liveUrl&&meetRunning(m);
 
 /* Three kinds of meet share the Open Meets page: "meet" = open meet hosted by BPSC, "externalMeet" = open meet
    hosted by someone else (county champs etc.), "teamMeet" = league/team gala (no entries or volunteers). */

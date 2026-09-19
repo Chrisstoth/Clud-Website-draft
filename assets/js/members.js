@@ -7,7 +7,8 @@ const ROLES = {
   comms:      {label:"Comms / Club News",    desc:"Post club news & announcements",   sections:["feed"], feedTypes:["news"]},
   training:   {label:"Coaching / Training Changes", desc:"Post key training schedule changes", sections:["feed"], feedTypes:["training"]},
   membership: {label:"Membership Team",      desc:"View trial & squad enquiries",     sections:["enquiries"]},
-  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","coaches","squads","roles","enquiries","newsDefaults"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
+  welfare:    {label:"Welfare Officer",      desc:"Edit the Welfare & Safeguarding page", sections:["welfare"]},
+  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","coaches","squads","roles","enquiries","newsDefaults","welfare"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
 };
 const SECTION_META = {
   feed:{name:"Club Feed", empty:"Nothing published yet — add the first item."},
@@ -15,7 +16,8 @@ const SECTION_META = {
   squads:{name:"Squad Timetables", empty:"No squads yet — add the first one."},
   roles:{name:"Volunteer Roles", empty:"No roles yet."},
   enquiries:{name:"Trial Enquiries (inbox)", empty:"No enquiries yet — the public Join Us form feeds this inbox."},
-  newsDefaults:{name:"Default News Pictures", empty:"No default picture categories yet."}
+  newsDefaults:{name:"Default News Pictures", empty:"No default picture categories yet."},
+  welfare:{name:"Welfare & Safeguarding Page", empty:""}
 };
 /* One type per feed item; a role's feedTypes controls which of these it can add/see */
 const FEED_TYPE_META = {
@@ -35,6 +37,7 @@ function slugify(s){return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"-"
 const SCHEMAS = {
   meet:[
     {k:"title",label:"Meet name",type:"text",req:1},
+    {k:"visible",label:"Show on the website (untick to hide without deleting)",type:"checkbox"},
     {k:"level",label:"Level / type",type:"select",opts:["Level 1","Level 2","Level 3","Level 4","Club"]},
     {k:"license",label:"Licence number (optional)",type:"text"},
     {k:"poolType",label:"Pool / course (e.g. 25m Short Course)",type:"text"},
@@ -46,11 +49,14 @@ const SCHEMAS = {
     {k:"entryUrl",label:"Entry pack link (URL)",type:"text"},
     {k:"officialsUrl",label:"Officials sign-up link (URL — button hidden if blank)",type:"text"},
     {k:"volunteerUrl",label:"Volunteer here link (URL — leave blank to use the Volunteering page)",type:"text"},
+    {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
     {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
     {k:"conditionsUrl",label:"Meet conditions & details link (URL)",type:"text"},
     {k:"conditionsLabel",label:"Meet conditions link text",type:"text"},
     {k:"entryFileUrl",label:"Sports Systems entry file link (URL)",type:"text"},
     {k:"entryFileLabel",label:"Entry file link text",type:"text"},
+    {k:"resultsFileUrl",label:"Sports Systems results file link (URL — the .zip other clubs import)",type:"text"},
+    {k:"resultsFileLabel",label:"Results file link text",type:"text"},
     {k:"currentEntriesUrl",label:"Current entries link (URL)",type:"text"},
     {k:"notes",label:"Notes for parents & swimmers",type:"textarea"},
     {k:"img",label:"Picture",type:"imagepicker"}
@@ -70,6 +76,7 @@ const SCHEMAS = {
   ],
   externalMeet:[
     {k:"title",label:"Meet name (e.g. Essex County Championships)",type:"text",req:1},
+    {k:"visible",label:"Show on the website (untick to hide without deleting)",type:"checkbox"},
     {k:"host",label:"Hosted by (e.g. Essex County ASA)",type:"text",req:1},
     {k:"level",label:"Level / type",type:"select",opts:["Level 1","Level 2","Level 3","Level 4","Regional","National","Other"]},
     {k:"license",label:"Licence number (optional)",type:"text"},
@@ -82,15 +89,19 @@ const SCHEMAS = {
     {k:"entryUrl",label:"Entry pack link (URL)",type:"text"},
     {k:"officialsUrl",label:"Officials sign-up link (URL — button hidden if blank)",type:"text"},
     {k:"volunteerUrl",label:"Volunteer link (URL — button hidden if blank)",type:"text"},
+    {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
     {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
     {k:"conditionsUrl",label:"Meet conditions & details link (URL)",type:"text"},
     {k:"conditionsLabel",label:"Meet conditions link text",type:"text"},
+    {k:"resultsFileUrl",label:"Sports Systems results file link (URL — the .zip other clubs import)",type:"text"},
+    {k:"resultsFileLabel",label:"Results file link text",type:"text"},
     {k:"currentEntriesUrl",label:"Current entries link (URL)",type:"text"},
     {k:"notes",label:"Notes for parents & swimmers",type:"textarea"},
     {k:"img",label:"Picture",type:"imagepicker"}
   ],
   teamMeet:[
     {k:"title",label:"Meet name (e.g. Arena League — Round 1)",type:"text",req:1},
+    {k:"visible",label:"Show on the website (untick to hide without deleting)",type:"checkbox"},
     {k:"league",label:"League / competition (e.g. Arena League, Essex League)",type:"text",req:1},
     {k:"poolType",label:"Pool / course (e.g. 25m Short Course)",type:"text"},
     {k:"start",label:"Date",type:"date",req:1},
@@ -98,6 +109,7 @@ const SCHEMAS = {
     {k:"venue",label:"Venue & pool",type:"text"},
     {k:"notes",label:"Info for parents & swimmers (team selection, arrival times…)",type:"textarea"},
     {k:"leagueUrl",label:"League info link (URL — optional)",type:"text"},
+    {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
     {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
     {k:"img",label:"Picture",type:"imagepicker"}
   ],
@@ -215,9 +227,11 @@ function itemSummary(sec,it){
   if(sec==="feed"){
     const typeLabel=FEED_TYPE_META[it.type].label;
     if(isMeet(it)){
-      const state=meetDone(it)?(it.resultsUrl?"completed · results linked":"completed · add results link"):it.type==="teamMeet"?(it.league||"team meet"):"entries "+it.status;
+      /* Flag a gala that is running today so the Open Meets Secretary can see at a glance whether the live link is set. */
+      const state=meetRunning(it)?(it.liveUrl?"● LIVE NOW — results linked":"● running today — add live results link"):meetDone(it)?(it.resultsUrl?"completed · results linked":"completed · add results link"):it.type==="teamMeet"?(it.league||"team meet"):"entries "+it.status;
       const who=it.type==="externalMeet"?` · host: ${it.host||"?"}`:"";
-      return {t:it.title,s:`${typeLabel}${who} · ${fmtDate(it.start)} · ${it.venue||"Venue TBC"} · ${state}`};
+      const hidden=it.visible===false?" · HIDDEN FROM SITE":"";
+      return {t:it.title,s:`${typeLabel}${who} · ${fmtDate(it.start)} · ${it.venue||"Venue TBC"} · ${state}${hidden}`};
     }
     if(it.type==="social")return {t:it.title,s:`${typeLabel} · ${fmtDate(it.start)}`};
     if(it.type==="news")return {t:it.title,s:`${typeLabel} · ${it.tag}${it.start?" · "+fmtDate(it.start):""}`};
@@ -241,6 +255,10 @@ function renderAdminSection(){
         <div class="s">${esc(q.parent)} · ${esc(q.email)} · DOB ${esc(q.dob)} · ${esc(q.detail)} · received ${esc(q.received)}</div>
         ${q.notes?`<div class="s inbox-msg">“${esc(q.notes)}”</div>`:""}
       </div></div>`).join(""):`<p style="color:var(--muted)">${SECTION_META.enquiries.empty}</p>`}`;
+    return;
+  }
+  if(sec==="welfare"){
+    showWelfareForm();
     return;
   }
   const items=sec==="feed"?feedItemsForRole(role):DB[sec];
@@ -403,6 +421,7 @@ function showForm(sec,id,forcedType){
   const fields=SCHEMAS[schemaKey].map(f=>{
     const val=esc(it[f.k]??"");
     if(f.type==="textarea")return `<label class="f">${f.label}<textarea name="${f.k}" rows="3" ${f.req?"required":""}>${val}</textarea></label>`;
+    if(f.type==="checkbox")return `<label class="f checkbox-f"><input type="checkbox" name="${f.k}" ${it[f.k]===false?"":"checked"}> ${f.label}</label>`;
     if(f.type==="select"){
       const opts=f.opts.map(o=>{const [v,l]=Array.isArray(o)?o:[o,o];return `<option value="${esc(v)}" ${it[f.k]===v?"selected":""}>${esc(l)}</option>`;}).join("");
       return `<label class="f">${f.label}<select name="${f.k}">${opts}</select></label>`;
@@ -571,6 +590,8 @@ function showForm(sec,id,forcedType){
   $("#adminForm").addEventListener("submit",async e=>{
     e.preventDefault();
     const data=Object.fromEntries(new FormData(e.target).entries());
+    /* FormData omits an unchecked checkbox entirely, so read those straight off the inputs. */
+    SCHEMAS[schemaKey].filter(f=>f.type==="checkbox").forEach(f=>{data[f.k]=formTarget.querySelector(`[name="${f.k}"]`).checked;});
     if(sec==="coaches"){data.squads=(data.squadsRaw||"").split(",").map(s=>s.trim()).filter(Boolean);delete data.squadsRaw;}
     if(isFeed)data.type=type;
     if(galleryField)data.photos=galleryPhotos;
@@ -611,6 +632,92 @@ function showArticlePreview(it){
   overlay.classList.add("open");
   document.getElementById("previewClose").addEventListener("click",()=>overlay.classList.remove("open"));
   wireArticleGallery((it.photos||[]).length);
+}
+
+/* The Welfare & Safeguarding page is a single document rather than a list of items, so it
+   gets its own editor instead of going through showForm/SCHEMAS — one rich-text box, a Save
+   button, and a "Preview the page" button using the exact same markup the public page
+   renders (welfarePageHtml, in core.js), so what an admin sees here is what publishes. */
+function showWelfareForm(){
+  const main=$("#adminMain"),current=DB.welfare[0];
+  main.innerHTML=`<h2>${SECTION_META.welfare.name}</h2>
+    <div class="admin-note">Changes here publish straight to the public Welfare page — no webmaster needed.</div>
+    <form class="stack" id="welfareForm" style="margin-top:10px">
+      <div class="f">
+        <div class="rte-toolbar" id="rteToolbar">
+          <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+          <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
+          <button type="button" data-cmd="formatBlock" data-val="&lt;h3&gt;" title="Subheading">H3</button>
+          <button type="button" data-cmd="formatBlock" data-val="&lt;p&gt;" title="Paragraph">¶</button>
+          <button type="button" data-cmd="insertUnorderedList" title="Bullet list">•⁠—</button>
+          <button type="button" data-cmd="insertOrderedList" title="Numbered list">1.—</button>
+          <button type="button" data-cmd="createLink" title="Insert link">🔗</button>
+          <label class="rte-img-btn" title="Insert photo">🖼️ Photo<input type="file" accept="image/*" id="rteImgInput" style="display:none"></label>
+        </div>
+        <div class="rte-editor article-body" id="rteEditor" contenteditable="true">${sanitizeArticleHtml(current?current.body:WELFARE_DEFAULT_BODY)}</div>
+        <p class="hint" style="margin-top:6px">This box shows exactly how the page text will look — headings, bold, links, lists and photos, in place.</p>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn" type="submit">Save &amp; publish</button>
+        <button type="button" class="btn small ghost" id="welfarePreviewBtn">Preview the page</button>
+      </div>
+    </form>`;
+  const rteEditor=$("#rteEditor");
+  $("#rteToolbar").addEventListener("click",e=>{
+    const b=e.target.closest("[data-cmd]");if(!b)return;
+    rteEditor.focus();
+    if(b.dataset.cmd==="createLink"){
+      const url=prompt("Link URL (https://… or mailto:…)");
+      if(url)document.execCommand("createLink",false,url);
+      return;
+    }
+    document.execCommand(b.dataset.cmd,false,b.dataset.val||null);
+  });
+  $("#rteImgInput").addEventListener("change",async e=>{
+    const file=e.target.files[0];
+    if(!file)return;
+    try{
+      const url=await uploadImage(file);
+      rteEditor.focus();
+      document.execCommand("insertHTML",false,`<img src="${url}" alt="">`);
+    }catch(err){toast(err.message||"Couldn't upload that photo");}
+    e.target.value="";
+  });
+  /* Pasting from Word/Docs/etc drags in fonts, colours and classes the sanitizer would strip
+     anyway — inserting as plain text keeps the editor honest about what will actually publish. */
+  rteEditor.addEventListener("paste",e=>{
+    e.preventDefault();
+    document.execCommand("insertText",false,(e.clipboardData||window.clipboardData).getData("text/plain"));
+  });
+  $("#welfarePreviewBtn").addEventListener("click",()=>{
+    showWelfarePreview(sanitizeArticleHtml(rteEditor.innerHTML));
+  });
+  $("#welfareForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const submit=e.target.querySelector('button[type="submit"]');
+    submit.disabled=true;
+    await publishItem("welfare",current?current.id:null,{body:sanitizeArticleHtml(rteEditor.innerHTML)});
+    submit.disabled=false;
+  });
+}
+function showWelfarePreview(body){
+  let overlay=document.getElementById("articlePreviewOverlay");
+  if(!overlay){
+    overlay=document.createElement("div");
+    overlay.id="articlePreviewOverlay";
+    overlay.className="preview-overlay";
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click",e=>{if(e.target===overlay)overlay.classList.remove("open");});
+  }
+  overlay.innerHTML=`<div class="preview-overlay-inner">
+    <div class="preview-overlay-bar">
+      <span>Preview — exactly how this will appear on the site</span>
+      <button type="button" class="btn small ghost" id="previewClose">Close</button>
+    </div>
+    <div class="preview-overlay-body"><div class="container">${welfarePageHtml(body)}</div></div>
+  </div>`;
+  overlay.classList.add("open");
+  document.getElementById("previewClose").addEventListener("click",()=>overlay.classList.remove("open"));
 }
 
 /* Photos go to the shared image store, so every visitor loads the same file rather than a
