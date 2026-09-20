@@ -213,7 +213,7 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 /* The focus ring has to follow the lean too -- an outline is drawn on the element's rectangle. */
 .btn:focus-visible{outline:none}
 .btn:focus-visible::before{box-shadow:0 0 0 3px rgba(245,132,31,.55)}
-.path-card{font:inherit;text-align:left;cursor:pointer;transition:border-color .15s, box-shadow .15s}
+.path-card{font:inherit;color:inherit;text-align:left;cursor:pointer;transition:border-color .15s, box-shadow .15s}
 .path-card:hover{border-color:var(--flame)}
 .path-card.sel{border:2px solid var(--flame);box-shadow:0 0 0 3px rgba(245,132,31,.18)}
 .btn.dark:hover::before{background:#2a2a32}
@@ -690,23 +690,9 @@ body.theme-dark .meet.ours .datebox .m{color:#3a1c00}
 .meet .closing{font-size:.88rem;color:var(--muted);margin-top:10px}
 .meet .closing strong{color:var(--text)}
 @media(max-width:520px){.meet{grid-template-columns:58px minmax(0,1fr);gap:14px}.meet .datebox{padding:9px 4px}.meet .datebox .d{font-size:1.4rem}.meet h3{font-size:1.15rem}}
-/* Mobile corner flag: once a card flattens to a plain rectangle (too tall to skew the whole
-   shape without eating the readable width -- see .pointed-card above), the lean survives as a
-   small triangular flame flag in the top-left corner instead. Its two short edges are sized so
-   the diagonal lands on the exact same --slant-deg as every skewed shape elsewhere (edge ratio
-   = --slant-ratio), just drawn directly with clip-path rather than a skewed fill -- there's no
-   room on a card this size for the padding a skewX fill would need to stay legible.
-   The card's own clip-path has to go first: the flag lives in exactly the corner the bevel
-   cuts away, so the two cannot both be on. */
 @media(max-width:640px){
   .meet{position:relative;clip-path:none;border-radius:var(--radius);padding:22px}
   .meet .news-thumb{margin-left:-22px;margin-right:-22px}
-  .comp-card::before,.social-card::before,.news-card::before,
-  .card.slanted::before,.card.coach::before,.card.role-card::before,.card.path-card::before{
-    content:"";position:absolute;top:0;left:0;z-index:1;width:18px;height:50px;
-    background:linear-gradient(180deg,var(--flame),var(--flame-dark));
-    clip-path:polygon(0 0,100% 0,0 100%);pointer-events:none;
-  }
 }
 
 /* coaches */
@@ -724,11 +710,65 @@ body.theme-dark .meet.ours .datebox .m{color:#3a1c00}
   transform:skewX(calc(-1 * var(--slant-deg)))}
 
 /* volunteers */
+.role-cat-tabs{margin-bottom:40px}
+/* Below 640px the three role-cat cards ate a full screen of scroll before any actual role
+   showed up, and stacked full-height it wasn't obvious they were a filter rather than content
+   in their own right. So on mobile they collapse to a single-line segmented row (title only)
+   and their eyebrow/description/count move into .role-cat-desc below, swapped by JS on each
+   click -- same data, just relocated so the choice reads as a control, not a wall of cards. */
+.role-cat-desc{display:none}
+.role-list{display:grid;gap:16px}
 .role-card h3{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.25rem;letter-spacing:-.01em}
-.role-card .meta{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0 12px}
+.role-card .meta{display:flex;gap:32px;flex-wrap:wrap;margin:10px 0 12px}
 .role-card .meta span{font-size:.82rem;color:var(--muted)}
-.role-card .meta strong{color:var(--ink);display:block;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em}
-.role-card p{font-size:.95rem;color:var(--body2)}
+.role-card .meta strong{color:var(--text);display:block;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em}
+.role-card p{font-size:.95rem;color:var(--body2);max-width:70ch}
+.role-cat-count{margin-top:14px;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--flame)}
+
+/* club committee: a scrollable role list drives a detail panel, rather than one long page of
+   cards -- there are ~19 posts, most with several bullets each. */
+.committee-layout{display:grid;grid-template-columns:300px 1fr;gap:24px;align-items:start}
+.committee-list{display:flex;flex-direction:column;gap:6px;max-height:70vh;overflow-y:auto;padding-right:10px;
+  scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.committee-list::-webkit-scrollbar{width:8px}
+.committee-list::-webkit-scrollbar-track{background:transparent}
+.committee-list::-webkit-scrollbar-thumb{background:var(--line);border-radius:999px}
+.committee-list::-webkit-scrollbar-thumb:hover{background:var(--flame)}
+.committee-group-label{font-family:'Montserrat',sans-serif;font-weight:800;font-size:.72rem;text-transform:uppercase;
+  letter-spacing:.1em;color:var(--muted);padding:14px 4px 2px}
+.committee-group-label:first-child{padding-top:4px}
+.committee-item{font:inherit;color:inherit;text-align:left;cursor:pointer;background:var(--card);
+  border:1px solid var(--line);border-radius:var(--radius);padding:8px 14px 8px 8px;
+  display:flex;align-items:center;gap:10px;transition:border-color .15s,background .15s}
+.committee-item:hover{border-color:var(--flame)}
+.committee-item .tp{display:flex;flex-direction:column;gap:2px;min-width:0}
+.committee-item .t{font-weight:700;font-size:.92rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.committee-item .p{font-size:.78rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.committee-item.active{border-color:var(--flame);background:linear-gradient(150deg,rgba(245,132,31,.16),var(--card) 65%)}
+.committee-item.active .t{color:var(--flame-dark)}
+body.theme-dark .committee-item.active .t{color:var(--ember)}
+/* photo, or initials on a flat tint when there isn't one -- "Vacant"/blank roles show a dash
+   rather than a misleading letter (see committeeInitials in site.js) */
+.committee-item-photo,.committee-detail-photo{border-radius:50%;flex:0 0 auto;background-size:cover;
+  background-position:center;background-color:var(--paper)}
+.committee-item-photo{width:36px;height:36px}
+.committee-detail-photo{width:76px;height:76px}
+.committee-item-photo.initials,.committee-detail-photo.initials{display:flex;align-items:center;justify-content:center}
+.committee-item-photo.initials span{font-family:'Montserrat',sans-serif;font-weight:800;font-size:.76rem;color:var(--muted)}
+.committee-detail-photo.initials span{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.4rem;color:var(--muted)}
+.committee-card{padding:26px 30px}
+.committee-card-head{display:flex;align-items:center;gap:18px}
+.committee-card h3{font-size:1.5rem}
+.committee-person{color:var(--muted);margin-top:6px;font-size:.95rem}
+.committee-commitment{margin-top:10px;font-size:.9rem;color:var(--body2)}
+.committee-card h4{margin-top:18px;font-family:'Montserrat',sans-serif;font-weight:800;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.committee-card ul{margin-top:8px;padding-left:20px;color:var(--body2);font-size:.94rem;line-height:1.6}
+.committee-card li{margin-bottom:4px}
+@media(max-width:820px){
+  .committee-layout{grid-template-columns:1fr}
+  .committee-list{flex-direction:row;overflow-x:auto;overflow-y:visible;max-height:none;padding-bottom:6px}
+  .committee-item{flex:0 0 200px}
+}
 
 /* socials */
 .social-card{display:flex;flex-direction:column}
@@ -836,6 +876,21 @@ body.theme-dark .meet.ours .datebox .m{color:#3a1c00}
 .card.path-card.sel{border-color:var(--line);box-shadow:none;
   background:linear-gradient(150deg,rgba(245,132,31,.22),var(--card) 60%);
   filter:drop-shadow(0 4px 14px rgba(245,132,31,.4))}
+/* Volunteering's tab cards need to read as selectable controls, not just link-styled boxes, so
+   they get a stronger hover lift, and the selected one goes to a solid flame fill rather than a
+   wash -- same dark-ink-on-flame pairing as .hero, which reads clearly in both themes since
+   --ink stays dark regardless of theme. .path-desc exists (rather than an inline color) so the
+   selected state below can override it; the count text --flame default also gets overridden. */
+.path-card .path-desc{margin-top:10px;color:var(--muted);font-size:.93rem}
+#roleCatTabs .path-card{transition:transform .15s,filter .15s,background .15s}
+#roleCatTabs .path-card:hover{transform:translateY(-3px);background:linear-gradient(150deg,rgba(245,132,31,.2),var(--card) 58%)}
+#roleCatTabs .path-card.sel{background:linear-gradient(135deg,var(--flame),var(--flame-dark));
+  filter:drop-shadow(0 10px 26px rgba(245,132,31,.55))}
+#roleCatTabs .path-card.sel:hover{transform:translateY(-3px)}
+#roleCatTabs .path-card.sel .eyebrow{color:rgba(16,16,20,.65)}
+#roleCatTabs .path-card.sel h3{color:var(--ink)}
+#roleCatTabs .path-card.sel .path-desc{color:rgba(16,16,20,.78)}
+#roleCatTabs .path-card.sel .role-cat-count{color:var(--ink)}
 /* our own hosted meets get a warm tint so they read as "ours" even scrolled past quickly --
    paired with the .pill.hosted ribbon (added inside .comp-top by site.js) */
 .comp-card.ours{background:linear-gradient(160deg,rgba(245,132,31,.14),var(--card) 55%)}
@@ -849,6 +904,14 @@ body.theme-dark .comp-card.ours.entries-open{background:linear-gradient(150deg,r
   .social-card .art,.news-card .news-thumb{margin:-18px -20px 14px -20px;border-radius:var(--radius) var(--radius) 0 0}
   .card.slanted,.card.coach,.card.role-card,.card.path-card{position:relative;padding:22px;min-height:0;clip-path:none;border-radius:var(--radius)}
   .card.coach .coach-photo{margin:-22px -22px 14px;border-radius:var(--radius) var(--radius) 0 0}
+  #roleCatTabs.role-cat-tabs{grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+  #roleCatTabs .path-card{padding:12px 10px;text-align:center}
+  #roleCatTabs .path-card .eyebrow,#roleCatTabs .path-card .path-desc,#roleCatTabs .path-card .role-cat-count{display:none}
+  #roleCatTabs .path-card h3{margin-top:0;font-size:.9rem;line-height:1.2}
+  .role-cat-desc{display:block;padding:14px 16px;margin-bottom:24px;border:1.5px solid var(--line);border-radius:var(--radius);background:var(--card)}
+  .role-cat-desc .eyebrow{margin-bottom:6px}
+  .role-cat-desc .path-desc{color:var(--body2);font-size:.9rem;margin:0}
+  .role-cat-desc .role-cat-count{margin-top:8px}
 }
 .cat-arrow{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.92);backdrop-filter:blur(4px);border:1px solid var(--line);color:var(--ink);font-size:1.3rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(16,16,20,.16);z-index:2;padding:0;transition:opacity .2s,background .2s,border-color .2s}
 .cat-arrow:hover{background:#fff;border-color:var(--flame);color:var(--flame-dark)}

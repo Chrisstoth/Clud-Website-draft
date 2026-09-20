@@ -32,6 +32,7 @@
           <a href="timetables">Squad Timetables</a>
           <a href="committee">Club Committee</a>
           <a class="active" aria-current="page" href="volunteering">Volunteering</a>
+          <a href="member-guides">Member Guides</a>
           <a href="policies">Club Policies</a>
           <a href="history">Mission &amp; Club History</a>
           <a href="contact">Contact Us</a>
@@ -69,13 +70,13 @@
         <div class="logos">
           <a href="#" target="_blank" rel="noopener">Allens of Kingsbury</a>
           <a href="#" target="_blank" rel="noopener">Arena</a>
-          <a href="#" target="_blank" rel="noopener">Club Organiser</a>
+          <a href="https://www.cluborganiser.co.uk/login" target="_blank" rel="noopener">Club Organiser</a>
           <a href="#" target="_blank" rel="noopener">Swimzi</a>
         </div>
         <div class="logos" aria-hidden="true">
           <a href="#" tabindex="-1" target="_blank" rel="noopener">Allens of Kingsbury</a>
           <a href="#" tabindex="-1" target="_blank" rel="noopener">Arena</a>
-          <a href="#" tabindex="-1" target="_blank" rel="noopener">Club Organiser</a>
+          <a href="https://www.cluborganiser.co.uk/login" tabindex="-1" target="_blank" rel="noopener">Club Organiser</a>
           <a href="#" tabindex="-1" target="_blank" rel="noopener">Swimzi</a>
         </div>
       </div>
@@ -90,9 +91,33 @@
       <p class="eyebrow">Clubs run on volunteers</p>
       <h2 class="display">Volunteering</h2>
       <div class="lane-rope"></div>
-      <p>No experience needed for most roles — training is provided and every hour genuinely helps. Here's what each role involves and how to get started.</p>
+      <p>BPSC runs entirely on people who give up their time — every gala we hold and every gala we enter depends on it. No experience needed for most roles, training is provided for the rest, and it's one of the best ways to feel properly part of the club: new faces, poolside seats, and a team of your own alongside your swimmer's.</p>
     </div>
-    <div class="grid cols-2" id="rolesList"></div>
+
+    <div class="grid cols-3 role-cat-tabs" id="roleCatTabs">
+      <button class="card path-card" data-cat="volunteering" type="button" aria-pressed="false">
+        <p class="eyebrow">No qualification needed</p>
+        <h3 class="display" style="font-size:1.25rem;margin-top:6px">Volunteering</h3>
+        <p class="path-desc">Just a spare hour and a willingness to help — the easiest roles to dip into, and a great way to meet the rest of the club.</p>
+        <p class="role-cat-count" data-count="volunteering"></p>
+      </button>
+      <button class="card path-card" data-cat="team_manager" type="button" aria-pressed="false">
+        <p class="eyebrow">Closest to poolside</p>
+        <h3 class="display" style="font-size:1.25rem;margin-top:6px">Team Manager</h3>
+        <p class="path-desc">On deck alongside the coaches at every meet we enter — home, league and away — and a role we can't compete without.</p>
+        <p class="role-cat-count" data-count="team_manager"></p>
+      </button>
+      <button class="card path-card" data-cat="officiating" type="button" aria-pressed="false">
+        <p class="eyebrow">Licensed &amp; qualified</p>
+        <h3 class="display" style="font-size:1.25rem;margin-top:6px">Officiating</h3>
+        <p class="path-desc">Poolside roles run through Swim England — the qualifications that let a gala actually happen. The club funds the training.</p>
+        <p class="role-cat-count" data-count="officiating"></p>
+      </button>
+    </div>
+
+    <div class="role-cat-desc" id="roleCatDesc"></div>
+
+    <div class="role-list" id="rolesList"></div>
   </div>
 </section>
 </main>
@@ -116,6 +141,7 @@
       <a href="join">Join us</a>
       <a href="timetables">Squad timetables</a>
       <a href="volunteering">Volunteering</a>
+      <a href="https://www.cluborganiser.co.uk/login" target="_blank" rel="noopener">Club Organiser</a>
       <a href="welfare">Welfare &amp; safeguarding</a>
     </div>
     <div>

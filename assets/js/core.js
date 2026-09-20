@@ -13,7 +13,7 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const TT_LOC={lc:"BSV Long Course",deep:"BSV Short Course – Deep End",shallow:"BSV Short Course – Shallow End",bill:"Billericay Pool",land:"BSV Meeting Room"};
 
 /* In-memory copy of what is published, filled by loadContent() on every page load. */
-const DB={feed:[],coaches:[],squads:[],roles:[],newsDefaults:[],welfare:[],enquiries:[]};
+const DB={feed:[],coaches:[],squads:[],roles:[],newsDefaults:[],welfare:[],committee:[],enquiries:[]};
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
@@ -38,12 +38,14 @@ const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads
 const coachToRow=c=>({name:c.name,role:c.role,quals:c.quals||null,squads:c.squads||[],photo:c.photo||null});
 const squadFromRow=r=>({id:r.id,name:r.name,lead:r.lead||"",sessions:r.sessions||[]});
 const squadToRow=s=>({name:s.name,lead:s.lead||null,sessions:s.sessions||[]});
-const roleFromRow=r=>({id:r.id,title:r.title,commitment:r.commitment||"",training:r.training||"",blurb:r.blurb});
-const roleToRow=r=>({title:r.title,commitment:r.commitment||null,training:r.training||null,blurb:r.blurb});
+const roleFromRow=r=>({id:r.id,title:r.title,category:r.category||"volunteering",commitment:r.commitment||"",training:r.training||"",blurb:r.blurb});
+const roleToRow=r=>({title:r.title,category:r.category||"volunteering",commitment:r.commitment||null,training:r.training||null,blurb:r.blurb});
 const pictureFromRow=r=>({id:r.id,key:r.key,label:r.label,icon:r.icon||"",bg:r.bg||"",img:r.img||""});
 const pictureToRow=p=>({key:p.key,label:p.label,icon:p.icon||null,bg:p.bg||null,img:p.img||null});
 const welfareFromRow=r=>({id:r.id,body:r.body||""});
 const welfareToRow=w=>({body:w.body||""});
+const committeeFromRow=r=>({id:r.id,title:r.title,tier:r.tier||"committee",person:r.person||"",email:r.email||"",photo:r.photo||"",summary:r.summary||"",commitment:r.commitment||"",skills:r.skills||[],duties:r.duties||[]});
+const committeeToRow=c=>({title:c.title,tier:c.tier||"committee",person:c.person||null,email:c.email||null,photo:c.photo||null,summary:c.summary||null,commitment:c.commitment||null,skills:c.skills||[],duties:c.duties||[]});
 
 /* Each members'-area section, and the table and translation it reads and writes. */
 const SECTIONS={
@@ -52,7 +54,8 @@ const SECTIONS={
   squads:{table:"squads",from:squadFromRow,to:squadToRow,order:"sort_order"},
   roles:{table:"volunteer_roles",from:roleFromRow,to:roleToRow,order:"sort_order"},
   newsDefaults:{table:"news_defaults",from:pictureFromRow,to:pictureToRow,order:"id"},
-  welfare:{table:"welfare_page",from:welfareFromRow,to:welfareToRow,order:"id"}
+  welfare:{table:"welfare_page",from:welfareFromRow,to:welfareToRow,order:"id"},
+  committee:{table:"committee_roles",from:committeeFromRow,to:committeeToRow,order:"sort_order"}
 };
 
 async function loadContent(){
@@ -234,6 +237,13 @@ function dateParts(iso){const d=new Date(iso+"T12:00:00");return{d:d.getDate(),m
 /* A meet moves to "Completed galas" automatically once its last day (end, or start for one-day meets) has passed. */
 function isoToday(){const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`;}
 const meetDone=m=>(m.end||m.start)<isoToday();
+
+/* Open meets (BPSC-hosted or another club's) aren't published with entries/officials/volunteering
+   details until they're getting close, so a meet still 4+ months out just clutters the Open Meets
+   page with a near-empty card. Team/league galas are exempt -- those are fixed-season fixtures
+   people want to see well ahead. */
+function isoPlusMonths(n){const d=new Date();d.setMonth(d.getMonth()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
+const meetTooFarAhead=m=>m.type!=="teamMeet"&&m.start>isoPlusMonths(4);
 
 /* A meet is "running" from its first day to its last day inclusive -- that's the window in which the
    live results feed from the poolside laptop is worth pointing people at. meetLive() also needs a

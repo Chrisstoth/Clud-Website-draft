@@ -91,6 +91,7 @@ create table if not exists public.squads (
 create table if not exists public.volunteer_roles (
   id          bigint generated always as identity primary key,
   title       text not null,
+  category    text not null default 'volunteering' check (category in ('officiating', 'team_manager', 'volunteering')),
   commitment  text,
   training    text,
   blurb       text not null,
@@ -117,6 +118,26 @@ create table if not exists public.welfare_page (
   body        text not null default '',
   updated_at  timestamptz not null default now(),
   constraint welfare_page_single_row check (id = 1)
+);
+
+-- Club Committee: one row per post, with who holds it and (where the club's "BPSC Committee
+-- Roles" document defines one) what it takes and what it involves. skills/duties are short
+-- bullet lists (jsonb text arrays); a post can leave them empty (Head Coach, Website & Club
+-- Email) if it's a contact point rather than a documented committee role.
+create table if not exists public.committee_roles (
+  id          bigint generated always as identity primary key,
+  title       text not null,
+  tier        text not null default 'committee' check (tier in ('executive', 'committee')),
+  person      text,
+  email       text,
+  photo       text,
+  summary     text,
+  commitment  text,
+  skills      jsonb not null default '[]'::jsonb,
+  duties      jsonb not null default '[]'::jsonb,
+  sort_order  int not null default 0,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
 );
 
 -- Who may edit what. Rows are added by hand in the dashboard; there is no sign-up.
@@ -146,8 +167,9 @@ language sql stable security definer set search_path = public as $$
         or (section = 'feed'    and m.feed_types is not null and feed_type = any (m.feed_types))
         or (section = 'coaches' and m.role = 'coaching')
         or (section = 'squads'  and m.role = 'coaching')
-        or (section = 'roles'   and m.role = 'volunteers')
-        or (section = 'welfare' and m.role = 'welfare')
+        or (section = 'roles'     and m.role = 'volunteers')
+        or (section = 'welfare'   and m.role = 'welfare')
+        or (section = 'committee' and m.role = 'secretary')
       )
   );
 $$;
@@ -158,15 +180,17 @@ alter table public.squads          enable row level security;
 alter table public.volunteer_roles enable row level security;
 alter table public.news_defaults   enable row level security;
 alter table public.welfare_page    enable row level security;
+alter table public.committee_roles enable row level security;
 alter table public.members         enable row level security;
 
 -- Anyone may read published content; the public site uses the publishable key.
-create policy "public read feed"     on public.feed            for select using (true);
-create policy "public read coaches"  on public.coaches         for select using (true);
-create policy "public read squads"   on public.squads          for select using (true);
-create policy "public read roles"    on public.volunteer_roles for select using (true);
-create policy "public read pictures" on public.news_defaults   for select using (true);
-create policy "public read welfare"  on public.welfare_page    for select using (true);
+create policy "public read feed"      on public.feed            for select using (true);
+create policy "public read coaches"   on public.coaches         for select using (true);
+create policy "public read squads"    on public.squads          for select using (true);
+create policy "public read roles"     on public.volunteer_roles for select using (true);
+create policy "public read pictures"  on public.news_defaults   for select using (true);
+create policy "public read welfare"   on public.welfare_page    for select using (true);
+create policy "public read committee" on public.committee_roles for select using (true);
 
 -- Signed-in club accounts may see their own membership row (drives the members' area menu).
 create policy "read own membership" on public.members for select
@@ -190,6 +214,8 @@ create policy "pictures write" on public.news_defaults for all to authenticated
   using (public.can_edit('newsDefaults')) with check (public.can_edit('newsDefaults'));
 create policy "welfare write" on public.welfare_page for all to authenticated
   using (public.can_edit('welfare')) with check (public.can_edit('welfare'));
+create policy "committee write" on public.committee_roles for all to authenticated
+  using (public.can_edit('committee')) with check (public.can_edit('committee'));
 
 create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $$
@@ -198,7 +224,7 @@ begin new.updated_at = now(); return new; end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['feed','coaches','squads','volunteer_roles','news_defaults','welfare_page'] loop
+  foreach t in array array['feed','coaches','squads','volunteer_roles','news_defaults','welfare_page','committee_roles'] loop
     execute format('drop trigger if exists touch_%1$s on public.%1$I', t);
     execute format('create trigger touch_%1$s before update on public.%1$I
                     for each row execute function public.touch_updated_at()', t);

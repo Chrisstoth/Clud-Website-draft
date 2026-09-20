@@ -23,7 +23,7 @@ function renderMeets(){
   /* BPSC-hosted galas get their own section, first, on Open Meets -- meets we're just entering
      stay in date order below rather than interleaved, so an urgent external closing date is
      still easy to spot without our own galas getting lost among them. */
-  const upcomingOpen=upcoming.filter(m=>m.type!=="teamMeet"),upcomingTeam=upcoming.filter(m=>m.type==="teamMeet");
+  const upcomingOpen=upcoming.filter(m=>m.type!=="teamMeet"&&!meetTooFarAhead(m)),upcomingTeam=upcoming.filter(m=>m.type==="teamMeet");
   const upcomingOurs=upcomingOpen.filter(m=>m.type==="meet"),upcomingOthers=upcomingOpen.filter(m=>m.type==="externalMeet");
   const extLink=(url,label,cls="big ghost")=>`<a class="btn ${cls}" href="${esc(url)}" target="_blank" rel="noopener">${label}</a>`;
   /* Live results are published by the poolside laptop to a separate host, so this is always an external link. */
@@ -40,10 +40,9 @@ function renderMeets(){
     let actions;
     if(done)actions=m.resultsUrl?extLink(m.resultsUrl,"Results","big"):`<span class="btn big disabled" aria-disabled="true">Results coming soon</span>`;
     else if(team)actions=m.leagueUrl?extLink(m.leagueUrl,"League info"):"";
-    else actions=(meetHasEntry(m)?extLink(m.entryUrl,"Entry pack","big"):`<span class="btn big disabled" aria-disabled="true">${m.status==="open"?"Entry pack coming soon":"Entries closed"}</span>`)
+    else actions=(meetHasEntry(m)?extLink(m.entryUrl,"Entry pack","big"):"")
       +(m.officialsUrl?extLink(m.officialsUrl,"Officials sign-up"):"")
-      +(m.volunteerUrl?extLink(m.volunteerUrl,"Volunteer here")
-        :m.type==="meet"?`<a class="btn big ghost" href="volunteering">Volunteer here</a>`:"");
+      +(m.volunteerUrl?extLink(m.volunteerUrl,"Volunteer here"):"");
     /* A gala in progress leads with its live-results button, whatever else the card offers. */
     if(meetLive(m))actions=liveLink(m.liveUrl)+actions;
     const dates=m.end?`${fmtDate(m.start)} – ${fmtDate(m.end)}`:fmtDate(m.start);
@@ -118,19 +117,105 @@ function renderCoaches(){
     $("#academyCoachesHead").hidden=!academy.length;
   }
 }
-function renderRoles(){
-  if(!$("#rolesList"))return;
-  $("#rolesList").innerHTML=DB.roles.map(r=>`
-    <article class="card role-card"><h3>${esc(r.title)}</h3>
+function roleCard(r){
+  return `<article class="card role-card" data-cat="${esc(r.category)}"><h3>${esc(r.title)}</h3>
       <div class="meta">
         <span><strong>Commitment</strong>${esc(r.commitment)}</span>
         <span><strong>Training</strong>${esc(r.training)}</span>
       </div>
-      <p>${esc(r.blurb)}</p></article>`).join("");
+      <p>${esc(r.blurb)}</p></article>`;
+}
+/* The tab cards above filter which of these stay visible -- see the #roleCatTabs wiring
+   further down, which also fills in each tab's role count once this has run. */
+function renderRoles(){
+  if(!$("#rolesList"))return;
+  $("#rolesList").innerHTML=DB.roles.map(roleCard).join("");
+  applyRoleCatFilter();
+}
+function applyRoleCatFilter(){
+  const tabs=$("#roleCatTabs");
+  if(!tabs)return;
+  const active=tabs.querySelector(".path-card.sel");
+  const cat=active?active.dataset.cat:null;
+  document.querySelectorAll("#rolesList [data-cat]").forEach(el=>{el.hidden=cat!==null&&el.dataset.cat!==cat;});
+  tabs.querySelectorAll("[data-count]").forEach(el=>{
+    const n=DB.roles.filter(r=>r.category===el.dataset.count).length;
+    el.textContent=`${n} role${n===1?"":"s"}`;
+  });
+  /* Mobile collapses the tab cards to a title-only row (see .role-cat-tabs in site.css) and
+     shows the rest of the active card's copy here instead -- kept in sync on every filter
+     change so it never lags behind which tab is actually selected. */
+  const descPanel=$("#roleCatDesc");
+  if(descPanel&&active){
+    descPanel.innerHTML=`${active.querySelector(".eyebrow")?.outerHTML||""}${active.querySelector(".path-desc")?.outerHTML||""}${active.querySelector(".role-cat-count")?.outerHTML||""}`;
+  }
 }
 function renderWelfare(){
   if(!$("#welfareBody"))return;
   $("#welfareBody").innerHTML=sanitizeArticleHtml(DB.welfare[0]?.body||WELFARE_DEFAULT_BODY);
+}
+
+/* ================= CLUB COMMITTEE =================
+   A scrollable role list on the left drives a detail panel on the right, rather than one
+   long page of cards -- there are ~19 posts, most with several bullets each, so showing them
+   all at once buried the page. The selection is kept across a re-render (e.g. after the
+   admin's own edits) by id, falling back to the first role if that id has since been deleted. */
+let committeeSelectedId=null;
+/* Initials fallback for a role with no photo -- "Vacant"/blank gets a plain dash rather than
+   a "V" that would misleadingly read as someone's actual initial. */
+function committeeInitials(person){
+  if(!person||person.trim().toLowerCase()==="vacant")return "–";
+  return person.split(" ").map(w=>w[0]).filter(Boolean).slice(0,2).join("").toUpperCase();
+}
+function committeeAvatar(r,cls){
+  return r.photo
+    ?`<div class="${cls}" style="background-image:url('${esc(r.photo)}')"></div>`
+    :`<div class="${cls} initials"><span>${esc(committeeInitials(r.person))}</span></div>`;
+}
+function committeeListItem(r){
+  return `<button type="button" class="committee-item${r.id===committeeSelectedId?" active":""}" data-id="${r.id}">
+    ${committeeAvatar(r,"committee-item-photo")}
+    <span class="tp">
+      <span class="t">${esc(r.title)}</span>
+      <span class="p">${esc(r.person||"Vacant")}</span>
+    </span>
+  </button>`;
+}
+function committeeBullets(label,items){
+  return items&&items.length?`<h4>${label}</h4><ul>${items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:"";
+}
+function committeeDetail(r){
+  if(!r)return `<p style="color:var(--muted)">No committee roles yet.</p>`;
+  return `<article class="card committee-card">
+    <div class="committee-card-head">
+      ${committeeAvatar(r,"committee-detail-photo")}
+      <div>
+        <h3 class="display">${esc(r.title)}</h3>
+        <p class="committee-person">${r.person?esc(r.person):"Vacant"}${r.email?` · <a href="mailto:${esc(r.email)}">${esc(r.email)}</a>`:""}</p>
+      </div>
+    </div>
+    ${r.commitment?`<p class="committee-commitment"><strong>Time commitment:</strong> ${esc(r.commitment)}</p>`:""}
+    ${r.summary?`<p>${esc(r.summary)}</p>`:""}
+    ${committeeBullets("Skills & experience",r.skills)}
+    ${committeeBullets("Main duties",r.duties)}
+  </article>`;
+}
+function renderCommittee(){
+  if(!$("#committeeList"))return;
+  const list=DB.committee;
+  const exec=list.filter(r=>r.tier==="executive"),rest=list.filter(r=>r.tier!=="executive");
+  const group=(label,items)=>items.length?`<div class="committee-group-label">${label}</div>${items.map(committeeListItem).join("")}`:"";
+  $("#committeeList").innerHTML=list.length?group("Executive Committee",exec)+group("Committee",rest):`<p style="color:var(--muted)">No committee roles yet.</p>`;
+  if(!list.some(r=>r.id===committeeSelectedId))committeeSelectedId=list[0]?.id??null;
+  $("#committeeDetail").innerHTML=committeeDetail(list.find(r=>r.id===committeeSelectedId));
+}
+if($("#committeeList")){
+  $("#committeeList").addEventListener("click",e=>{
+    const b=e.target.closest("[data-id]");
+    if(!b)return;
+    committeeSelectedId=+b.dataset.id;
+    renderCommittee();
+  });
 }
 
 /* ================= SQUAD TIMETABLES =================
@@ -562,7 +647,7 @@ function renderArticle(){
     +`<div style="margin-top:28px"><a class="btn small ghost" href="${back.href}">${back.label}</a></div>`;
   wireArticleGallery((it.photos||[]).length);
 }
-function renderAllPublic(){renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();}
+function renderAllPublic(){renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();renderCommittee();}
 
 /* ================= NAV ================= */
 const infoDropdown=$("#infoDropdown"), infoToggle=$("#infoToggle");
@@ -607,16 +692,33 @@ if($("#joinLessons")){
     const p=b.dataset.path;
     $("#joinLessons").hidden = p!=="lessons";
     $("#joinCompetitive").hidden = p!=="competitive";
+    $("#joinMasters").hidden = p!=="masters";
   }));
   /* default pathway so a form is always visible and swaps in place */
   document.querySelector('.path-card[data-path="lessons"]').classList.add("sel");
   $("#joinLessons").hidden=false;
   $("#joinLessons").addEventListener("submit",e=>submitEnquiry(e,"Academy / lessons",f=>f.get("stage")));
   $("#joinCompetitive").addEventListener("submit",e=>submitEnquiry(e,"Competitive trial",f=>`SE ${f.get("seNo")} · ${f.get("level")}`));
+  $("#joinMasters").addEventListener("submit",e=>submitEnquiry(e,"Masters",()=>"Masters enquiry"));
+}
+
+if($("#roleCatTabs")){
+  document.querySelectorAll("#roleCatTabs .path-card").forEach(b=>b.addEventListener("click",()=>{
+    document.querySelectorAll("#roleCatTabs .path-card").forEach(x=>{
+      x.classList.toggle("sel",x===b);
+      x.setAttribute("aria-pressed",x===b?"true":"false");
+    });
+    applyRoleCatFilter();
+  }));
+  /* Volunteering is the widest-appeal tab -- default open so a first-time visitor always
+     sees roles straight away rather than an empty grid. */
+  const defaultTab=document.querySelector('#roleCatTabs .path-card[data-cat="volunteering"]');
+  defaultTab.classList.add("sel");
+  defaultTab.setAttribute("aria-pressed","true");
 }
 
 /* ================= INIT ================= */
-const CONTENT_SLOTS="#meetsList,#otherMeetsList,#teamMeetsList,#completedMeetsList,#coachesList,#academyCoachesList,#rolesList,#newsList,#ttBody,#socialsList,#compList,#leagueList";
+const CONTENT_SLOTS="#meetsList,#otherMeetsList,#teamMeetsList,#completedMeetsList,#coachesList,#academyCoachesList,#rolesList,#newsList,#ttBody,#socialsList,#compList,#leagueList,#committeeList,#committeeDetail";
 document.querySelectorAll(CONTENT_SLOTS).forEach(el=>{el.innerHTML=`<p style="color:var(--muted)">Loading…</p>`;});
 loadContent().then(()=>{
   /* Admins can hide a meet from the public site (without deleting it) by unticking "Show on

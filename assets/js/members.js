@@ -8,7 +8,8 @@ const ROLES = {
   training:   {label:"Coaching / Training Changes", desc:"Post key training schedule changes", sections:["feed"], feedTypes:["training"]},
   membership: {label:"Membership Team",      desc:"View trial & squad enquiries",     sections:["enquiries"]},
   welfare:    {label:"Welfare Officer",      desc:"Edit the Welfare & Safeguarding page", sections:["welfare"]},
-  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","coaches","squads","roles","enquiries","newsDefaults","welfare"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
+  secretary:  {label:"Club Secretary",       desc:"Edit the Club Committee page",     sections:["committee"]},
+  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","coaches","squads","roles","enquiries","newsDefaults","welfare","committee"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
 };
 const SECTION_META = {
   feed:{name:"Club Feed", empty:"Nothing published yet — add the first item."},
@@ -17,7 +18,8 @@ const SECTION_META = {
   roles:{name:"Volunteer Roles", empty:"No roles yet."},
   enquiries:{name:"Trial Enquiries (inbox)", empty:"No enquiries yet — the public Join Us form feeds this inbox."},
   newsDefaults:{name:"Default News Pictures", empty:"No default picture categories yet."},
-  welfare:{name:"Welfare & Safeguarding Page", empty:""}
+  welfare:{name:"Welfare & Safeguarding Page", empty:""},
+  committee:{name:"Club Committee", empty:"No committee roles yet."}
 };
 /* One type per feed item; a role's feedTypes controls which of these it can add/see */
 const FEED_TYPE_META = {
@@ -70,9 +72,21 @@ const SCHEMAS = {
   ],
   roles:[
     {k:"title",label:"Role title",type:"text",req:1},
+    {k:"category",label:"Section",type:"select",opts:[["volunteering","Volunteering"],["team_manager","Team Manager"],["officiating","Officiating"]],req:1},
     {k:"commitment",label:"Typical commitment",type:"text"},
     {k:"training",label:"Training provided",type:"text"},
     {k:"blurb",label:"What it involves",type:"textarea",req:1}
+  ],
+  committee:[
+    {k:"title",label:"Role title",type:"text",req:1},
+    {k:"tier",label:"Group",type:"select",opts:[["committee","Committee"],["executive","Executive Committee"]],req:1},
+    {k:"person",label:"Who holds it (leave blank, or \"Vacant\", if nobody does)",type:"text"},
+    {k:"photo",label:"Photo (optional)",type:"imagepicker",swatches:false},
+    {k:"email",label:"Contact email",type:"text"},
+    {k:"commitment",label:"Typical time commitment",type:"text"},
+    {k:"summary",label:"One-line summary (optional — shown above the bullets)",type:"textarea"},
+    {k:"skillsRaw",label:"Skills & experience (one per line)",type:"textarea"},
+    {k:"dutiesRaw",label:"Main duties (one per line)",type:"textarea"}
   ],
   externalMeet:[
     {k:"title",label:"Meet name (e.g. Essex County Championships)",type:"text",req:1},
@@ -240,7 +254,9 @@ function itemSummary(sec,it){
   switch(sec){
     case "coaches":return {t:it.name,s:it.role};
     case "squads":{const n=(it.sessions||[]).length;return {t:it.name,s:`Lead squad coach: ${it.lead||"TBC"} · ${n} session${n===1?"":"s"} a week`};}
-    case "roles":return {t:it.title,s:it.commitment};
+    case "roles":{const catLabel={officiating:"Officiating",team_manager:"Team Manager",volunteering:"Volunteering"}[it.category]||"Volunteering";
+      return {t:it.title,s:`${catLabel}${it.commitment?" · "+it.commitment:""}`};}
+    case "committee":return {t:it.title,s:`${it.tier==="executive"?"Executive · ":""}${it.person||"Vacant"}`};
     case "newsDefaults":return {t:it.label,s:it.img?"Custom photo set":`Gradient placeholder ${it.icon||""}`};
   }
 }
@@ -418,6 +434,7 @@ function showForm(sec,id,forcedType){
   const type=isFeed?(it.type||forcedType):null;
   const schemaKey=isFeed?type:sec;
   if(sec==="coaches"&&it.squads)it.squadsRaw=it.squads.join(", ");
+  if(sec==="committee"){it.skillsRaw=(it.skills||[]).join("\n");it.dutiesRaw=(it.duties||[]).join("\n");}
   const fields=SCHEMAS[schemaKey].map(f=>{
     const val=esc(it[f.k]??"");
     if(f.type==="textarea")return `<label class="f">${f.label}<textarea name="${f.k}" rows="3" ${f.req?"required":""}>${val}</textarea></label>`;
@@ -593,6 +610,10 @@ function showForm(sec,id,forcedType){
     /* FormData omits an unchecked checkbox entirely, so read those straight off the inputs. */
     SCHEMAS[schemaKey].filter(f=>f.type==="checkbox").forEach(f=>{data[f.k]=formTarget.querySelector(`[name="${f.k}"]`).checked;});
     if(sec==="coaches"){data.squads=(data.squadsRaw||"").split(",").map(s=>s.trim()).filter(Boolean);delete data.squadsRaw;}
+    if(sec==="committee"){
+      data.skills=(data.skillsRaw||"").split("\n").map(s=>s.trim()).filter(Boolean);delete data.skillsRaw;
+      data.duties=(data.dutiesRaw||"").split("\n").map(s=>s.trim()).filter(Boolean);delete data.dutiesRaw;
+    }
     if(isFeed)data.type=type;
     if(galleryField)data.photos=galleryPhotos;
     if(rteEditor)data.body=sanitizeArticleHtml(rteEditor.innerHTML);
