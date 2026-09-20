@@ -295,6 +295,30 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
     transform:skewX(calc(-1 * var(--slant-deg)));transition:background .18s;
   }
   nav.main .nav-dropdown-menu a.active::after{background:#fff}
+
+  /* Follow us: the drawer is where someone actually goes looking for the club, so the two
+     social links sit at the foot of it rather than only down in the page footer. They are
+     ordinary drawer rows -- same skewed ::before panel, same press state, same dark-theme
+     recolouring, all inherited from the rules above -- just laid out two-up. The panel inset
+     drops from 10px to 4px because on a half-width tile a 10px inset each side eats most of
+     the lean; at this width the skew still reads at the full --slant-deg. */
+  .nav-social{display:flex;gap:0;margin-top:10px}
+  nav.main .nav-social a{
+    flex:1;justify-content:center;gap:9px;
+    padding:14px 10px;margin-bottom:0;font-size:.88rem;
+  }
+  nav.main .nav-social a::before{inset:0 4px}
+  nav.main .nav-social a svg{flex:0 0 auto;width:20px;height:20px}
+  /* the heading for the pair, carrying the same flame tick the dropdown rows use */
+  .nav-social-label{
+    display:flex;align-items:center;gap:9px;margin:16px 10px 2px;
+    font-family:'Montserrat',sans-serif;font-weight:800;font-size:.68rem;
+    text-transform:uppercase;letter-spacing:.14em;color:var(--muted);
+  }
+  .nav-social-label::before{
+    content:"";flex:0 0 auto;width:4px;height:13px;background:var(--flame);
+    transform:skewX(calc(-1 * var(--slant-deg)));
+  }
 }
 /* phones: shrink the brand block so logo, name, theme toggle and menu button all fit on screen */
 @media(max-width:560px){
@@ -1352,3 +1376,7 @@ main{overflow-x:clip}
   .mission-statement{padding-left:16px}
   .foot-grid{gap:26px;padding-block:34px}
 }
+
+/* The two social links in the header live in the mobile drawer only -- the desktop bar is
+   already full at 1024px, and the footer carries them there. */
+@media(min-width:1024px){.nav-social,.nav-social-label{display:none}}
