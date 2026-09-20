@@ -239,6 +239,11 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
      copy's last item needs its tick back too, or the seam between loops reads as a bare gap
      next to every other, ticked gap */
   .logos-scroll .logos a:last-child::after{display:block}
+  /* A marquee item must stay on ONE line: the links inherit flex:1 1 0 from the wrapping
+     desktop layout, which inside the track's width:max-content squeezed a two-word partner
+     ("Allens of Kingsbury") onto two lines and made the whole ink strip twice as tall as it
+     needs to be. In the ticker each item is simply as wide as its own name. */
+  .logos-scroll .logos a{flex:0 0 auto;white-space:nowrap;text-align:left}
   @media(hover:hover){.logos-scroll:hover .logos-track{animation-play-state:paused}}
 }
 :focus-visible{outline:3px solid var(--ember);outline-offset:2px}
@@ -1079,14 +1084,12 @@ body.theme-dark label.f input:focus,body.theme-dark label.f select:focus,body.th
   .pointed-card.feature .eyebrow,body.theme-dark .pointed-card.feature .eyebrow{color:#fff}
   .pointed-card.feature .eyebrow::before{background:linear-gradient(100deg,#101014 0%,#2a2a32 100%)}
 }
-/* the partners row wraps on phones, which left the trailing separators dangling at the end of
-   each line -- a LEADING tick can't dangle, and reads as the same diagonal either way */
-@media(max-width:760px){
-  .partners .logos a::before{
-    content:"";display:inline-block;width:3px;height:13px;margin-right:9px;vertical-align:-1px;
-    background:var(--flame);opacity:.85;transform:skewX(calc(-1 * var(--slant-deg)));
-  }
-}
+/* The partners row used to WRAP on phones, and a leading tick was added here because a
+   trailing separator could dangle at the end of a wrapped line. That layout is gone -- at
+   <=760px the row is now a single nowrap auto-scrolling ticker (see .logos-scroll above), so
+   a leading tick is simply a second separator sitting beside the trailing one, and every gap
+   between partners drew two diagonals. The trailing tick alone is kept: it is the same tall
+   skewed divider the desktop bar and the nav use. */
 
 /* ---------- article page & admin article preview ---------- */
 .article-container{max-width:760px}
@@ -1243,6 +1246,10 @@ main{overflow-x:clip}
 @media(pointer:coarse){
   .btn.small{padding:10px 18px}
   .news-tag-chip,.news-jump-chip,.tt-chip{padding-top:11px;padding-bottom:11px}
+  .news-jump-arrow{padding-top:10px;padding-bottom:10px}
+  /* sponsor links were a 24px-tall target on every page */
+  .partners .logos a{padding-block:8px}
+  .partners{padding:7px 0}
   .cal-nav-btn{width:42px;height:42px;font-size:1.2rem}
   .gallery-arrow,.hero-arrow{width:44px;height:44px}
   .comp-foot a{padding:6px 0}
@@ -1336,7 +1343,9 @@ main{overflow-x:clip}
      of the article */
   .article-cover{height:clamp(170px,46vw,260px)}
   .article-cover .news-thumb-icon{font-size:2.6rem}
-  .coach-photo{height:clamp(150px,42vw,200px)}
+  /* deliberately NOT shrunk with the others: these are portraits of people, and the
+     background-position:center crop takes the top of the head off first, so a shorter
+     box costs a face rather than whitespace. */
   .news-thumb{height:clamp(110px,32vw,130px)}
   .social-card .art{height:clamp(110px,32vw,132px)}
   /* the page's one headline claim shouldn't need three lines of scroll */
