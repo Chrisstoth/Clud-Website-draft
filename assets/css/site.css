@@ -155,10 +155,15 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
   }
   nav.main a.cta:hover{filter:brightness(1.08)}
 }
-/* the full bar wants ~1050px of header. between the burger's cut-off and that, the brand and
-   the link padding tighten so a landscape tablet still gets the real nav instead of a header
-   that quietly pushes the whole page sideways. */
-@media(min-width:1024px) and (max-width:1159px){
+/* These tighter proportions started life as a 1024-1159px patch so a landscape tablet still
+   got the real nav. They now run across the WHOLE desktop range, because .nav-wrap is capped
+   at max-width:1120px -- a wider monitor gives the bar no more room than a 1120px one. At the
+   untightened sizes the brand, the six nav items and the toggle came to ~1124px inside a
+   1080px content box, so the bar had been overflowing its own wrap at every width from 1160px
+   up; it only escaped notice because above ~1400px the page's side margins are wide enough to
+   absorb the bleed instead of showing a scrollbar. Tightened, the same row needs ~979px, which
+   leaves real slack -- and that slack is what the two social icons now sit in. */
+@media(min-width:1024px){
   .brand img{width:84px;height:84px}
   .brand{gap:11px}
   .brand .name{font-size:1.02rem}
@@ -166,6 +171,18 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
   nav.main a,.nav-dropdown-toggle{padding:0 12px}
   nav.main a.cta{padding:0 15px}
   nav.main>a:not(.cta):not(:has(+.cta))::after,.nav-dropdown::after{right:-6px}
+}
+/* 1024-1059 is the tightest the real bar ever gets: 1024 is where the burger hands over and
+   the wrap is still only 984px of content box. Even at the tightened sizes the row spilled
+   ~27px past its padding there -- the toggle sat hard against the edge -- so this narrow band
+   goes tighter again. (Pre-existing; it predates the social icons, which are off below 1120.) */
+@media(min-width:1024px) and (max-width:1059px){
+  .brand{gap:9px}
+  .brand .name{font-size:.96rem}
+  nav.main{gap:8px}
+  nav.main a,.nav-dropdown-toggle{padding:0 9px}
+  nav.main a.cta{padding:0 12px}
+  nav.main>a:not(.cta):not(:has(+.cta))::after,.nav-dropdown::after{right:-5px}
 }
 
 .theme-toggle{display:flex;align-items:center;justify-content:center;width:42px;height:42px;background:none;border:1.5px solid rgba(16,16,20,.25);color:var(--ink);border-radius:50%;cursor:pointer;padding:0}
@@ -684,13 +701,12 @@ body.theme-dark .meet.ours .datebox .m{color:#3a1c00}
 @media(max-width:640px){
   .meet{position:relative;clip-path:none;border-radius:var(--radius);padding:22px}
   .meet .news-thumb{margin-left:-22px;margin-right:-22px}
-  .meet::after,.comp-card::before,.social-card::before,.news-card::before,
+  .comp-card::before,.social-card::before,.news-card::before,
   .card.slanted::before,.card.coach::before,.card.role-card::before,.card.path-card::before{
     content:"";position:absolute;top:0;left:0;z-index:1;width:18px;height:50px;
     background:linear-gradient(180deg,var(--flame),var(--flame-dark));
     clip-path:polygon(0 0,100% 0,0 100%);pointer-events:none;
   }
-  .meet.ours::after{width:26px;height:64px}
 }
 
 /* coaches */
@@ -1377,6 +1393,35 @@ main{overflow-x:clip}
   .foot-grid{gap:26px;padding-block:34px}
 }
 
-/* The two social links in the header live in the mobile drawer only -- the desktop bar is
-   already full at 1024px, and the footer carries them there. */
+/* ---------- the two social links in the header ----------
+   Phones get them as rows at the foot of the drawer (.nav-social, above); the desktop bar
+   gets them as plain icons sitting just left of the day/night toggle, so the whole cluster at
+   the right-hand end reads as one group of controls. Each is its own breakpoint's version of
+   the same thing, so only one is ever on. */
 @media(min-width:1024px){.nav-social,.nav-social-label{display:none}}
+/* below the bar breakpoint the drawer version takes over */
+.nav-social-desk{display:none}
+/* 1120px, not the 1024px the bar itself starts at. .nav-wrap is capped at max-width:1120px,
+   so 1120 is the first width where the bar gets its full 1080px content box -- and the icon
+   cluster needs about 1079px of it. Below that the window is narrower than the cap and the
+   row would spill past its gutter, so that band keeps the bar it already has and the footer
+   carries the links there. Measured, not guessed: at 1100px the same row spills 21px. */
+@media(min-width:1120px){
+  .nav-social-desk{display:flex;align-items:center;gap:0;position:relative;padding-right:8px}
+  /* the same skewed tick that divides the nav links and the partner logos, so the icons are
+     separated from the toggle the way everything else on this bar is separated */
+  .nav-social-desk::after{
+    content:"";position:absolute;top:6px;bottom:6px;right:0;width:2px;
+    background:var(--flame);opacity:.7;transform:skewX(calc(-1 * var(--slant-deg)));pointer-events:none;
+  }
+  /* colours track .theme-toggle rather than the global link colour -- these sit in the header
+     cluster, not in running text */
+  .nav-social-desk a{
+    display:flex;align-items:center;justify-content:center;width:27px;height:27px;
+    color:var(--ink);text-decoration:none;transition:color .15s,transform .15s;
+  }
+  .nav-social-desk a svg{width:18px;height:18px}
+  .nav-social-desk a:hover{color:var(--flame-dark);transform:translateY(-1px)}
+  body.theme-dark .nav-social-desk a{color:#fff}
+  body.theme-dark .nav-social-desk a:hover{color:var(--ember)}
+}
