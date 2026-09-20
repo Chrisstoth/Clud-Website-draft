@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=31">
+<link rel="stylesheet" href="assets/css/site.css?v=32">
 </head>
 <body class="theme-dark">
 <script>try{if(localStorage.getItem("bpsc_theme")==="light")document.body.classList.remove("theme-dark")}catch(e){}</script>
@@ -77,10 +77,15 @@
       <p class="eyebrow">What's happening</p>
       <h2 class="display">Club News</h2>
       <div class="lane-rope"></div>
-      <p style="color:var(--muted)">Sample announcements — the real feed will be editable from the members' area.</p>
+      <p style="color:var(--muted)">Newest first &mdash; this week is at the top, and the archive runs back from there. Sample announcements — the real feed will be editable from the members' area.</p>
     </div>
     <div class="news-tag-chips" id="newsTagChips"></div>
-    <div class="grid cols-3" id="newsList"></div>
+    <div class="news-jump" id="newsJump" hidden>
+      <button type="button" class="news-jump-arrow" data-dir="newer" aria-label="Jump to newer news">&uarr; Newer</button>
+      <div class="news-jump-chips" id="newsJumpChips" role="tablist" aria-label="Jump to a period"></div>
+      <button type="button" class="news-jump-arrow" data-dir="older" aria-label="Jump to older news">Older &darr;</button>
+    </div>
+    <div class="news-timeline" id="newsList"></div>
   </div>
 </section>
 </main>
@@ -119,6 +124,6 @@
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <script src="assets/js/core.js?v=12"></script>
-<script src="assets/js/site.js?v=15"></script>
+<script src="assets/js/site.js?v=16"></script>
 </body>
 </html>

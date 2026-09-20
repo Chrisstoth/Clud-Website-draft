@@ -408,6 +408,63 @@ section.page{padding:52px 0 72px}
 .news-tag-chip.active{color:#fff}
 .news-tag-chip.active::before{background:var(--flame);border-color:var(--flame)}
 .meet .news-thumb{grid-column:1/-1}
+
+/* ---- Club News timeline (see renderNews in site.js) ----
+   One scroller running backwards through time. Each period is a block with its own heading;
+   the sticky bar above them is the way forward and back. --hdr-h is set by site.js from the
+   real header height, because the header's height changes with the logo at each breakpoint. */
+.news-jump{position:sticky;top:calc(var(--hdr-h,128px) + 0px);z-index:20;display:flex;align-items:center;gap:10px;
+  margin:0 0 26px;padding:9px 12px;background:var(--card);border:1.5px solid var(--line);
+  box-shadow:0 10px 22px rgba(16,16,20,.08)}
+.news-jump-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;flex:1;scroll-behavior:smooth}
+.news-jump-chips::-webkit-scrollbar{display:none}
+.news-jump-chip{position:relative;z-index:0;flex:0 0 auto;font:inherit;font-weight:700;font-size:.76rem;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--muted);background:none;border:none;padding:7px 15px;cursor:pointer;transition:color .15s}
+.news-jump-chip::before{content:"";position:absolute;inset:0;z-index:-1;background:transparent;border:1.5px solid transparent;
+  transform:skewX(calc(-1 * var(--slant-deg)));transition:border-color .15s,background .15s}
+.news-jump-chip:hover{color:var(--text)}
+.news-jump-chip:hover::before{border-color:var(--line)}
+.news-jump-chip.active{color:var(--flame-dark)}
+.news-jump-chip.active::before{background:rgba(245,132,31,.14);border-color:var(--flame)}
+.news-jump-arrow{flex:0 0 auto;font:inherit;font-weight:700;font-size:.76rem;letter-spacing:.03em;color:var(--text);
+  background:none;border:1.5px solid var(--line);border-radius:999px;padding:7px 13px;cursor:pointer;white-space:nowrap;
+  transition:border-color .15s,color .15s,opacity .15s}
+.news-jump-arrow:hover:not(:disabled){border-color:var(--flame);color:var(--flame-dark)}
+.news-jump-arrow:disabled{opacity:.3;cursor:default}
+
+.news-era{scroll-margin-top:calc(var(--hdr-h,128px) + 74px)}
+.news-era+.news-era{margin-top:38px}
+.news-era-head{display:flex;align-items:baseline;gap:14px;margin:0 0 16px;padding-left:16px;position:relative}
+.news-era-head::before{content:"";position:absolute;left:0;top:2px;bottom:2px;width:5px;
+  background:linear-gradient(180deg,var(--flame),var(--flame-dark));transform:skewX(calc(-1 * var(--slant-deg)))}
+.news-era-head h3{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.2rem;letter-spacing:-.01em}
+.news-era-count{font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.news-date{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:6px}
+/* This week's stories carry the warm wash the Open Meets page gives "ours" -- the eye lands on
+   the newest block first without the archive below having to be dimmed. */
+.news-card.is-latest{background:linear-gradient(160deg,rgba(245,132,31,.13),var(--card) 58%)}
+body.theme-dark .news-card.is-latest{background:linear-gradient(160deg,rgba(245,132,31,.22),var(--card) 58%)}
+
+/* The break between recent news and the archive. Deliberately a big empty stretch: it is the
+   signal that the reader has reached the end of what is current, so it has to be impossible to
+   scroll past without noticing. */
+.news-break{margin:72px 0 56px;text-align:center;position:relative}
+.news-break::before{content:"";position:absolute;left:0;right:0;top:17px;height:6px;
+  background:repeating-linear-gradient(90deg,var(--ink) 0 16px,transparent 16px 22px,#fff 22px 38px,transparent 38px 44px);
+  border-radius:3px;opacity:.5}
+body.theme-dark .news-break::before{background:repeating-linear-gradient(90deg,var(--flame) 0 16px,transparent 16px 22px,#fff 22px 38px,transparent 38px 44px)}
+.news-break-label{position:relative;z-index:1;display:inline-block;font-family:'Montserrat',sans-serif;font-weight:800;
+  font-size:.82rem;text-transform:uppercase;letter-spacing:.14em;color:#fff;background:var(--ink);padding:10px 26px;
+  transform:skewX(calc(-1 * var(--slant-deg)))}
+body.theme-dark .news-break-label{background:var(--flame);color:var(--ink)}
+.news-break-note{margin-top:14px;font-size:.86rem;color:var(--muted)}
+.news-break-note-solo{margin:0 0 26px}
+@media(max-width:640px){
+  .news-jump{gap:6px;padding:7px 8px}
+  .news-jump-arrow{padding:7px 9px;font-size:.72rem}
+  .news-break{margin:54px 0 42px}
+}
+
 .social-card .art{background-size:cover;background-position:center}
 .news-thumb-icon{font-size:2.4rem;filter:drop-shadow(0 2px 6px rgba(0,0,0,.35))}
 .img-picker{display:grid;gap:10px}

@@ -298,9 +298,43 @@ const HERO_SLIDE_BG=[
 ];
 let heroIndex=0;
 let newsTagFilter=null;
+
+/* ================= NEWS TIMELINE =================
+   Club News reads as one scroller running backwards through time: whatever landed in the last
+   week sits at the top, the rest of the current month under it, then a deliberate full-width
+   break ("Previous history") before the month-by-month archive. The break matters -- without it
+   a reader scrolling past this week's two stories has no way to tell that what follows is old
+   news rather than more of the same. The sticky bar above the timeline is the way back and
+   forth through it: Newer/Older step between periods, and the chips jump straight to one.
+
+   Eras are assigned by decreasing recency and rendered in that order, so the page is always
+   strictly newest-first even when a month boundary falls mid-week. A story dated ahead of today
+   (scheduled, or an announcement about something still to come) gets its own "Coming up" era
+   above this week rather than being buried under it. */
+const NEWS_MS_DAY=86400000;
+function newsEraFor(iso,today){
+  const d=new Date(iso+"T12:00:00");
+  const days=Math.round((today-d)/NEWS_MS_DAY);
+  if(days<0)return {key:"ahead",label:"Coming up",chip:"Coming up",recent:true};
+  if(days<7)return {key:"week",label:"This week",chip:"This week",recent:true};
+  if(d.getFullYear()===today.getFullYear()&&d.getMonth()===today.getMonth())
+    return {key:"month",label:"Earlier this month",chip:"This month",recent:true};
+  const sameYear=d.getFullYear()===today.getFullYear();
+  return {key:iso.slice(0,7),label:d.toLocaleDateString("en-GB",{month:"long",year:"numeric"}),
+    chip:d.toLocaleDateString("en-GB",sameYear?{month:"short"}:{month:"short",year:"2-digit"}),recent:false};
+}
+function newsCard(n,featured){
+  const r=resolveNewsImage(n.img);
+  const thumb=r?`<div class="news-thumb" style="background:${r.css}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
+  return `<article class="card news-card${featured?" is-latest":""}">${thumb}<p class="eyebrow">${esc(n.tag)}</p>
+    <h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3>
+    <p class="news-date"><time datetime="${esc(n.start)}">${fmtDate(n.start)}</time></p>
+    <p style="color:var(--muted);font-size:.9rem;margin-top:8px">${esc(n.blurb)}</p>
+    <div style="margin-top:14px"><a class="btn small ghost" href="article?id=${n.id}">Read more →</a></div></article>`;
+}
 function renderNews(){
   if(!$("#newsList"))return;
-  const all=DB.feed.filter(it=>it.type==="news").sort((a,b)=>a.start<b.start?-1:1);
+  const all=DB.feed.filter(it=>it.type==="news").sort((a,b)=>a.start<b.start?1:-1);
   const tags=[...new Set(all.map(n=>n.tag).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   if(newsTagFilter&&!tags.includes(newsTagFilter))newsTagFilter=null;
   if($("#newsTagChips")){
@@ -308,19 +342,111 @@ function renderNews(){
       .concat(tags.map(t=>`<button type="button" class="news-tag-chip${t===newsTagFilter?" active":""}" data-tag="${esc(t)}">${esc(t)}</button>`)).join("");
   }
   const list=newsTagFilter?all.filter(n=>n.tag===newsTagFilter):all;
-  $("#newsList").innerHTML=list.map(n=>{
-    const r=resolveNewsImage(n.img);
-    const thumb=r?`<div class="news-thumb" style="background:${r.css}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
-    return `<article class="card news-card">${thumb}<p class="eyebrow">${esc(n.tag)}</p><h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3><p style="color:var(--muted);font-size:.9rem;margin-top:8px">${esc(n.blurb)}</p><div style="margin-top:14px"><a class="btn small ghost" href="article?id=${n.id}">Read more →</a></div></article>`;
-  }).join("");
-  if(!list.length)$("#newsList").innerHTML=`<p style="color:var(--muted)">No news articles tagged "${esc(newsTagFilter)}" yet.</p>`;
+  if(!list.length){
+    $("#newsList").innerHTML=`<p style="color:var(--muted)">${newsTagFilter?`No news articles tagged "${esc(newsTagFilter)}" yet.`:"No news articles yet."}</p>`;
+    renderNewsJump([]);
+    return;
+  }
+  const today=new Date(isoToday()+"T12:00:00");
+  const eras=[];
+  list.forEach(n=>{
+    const era=newsEraFor(n.start,today);
+    const last=eras[eras.length-1];
+    if(last&&last.key===era.key)last.items.push(n);
+    else eras.push(Object.assign({items:[n]},era));
+  });
+  const recent=eras.filter(e=>e.recent),archive=eras.filter(e=>!e.recent);
+  const block=(e,featured)=>`<section class="news-era" id="news-era-${esc(e.key)}" aria-labelledby="news-era-${esc(e.key)}-h">
+      <div class="news-era-head"><h3 id="news-era-${esc(e.key)}-h">${esc(e.label)}</h3>
+        <span class="news-era-count">${e.items.length} ${e.items.length===1?"story":"stories"}</span></div>
+      <div class="grid cols-3">${e.items.map(n=>newsCard(n,featured)).join("")}</div>
+    </section>`;
+  /* The break divides two halves of one list, so it only earns its space when there is
+     something on both sides of it. With no recent news at all the archive simply opens the
+     page, under a line saying why. */
+  let html=recent.map((e,i)=>block(e,i===0)).join("");
+  if(archive.length){
+    html+=recent.length
+      ? `<div class="news-break"><span class="news-break-label">Previous history</span>
+           <p class="news-break-note">Everything below is older news, most recent first.</p></div>`
+      : `<p class="news-break-note news-break-note-solo">Nothing new in the past month — here is what came before.</p>`;
+    html+=archive.map(e=>block(e,false)).join("");
+  }
+  $("#newsList").innerHTML=html;
+  renderNewsJump(eras);
 }
+
+/* ---- the sticky period bar ---- */
+let newsEraKeys=[];
+function renderNewsJump(eras){
+  const bar=$("#newsJump"),chips=$("#newsJumpChips");
+  if(!bar||!chips)return;
+  newsEraKeys=eras.map(e=>e.key);
+  /* One period is the whole page -- nothing to jump between. */
+  bar.hidden=eras.length<2;
+  setHeaderVar();
+  chips.innerHTML=eras.map((e,i)=>`<button type="button" class="news-jump-chip${i===0?" active":""}" data-era="${esc(e.key)}">${esc(e.chip)}</button>`).join("");
+  newsJumpSpy();
+}
+/* The header is sticky and its height changes with the logo at each breakpoint, so the CSS
+   cannot hard-code where the period bar should stick. Publish the measured height instead. */
+function setHeaderVar(){
+  const h=document.querySelector("header.site");
+  if(h)document.documentElement.style.setProperty("--hdr-h",h.offsetHeight+"px");
+}
+window.addEventListener("resize",setHeaderVar);
+window.addEventListener("load",setHeaderVar);
+const newsEraEl=key=>document.getElementById("news-era-"+key);
+function newsScrollToEra(key){
+  const el=newsEraEl(key);
+  if(el)el.scrollIntoView({block:"start",behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});
+}
+/* The "current" period is the last heading to have passed under the sticky bar -- the one the
+   reader is actually inside. An IntersectionObserver would instead fire on whichever heading
+   happened to cross the viewport first, which on a fast flick lights up the wrong chip. */
+let newsSpyQueued=false;
+function newsJumpSpy(){
+  const bar=$("#newsJump");
+  if(!bar||bar.hidden||!newsEraKeys.length)return;
+  const line=(document.querySelector("header.site")?.offsetHeight||0)+bar.offsetHeight+14;
+  let current=newsEraKeys[0];
+  newsEraKeys.forEach(k=>{const el=newsEraEl(k);if(el&&el.getBoundingClientRect().top<=line)current=k;});
+  document.querySelectorAll("#newsJumpChips .news-jump-chip").forEach(c=>c.classList.toggle("active",c.dataset.era===current));
+  const i=newsEraKeys.indexOf(current);
+  const newer=bar.querySelector('.news-jump-arrow[data-dir="newer"]'),older=bar.querySelector('.news-jump-arrow[data-dir="older"]');
+  if(newer)newer.disabled=i<=0;
+  if(older)older.disabled=i>=newsEraKeys.length-1;
+  const active=$("#newsJumpChips .news-jump-chip.active");
+  if(active)active.scrollIntoView({block:"nearest",inline:"nearest"});
+}
+window.addEventListener("scroll",()=>{
+  if(newsSpyQueued)return;
+  newsSpyQueued=true;
+  requestAnimationFrame(()=>{newsSpyQueued=false;newsJumpSpy();});
+},{passive:true});
+window.addEventListener("resize",newsJumpSpy);
 document.addEventListener("click",e=>{
   const chip=e.target.closest("#newsTagChips .news-tag-chip");
-  if(!chip)return;
-  newsTagFilter=chip.dataset.tag||null;
-  renderNews();
+  if(chip){
+    newsTagFilter=chip.dataset.tag||null;
+    renderNews();
+    /* Filtering can shorten the page under a reader who is deep in the archive, leaving them
+       below everything that is left. Put them back at the top of the list they just asked for. */
+    setHeaderVar();
+    const anchor=$("#newsTagChips");
+    if(anchor)window.scrollTo({top:Math.max(0,anchor.getBoundingClientRect().top+window.scrollY-((document.querySelector("header.site")?.offsetHeight||0)+14)),behavior:"auto"});
+    return;
+  }
+  const jump=e.target.closest("#newsJumpChips .news-jump-chip");
+  if(jump){newsScrollToEra(jump.dataset.era);return;}
+  const arrow=e.target.closest(".news-jump-arrow");
+  if(!arrow||!newsEraKeys.length)return;
+  const active=$("#newsJumpChips .news-jump-chip.active");
+  const i=newsEraKeys.indexOf(active?active.dataset.era:newsEraKeys[0]);
+  const next=i+(arrow.dataset.dir==="older"?1:-1);
+  if(next>=0&&next<newsEraKeys.length)newsScrollToEra(newsEraKeys[next]);
 });
+
 /* Hero carousel: pulls across the whole feed (meets, socials, news) so it reads as one connected
    "what's happening" strip rather than club news alone — sorted by closeness to today's date. */
 function heroFeedContent(it){
