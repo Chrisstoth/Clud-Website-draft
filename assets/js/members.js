@@ -312,6 +312,9 @@ function renderAdminSection(){
     else showForm(sec,null,sec==="feed"?role.feedTypes[0]:undefined);
   });
   main.addEventListener("click",e=>{
+    /* The edit form opens inside this list, so its own buttons bubble up to here -- they must
+       never be mistaken for the list's Edit/Delete buttons. */
+    if(e.target.closest("#adminForm"))return;
     const ed=e.target.closest("[data-edit]"),del=e.target.closest("[data-del]");
     if(ed){
       const clickedId=+ed.dataset.edit,wasOpen=editingId===clickedId;
@@ -570,17 +573,17 @@ function showForm(sec,id,forcedType){
     const renderGalleryThumbs=()=>{
       $("#galleryThumbs").innerHTML=galleryPhotos.length?galleryPhotos.map((url,i)=>
         `<div class="gallery-thumb"><img src="${esc(url)}" alt="" style="${photoImgStyle(url)}">
-          <button type="button" class="gallery-thumb-del" data-del="${i}" aria-label="Remove this photo">×</button>
-          <button type="button" class="gallery-thumb-frame" data-frame="${i}">Frame</button></div>`).join("")
+          <button type="button" class="gallery-thumb-del" data-photo-del="${i}" aria-label="Remove this photo">×</button>
+          <button type="button" class="gallery-thumb-frame" data-photo-frame="${i}">Frame</button></div>`).join("")
         :`<p class="hint" style="margin:0">No photos yet.</p>`;
     };
     renderGalleryThumbs();
     $("#galleryThumbs").addEventListener("click",async e=>{
-      const del=e.target.closest("[data-del]");
-      if(del){galleryPhotos.splice(+del.dataset.del,1);renderGalleryThumbs();return;}
-      const frame=e.target.closest("[data-frame]");
-      if(!frame)return;
-      const i=+frame.dataset.frame;
+      const del=e.target.closest("[data-photo-del]");
+      if(del){galleryPhotos.splice(+del.dataset.photoDel,1);renderGalleryThumbs();return;}
+      const frameBtn=e.target.closest("[data-photo-frame]");
+      if(!frameBtn)return;
+      const i=+frameBtn.dataset.photoFrame;
       const framed=await frame(galleryPhotos[i]);
       if(framed){galleryPhotos[i]=framed;renderGalleryThumbs();}
     });
