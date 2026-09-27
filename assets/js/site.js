@@ -53,7 +53,7 @@ function renderMeets(){
       m.currentEntriesUrl?`Current entries: <a href="${esc(m.currentEntriesUrl)}">View entries</a>`:""
     ].filter(Boolean).map(line=>`<div class="link-line">${line}</div>`).join("");
     const r=resolveNewsImage(m.img);
-    const thumb=r?`<div class="news-thumb ${r.cls}" style="background:${r.css};${r.vars}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
+    const thumb=r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
     return `<article class="card meet${meetLive(m)?" live":""}${done?" done":""}${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
       ${thumb}
       <div class="datebox"><div class="d">${dp.d}</div><div class="m">${dp.m}</div></div>
@@ -336,10 +336,13 @@ function renderSocials(){
   const socials=DB.feed.filter(it=>it.type==="social").sort((a,b)=>a.start<b.start?-1:1);
   $("#socialsList").innerHTML=socials.length?socials.map(it=>{
     const r=resolveNewsImage(it.img);
-    const artBg=r?`linear-gradient(160deg,rgba(16,16,20,.15),rgba(16,16,20,.65)),${r.css}`:it.color;
+    /* the darkening keeps the title legible: over a photo it rides on the .photo layer (--shade),
+       over a default gradient or the chosen card colour it's just another background layer */
+    const shade="linear-gradient(160deg,rgba(16,16,20,.15),rgba(16,16,20,.65))";
+    const artStyle=!r?`background:${it.color}`:r.bg?`background:${shade},${r.bg}`:`${r.style};--shade:${shade}`;
     return `
     <article class="card social-card">
-      <div class="art ${r?r.cls:""}" style="background:${artBg};${r?r.vars:""}">${esc(it.title)}</div>
+      <div class="art ${r?r.cls:""}" style="${artStyle}">${esc(it.title)}</div>
       <div class="body"><div class="when">${esc(fmtDate(it.start))}</div><p>${esc(it.blurb)}</p>
       ${it.link?`<div><a class="btn small" href="${esc(it.link)}">Details / tickets</a></div>`:""}
       <div><a class="btn small ghost" href="article?id=${it.id}">Read more →</a></div></div>
@@ -410,7 +413,7 @@ function newsEraFor(iso,today){
 }
 function newsCard(n,featured){
   const r=resolveNewsImage(n.img);
-  const thumb=r?`<div class="news-thumb ${r.cls}" style="background:${r.css};${r.vars}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
+  const thumb=r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
   return `<article class="card news-card${featured?" is-latest":""}">${thumb}<p class="eyebrow">${esc(n.tag)}</p>
     <h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3>
     <p class="news-date"><time datetime="${esc(n.start)}">${fmtDate(n.start)}</time></p>
@@ -546,9 +549,9 @@ function renderHeroFeed(){
     const c=heroFeedContent(it);
     /* An article with a gallery shows all of it here, cross-fading (see cycleHeroPhotos);
        anything else shows its single picture, or a club gradient if it has none. */
-    const layers=((it.photos||[]).length?it.photos:[c.img]).map(resolveNewsImage).filter(Boolean);
+    const layers=((it.photos||[]).length?it.photos:[c.img]).map(src=>resolveNewsImage(src,"hero")).filter(Boolean);
     const media=layers.length?`<div class="hero-slide-media">${layers.map((r,j)=>
-      `<div class="hero-slide-photo${j===0?" show":""} ${r.cls}" style="background:${r.css};${r.vars}"></div>`).join("")}</div>`:"";
+      `<div class="hero-slide-photo${j===0?" show":""} ${r.cls}" style="${r.style}"></div>`).join("")}</div>`:"";
     return `
     <div class="hero-slide" style="background:${layers.length?"#101014":HERO_SLIDE_BG[i%HERO_SLIDE_BG.length]}">
       ${media}

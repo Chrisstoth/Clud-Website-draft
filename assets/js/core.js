@@ -103,58 +103,87 @@ function compressImage(file){
 const dataUrlKB=s=>Math.round(s.length*0.75/1024);
 
 /* Resolves a news item's img field (real path/data-URL, "default:<key>" token, or empty) into
-   a CSS background + optional icon glyph. Shared by the news grid, the hero carousel and the
-   swatch buttons in the picker. Looks defaults up live in DB.newsDefaults so webmaster edits
-   to the default picture library apply immediately. A default with a real "img" set wins over
-   its gradient. */
-function resolveNewsImage(img){
+   what a box needs to draw it: {cls, style, icon} for class="thing ${r.cls}" style="${r.style}",
+   plus "bg" (the plain CSS background) for the gradient defaults, which aren't photos. Shared by
+   the news grid, the hero carousel and the picker. Looks defaults up live in DB.newsDefaults so
+   webmaster edits to the default picture library apply immediately. A default with a real "img"
+   set wins over its gradient. "pair" picks per-view framing -- see photoLook. */
+function resolveNewsImage(img,pair){
   if(!img)return null;
   if(img.indexOf("default:")===0){
     const d=DB.newsDefaults.find(x=>x.key===img.slice(8));
     if(!d)return null;
-    return d.img?photoLook(d.img):{css:d.bg,icon:d.icon,cls:"",vars:""};
+    return d.img?photoLook(d.img,pair):{cls:"",style:`background:${d.bg}`,bg:d.bg,icon:d.icon};
   }
-  return photoLook(img);
-}
-/* What a container needs to draw a photo with its framing: the background, plus -- when it's
-   zoomed -- the "photo-zoom" class and the two custom properties that class reads. Use as
-   class="thing ${r.cls}" style="background:${r.css};${r.vars}". */
-function photoLook(url){
-  const f=imgFraming(url);
-  const zoomed=!f.fit&&f.zoom>1;
-  return {css:photoCss(url),icon:null,cls:zoomed?"photo-zoom":"",vars:zoomed?`--z:${f.zoom};--fo:${f.x}% ${f.y}%`:""};
+  return photoLook(img,pair);
 }
 
-/* Framing. Every place crops a photo differently -- a wide strip on the homepage, near-square
-   on phones, 16:10 on the article page -- so instead of one fixed crop an admin picks the spot
-   that must stay in view ("#focus=30,70", percent across,down) and how far to zoom in on it
-   ("&zoom=1.6"), or asks for the whole photo uncropped ("#fit", for posters and logos). It
-   rides in the URL fragment, which never reaches the server: the same URL loads the same file
-   everywhere and no column had to change shape. Zooming happens around the focus point, so
-   that spot never drifts out of frame however far in the admin goes. */
+/* Framing. Every place crops a photo differently -- a wide slanted strip on the homepage, near
+   square on phones, 16:10 on the article page -- so an admin frames each photo separately for
+   each of the four views an article is really seen in (FRAME_VIEWS): the spot that must stay in
+   view (focus, percent across/down), how far to zoom in on it, or "fit" to show the whole photo
+   uncropped (posters and logos). Zooming happens around the focus point, so that spot never
+   drifts out of frame however far in the admin goes.
+
+   It rides in the URL fragment, which never reaches the server: the same URL loads the same
+   file everywhere and no column had to change shape. The article-page framing is the base
+   ("#focus=30,70&zoom=1.6", or "#fit") and is also what small cards and thumbnails use; the other
+   views are stored only where they differ from it ("&hd=20,40,1.8", "&hp=fit").  */
 const ZOOM_MAX=3;
+const FRAME_VIEWS=[
+  {key:"hd",label:"Homepage — computer"},
+  {key:"hp",label:"Homepage — phone"},
+  {key:"ad",label:"Article page"},
+  {key:"ap",label:"Article — phone"}
+];
+const FRAME_CENTRE={x:50,y:50,zoom:1,fit:false};
+const okPct=n=>Number.isFinite(n)&&n>=0&&n<=100;
+const clampZoom=z=>Number.isFinite(z)?Math.min(ZOOM_MAX,Math.max(1,z)):1;
+function parseViewFrame(v){
+  if(v==="fit")return {...FRAME_CENTRE,fit:true};
+  const [x,y,z]=String(v||"").split(",").map(Number);
+  return okPct(x)&&okPct(y)?{x,y,zoom:clampZoom(z),fit:false}:null;
+}
+const viewFrameToken=f=>f.fit?"fit":`${Math.round(f.x)},${Math.round(f.y)},${Math.round(f.zoom*100)/100}`;
+/* -> {hd,hp,ad,ap}, every view filled in (falling back to the base). */
 function imgFraming(url){
   const p=new URLSearchParams(String(url||"").split("#")[1]||"");
   const [x,y]=(p.get("focus")||"").split(",").map(Number);
-  const ok=n=>Number.isFinite(n)&&n>=0&&n<=100;
-  const z=Number(p.get("zoom"));
-  return {...(ok(x)&&ok(y)?{x,y}:{x:50,y:50}),fit:p.has("fit"),zoom:Number.isFinite(z)?Math.min(ZOOM_MAX,Math.max(1,z)):1};
+  const base=p.has("fit")?{...FRAME_CENTRE,fit:true}
+    :{...(okPct(x)&&okPct(y)?{x,y}:{x:50,y:50}),zoom:clampZoom(Number(p.get("zoom"))),fit:false};
+  const views={ad:base};
+  for(const k of ["hd","hp","ap"])views[k]=parseViewFrame(p.get(k))||{...base};
+  return views;
 }
-function withFraming(url,{x,y,fit,zoom=1}){
-  const base=String(url).split("#")[0];
-  if(fit)return `${base}#fit`;
+function withFraming(url,views){
+  const clean=String(url).split("#")[0];
+  const b=views.ad;
   const parts=[];
-  if(Math.round(x)!==50||Math.round(y)!==50)parts.push(`focus=${Math.round(x)},${Math.round(y)}`);
-  if(zoom>1.001)parts.push(`zoom=${Math.round(zoom*100)/100}`);
-  return parts.length?`${base}#${parts.join("&")}`:base;
+  if(b.fit)parts.push("fit");
+  else{
+    if(Math.round(b.x)!==50||Math.round(b.y)!==50)parts.push(`focus=${Math.round(b.x)},${Math.round(b.y)}`);
+    if(b.zoom>1.001)parts.push(`zoom=${Math.round(b.zoom*100)/100}`);
+  }
+  for(const k of ["hd","hp","ap"])if(viewFrameToken(views[k])!==viewFrameToken(b))parts.push(`${k}=${viewFrameToken(views[k])}`);
+  return parts.length?`${clean}#${parts.join("&")}`:clean;
 }
-function photoCss(url){
-  const f=imgFraming(url);
-  return f.fit?`url('${esc(url)}') center/contain no-repeat,#101014`:`url('${esc(url)}') ${f.x}% ${f.y}%/cover no-repeat`;
+/* One view's framing as the custom properties the .photo class draws from (site.css). */
+const frameVars=(f,sfx="")=>`--pos${sfx}:${f.x}% ${f.y}%;--size${sfx}:${f.fit?"contain":"cover"};--z${sfx}:${f.fit?1:f.zoom}`;
+const photoUrlVar=url=>`--img:url('${esc(String(url).split("#")[0])}')`;
+/* What a box needs to draw a framed photo. With no pair it uses the base (article-page)
+   framing -- right for cards and thumbnails. With a pair ("hero" or "article") it carries the
+   wide and narrow views of that place, and the .photo-hero / .photo-article classes switch
+   between them at the same breakpoints the layouts themselves switch at. */
+const FRAME_PAIRS={hero:["hd","hp"],article:["ad","ap"]};
+function photoLook(url,pair){
+  const v=imgFraming(url);
+  if(!pair)return {cls:"photo",style:`${photoUrlVar(url)};${frameVars(v.ad)}`,icon:null};
+  const [wide,narrow]=FRAME_PAIRS[pair];
+  return {cls:`photo photo-${pair}`,style:`${photoUrlVar(url)};${frameVars(v[wide],"-w")};${frameVars(v[narrow],"-n")}`,icon:null};
 }
-/* The same framing for an <img> (the article gallery), where object-fit does the cropping. */
+/* The base framing for an <img> (admin thumbnails), where object-fit does the cropping. */
 function photoImgStyle(url){
-  const f=imgFraming(url);
+  const f=imgFraming(url).ad;
   if(f.fit)return "object-fit:contain";
   const pos=`${f.x}% ${f.y}%`;
   return `object-position:${pos}`+(f.zoom>1?`;transform:scale(${f.zoom});transform-origin:${pos}`:"");
@@ -231,7 +260,7 @@ function articleGalleryHtml(photos){
   if(!photos||!photos.length)return "";
   return `<div class="article-gallery">
     <div class="article-gallery-track" id="agTrack">
-      ${photos.map(p=>`<div class="article-gallery-slide"><img src="${esc(p)}" alt="" style="${photoImgStyle(p)}"></div>`).join("")}
+      ${photos.map(p=>{const r=photoLook(p,"article");return `<div class="article-gallery-slide ${r.cls}" style="${r.style}" role="img" aria-label="Photo"></div>`;}).join("")}
     </div>
     ${photos.length>1?`
     <button type="button" class="gallery-arrow prev" id="agPrev" aria-label="Previous photo">‹</button>
@@ -277,11 +306,11 @@ function wireArticleGallery(n){
    article that hasn't had a body written yet). */
 function articleContentHtml(it){
   const photos=it.photos||[];
-  const cover=!photos.length?resolveNewsImage(it.img):null;
+  const cover=!photos.length?resolveNewsImage(it.img,"article"):null;
   const dateLabel=it.start?fmtDate(it.start):"";
   const eyebrow=it.type==="news"?(it.tag||"Club News"):"Club Calendar · Social";
   const media=photos.length?articleGalleryHtml(photos)
-    :(cover?`<div class="article-cover ${cover.cls}" style="background:${cover.css};${cover.vars}">${cover.icon?`<span class="news-thumb-icon">${cover.icon}</span>`:""}</div>`:"");
+    :(cover?`<div class="article-cover ${cover.cls}" style="${cover.style}">${cover.icon?`<span class="news-thumb-icon">${cover.icon}</span>`:""}</div>`:"");
   const bodyHtml=sanitizeArticleHtml(it.body||"")||`<p>${esc(it.blurb||"")}</p>`;
   return `<div class="page-head">
       <p class="eyebrow">${esc(eyebrow)}</p>

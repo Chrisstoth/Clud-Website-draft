@@ -459,7 +459,7 @@ function showForm(sec,id,forcedType){
       }).join(""):"";
       return `<div class="f">${f.label}
         <div class="img-picker">
-          <div class="img-preview${r?"":" empty"}" id="imgPreview" style="background:${r?r.css:""}">${r&&r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>
+          <div class="img-preview${r?" "+r.cls:" empty"}" id="imgPreview" style="${r?r.style:""}">${r&&r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>
           ${showSwatches?`<div class="img-swatches">${swatches}</div>`:""}
           <label class="img-upload-btn">Upload your own photo<input type="file" accept="image/*" id="imgUploadInput" style="display:none"></label>
           <button type="button" class="img-clear-btn" id="imgClearBtn">No picture</button>
@@ -534,7 +534,8 @@ function showForm(sec,id,forcedType){
     const preview=$("#imgPreview");
     const setPreview=val=>{
       const r=resolveNewsImage(val);
-      preview.style.background=r?r.css:"";
+      preview.className=`img-preview${r?" "+r.cls:" empty"}`;
+      preview.style.cssText=r?r.style:"";
       preview.innerHTML=r&&r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:"";
       preview.classList.toggle("empty",!r);
       if($("#imgFrameBtn"))$("#imgFrameBtn").hidden=!isUploadedPhoto(val);
@@ -710,27 +711,25 @@ function showArticlePreview(it){
   wireArticleGallery((it.photos||[]).length);
 }
 
-/* Framing editor: the admin taps the spot in a photo that must always stay in view, zooms in on
-   it if they like, or ticks "whole photo" for posters and logos -- and sees straight away how
-   each page will crop it. The homepage previews are to-scale replicas of the real slides with
-   the story's card on top, because on a wide slide the card hides a good third of the photo;
-   the card can be moved to the other side or cut down to its title from here. Framing is stored
-   on the photo's URL (imgFraming in core.js), the card layout on the story (feed.hero_card).
-   A gallery is framed as a set: the strip along the top switches photo, each keeps its own
-   framing, and Done saves them all. Resolves to {urls, layout}, or null if they cancel. */
-const FRAME_SMALL_PREVIEWS=[
-  {label:"Article page",ratio:"16/10"},
-  {label:"Article page — phone",ratio:"4/3"}
-];
+/* Framing editor. Each photo is framed separately for each of the four views an article is
+   seen in (FRAME_VIEWS in core.js): the admin picks a view, taps the spot that must stay in view,
+   zooms in on it if they like, or ticks "whole photo" for posters and logos -- and sees straight
+   away how every view crops it. The homepage previews are to-scale replicas of the real slides
+   with the story's card on top, slant and all, because on the homepage the card and the slanted
+   edges between them hide a good share of the photo; the card can be moved to the other side or
+   cut down to its title from here. A gallery is framed as a set: the strip along the top
+   switches photo. Framing is stored on each photo's URL (imgFraming in core.js), the card layout
+   on the story (feed.hero_card). Resolves to {urls, layout}, or null if they cancel. */
 const isUploadedPhoto=v=>!!v&&!String(v).startsWith("default:");
 /* A real slide's size in px (see .hero-slide in site.css): drawn at that size, then scaled to fit. */
-const HERO_REPLICAS={desk:{w:900,h:420,label:"Homepage — computer"},phone:{w:360,h:340,label:"Homepage — phone"}};
-function heroReplicaHtml(kind,card){
-  const r=HERO_REPLICAS[kind];
-  return `<figure class="frame-hero-fig frame-hero-${kind}">
-    <div class="fh" data-w="${r.w}" style="aspect-ratio:${r.w}/${r.h}">
+const HERO_REPLICAS={hd:{w:900,h:420,cls:"frame-hero-desk"},hp:{w:360,h:340,cls:"frame-hero-phone"}};
+const ARTICLE_RATIOS={ad:"16/10",ap:"4/3"};
+function framePreviewHtml(view,card){
+  const label=FRAME_VIEWS.find(v=>v.key===view).label;
+  const r=HERO_REPLICAS[view];
+  const body=r?`<div class="fh" data-w="${r.w}" style="aspect-ratio:${r.w}/${r.h}">
       <div class="fh-inner" style="width:${r.w}px;height:${r.h}px">
-        <div class="fh-photo"></div><div class="fh-shade"></div>
+        <div class="fh-photo photo" data-paint="${view}"></div><div class="fh-shade"></div>
         ${card?`<div class="fh-card">
           <p class="eyebrow">${esc(card.tag)}</p>
           <h3>${esc(card.title||"Your headline")}</h3>
@@ -738,15 +737,19 @@ function heroReplicaHtml(kind,card){
           <span class="fh-link">Read more →</span>
         </div>`:""}
       </div>
-    </div>
-    <figcaption>${r.label}</figcaption>
+    </div>`
+    :`<div class="frame-preview photo" data-paint="${view}" style="aspect-ratio:${ARTICLE_RATIOS[view]}"></div>`;
+  return `<figure class="frame-view ${r?"frame-hero-fig "+r.cls:""}" data-view="${view}" title="Adjust ${label}">
+    ${body}
+    <figcaption>${label}<span class="frame-editing">Adjusting</span></figcaption>
   </figure>`;
 }
 function openFramingEditor(urls,start,card){
   return new Promise(resolve=>{
-    const frames=urls.map(u=>({url:u,...imgFraming(u)}));
+    const frames=urls.map(u=>({url:u,v:imgFraming(u)}));
     let cur=Math.max(0,Math.min(start||0,frames.length-1));
-    let {x,y,fit,zoom}=frames[cur];
+    let view="hd";
+    const fr=()=>frames[cur].v[view];
     const layout=new Set(String(card?.layout||"").split(/\s+/).filter(Boolean));
     let overlay=document.getElementById("framingOverlay");
     if(!overlay){
@@ -765,9 +768,14 @@ function openFramingEditor(urls,start,card){
         </span>
       </div>
       <div class="frame-body">
-        <p class="hint" style="margin:0">Tap (or drag) on the part of the photo that must always stay in view — faces, a banner, the pool. Every page crops around that spot, and zooming closes in on it. The previews below update as you go.</p>
         ${frames.length>1?`<div class="frame-strip" id="frameStrip">${frames.map((f,i)=>
           `<button type="button" data-photo="${i}" aria-label="Photo ${i+1}"><img src="${esc(String(f.url).split("#")[0])}" alt="" style="${photoImgStyle(f.url)}"></button>`).join("")}</div>`:""}
+        <div class="frame-viewpick">
+          <span class="frame-label">Adjusting</span>
+          <div class="frame-seg frame-seg-views">${FRAME_VIEWS.map(v=>`<button type="button" data-view="${v.key}">${v.label}</button>`).join("")}</div>
+          <button type="button" class="frame-copy" id="frameCopy">Copy to all views</button>
+        </div>
+        <p class="hint" style="margin:0">Tap (or drag) on the part of the photo that must stay in view in <b id="frameViewName"></b> — zoom closes in on that spot. Each view keeps its own framing; tap a preview below to switch to it.</p>
         <div class="frame-stage" id="frameStage"><img alt="" draggable="false"><span class="frame-marker" id="frameMarker"></span></div>
         <div class="frame-zoom">
           <span class="frame-label">Zoom</span>
@@ -776,7 +784,7 @@ function openFramingEditor(urls,start,card){
         </div>
         <label class="f checkbox-f"><input type="checkbox" id="frameFit"> Show the whole photo, uncropped</label>
         <p class="hint" style="margin:-10px 0 0">Best for posters, logos and anything with writing on it. Any gap around the photo is filled in black.</p>
-        ${heroReplicaHtml("desk",card)}
+        ${framePreviewHtml("hd",card)}
         ${card?`<div class="frame-card-opts">
           <p class="hint" style="margin:0">Homepage card for this story — the same for all its photos. Move it off whatever matters in the picture.</p>
           <div class="frame-card-row">
@@ -784,70 +792,58 @@ function openFramingEditor(urls,start,card){
             <span class="frame-opt"><span class="frame-label">Size</span>${seg("size",[["full","Full"],["compact","Title only"]])}</span>
           </div>
         </div>`:""}
-        <div class="frame-previews">
-          ${heroReplicaHtml("phone",card)}
-          ${FRAME_SMALL_PREVIEWS.map(p=>`<figure>
-            <div class="frame-preview" style="aspect-ratio:${p.ratio}"></div>
-            <figcaption>${p.label}</figcaption></figure>`).join("")}
-        </div>
+        <div class="frame-previews">${["hp","ad","ap"].map(v=>framePreviewHtml(v,card)).join("")}</div>
       </div>
     </div>`;
     const q=sel=>overlay.querySelector(sel);
     const stage=q("#frameStage"),marker=q("#frameMarker"),fitBox=q("#frameFit"),zoomIn=q("#frameZoom");
-    const current=()=>withFraming(frames[cur].url,{x,y,fit,zoom});
-    /* Switch the editor to photo i, keeping what was done to the one being left. */
-    const show=i=>{
-      Object.assign(frames[cur],{x,y,fit,zoom});
-      cur=i;
-      ({x,y,fit,zoom}=frames[cur]);
-      stage.querySelector("img").src=String(frames[cur].url).split("#")[0];
-      fitBox.checked=fit;
-      zoomIn.value=zoom;
-      if(frames.length>1)q("#frameTitle").textContent=`Frame photo ${cur+1} of ${frames.length}`;
-      overlay.querySelectorAll("#frameStrip [data-photo]").forEach((b,j)=>b.classList.toggle("on",j===cur));
-      draw();
-    };
     const layoutValue=()=>["right","compact"].filter(t=>layout.has(t)).join(" ");
     /* The replicas are laid out at a real slide's pixel size and scaled down to their box, so
        the card's type, padding and slant land exactly where they will on the live page. */
     const fitReplicas=()=>overlay.querySelectorAll(".fh").forEach(fh=>fh.style.setProperty("--s",fh.clientWidth/fh.dataset.w));
-    const paint=(el,base,look)=>{
-      el.className=`${base} ${look.cls}`;
-      el.style.background=look.css;
-      el.style.setProperty("--z",fit?1:zoom);
-      el.style.setProperty("--fo",`${x}% ${y}%`);
-    };
     const draw=()=>{
-      marker.style.left=`${x}%`;marker.style.top=`${y}%`;
-      stage.classList.toggle("fit",fit);
-      zoomIn.disabled=fit;
-      q("#frameZoomOut").textContent=fit?"—":`${zoom.toFixed(1)}×`;
-      const look=photoLook(current());
-      /* the strip thumbnail of the photo being framed follows along */
+      const f=fr(),photo=frames[cur];
+      marker.style.left=`${f.x}%`;marker.style.top=`${f.y}%`;
+      stage.classList.toggle("fit",f.fit);
+      fitBox.checked=f.fit;
+      zoomIn.disabled=f.fit;
+      zoomIn.value=f.zoom;
+      q("#frameZoomOut").textContent=f.fit?"—":`${f.zoom.toFixed(1)}×`;
+      q("#frameViewName").textContent=FRAME_VIEWS.find(v=>v.key===view).label.toLowerCase();
+      overlay.querySelectorAll("[data-paint]").forEach(el=>{el.style.cssText=`${el.dataset.paint in ARTICLE_RATIOS?`aspect-ratio:${ARTICLE_RATIOS[el.dataset.paint]};`:""}${photoUrlVar(photo.url)};${frameVars(photo.v[el.dataset.paint])}`;});
+      overlay.querySelectorAll(".frame-view").forEach(el=>el.classList.toggle("on",el.dataset.view===view));
+      overlay.querySelectorAll(".frame-seg-views [data-view]").forEach(b=>b.classList.toggle("on",b.dataset.view===view));
+      /* the strip thumbnail of the photo being framed follows its article-page framing */
       const thumb=overlay.querySelector(`#frameStrip [data-photo="${cur}"] img`);
-      if(thumb)thumb.style.cssText=photoImgStyle(current());
-      overlay.querySelectorAll(".frame-preview").forEach(el=>paint(el,"frame-preview",look));
-      overlay.querySelectorAll(".fh-photo").forEach(el=>paint(el,"fh-photo",look));
+      if(thumb)thumb.style.cssText=photoImgStyle(withFraming(photo.url,photo.v));
       overlay.querySelectorAll(".fh-card").forEach(el=>{
         el.classList.toggle("card-right",layout.has("right"));
         el.classList.toggle("card-compact",layout.has("compact"));
       });
-      overlay.querySelectorAll(".frame-seg").forEach(sg=>{
+      overlay.querySelectorAll(".frame-seg[data-opt]").forEach(sg=>{
         const on=sg.dataset.opt==="side"?(layout.has("right")?"right":"left"):(layout.has("compact")?"compact":"full");
         sg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===on));
       });
     };
+    const show=i=>{
+      cur=i;
+      stage.querySelector("img").src=String(frames[cur].url).split("#")[0];
+      if(frames.length>1)q("#frameTitle").textContent=`Frame photo ${cur+1} of ${frames.length}`;
+      overlay.querySelectorAll("#frameStrip [data-photo]").forEach((b,j)=>b.classList.toggle("on",j===cur));
+      draw();
+    };
     const place=e=>{
-      if(fit)return;
+      const f=fr();
+      if(f.fit)return;
       const r=stage.querySelector("img").getBoundingClientRect();
-      x=Math.max(0,Math.min(100,(e.clientX-r.left)/r.width*100));
-      y=Math.max(0,Math.min(100,(e.clientY-r.top)/r.height*100));
+      f.x=Math.max(0,Math.min(100,(e.clientX-r.left)/r.width*100));
+      f.y=Math.max(0,Math.min(100,(e.clientY-r.top)/r.height*100));
       draw();
     };
     stage.addEventListener("pointerdown",e=>{stage.setPointerCapture(e.pointerId);place(e);});
     stage.addEventListener("pointermove",e=>{if(stage.hasPointerCapture(e.pointerId))place(e);});
-    fitBox.addEventListener("change",()=>{fit=fitBox.checked;draw();});
-    zoomIn.addEventListener("input",()=>{zoom=+zoomIn.value;draw();});
+    fitBox.addEventListener("change",()=>{fr().fit=fitBox.checked;draw();});
+    zoomIn.addEventListener("input",()=>{fr().zoom=+zoomIn.value;draw();});
     const resizeObs=new ResizeObserver(fitReplicas);
     overlay.querySelectorAll(".fh").forEach(fh=>resizeObs.observe(fh));
     const close=result=>{
@@ -862,16 +858,23 @@ function openFramingEditor(urls,start,card){
       if(e.target===overlay)return close(null);
       const pick=e.target.closest("[data-photo]");
       if(pick)return show(+pick.dataset.photo);
-      const b=e.target.closest(".frame-seg button");
+      const pickView=e.target.closest("[data-view]");
+      if(pickView){view=pickView.dataset.view;return draw();}
+      if(e.target.closest("#frameCopy")){
+        const f=fr();
+        for(const v of FRAME_VIEWS)frames[cur].v[v.key]={...f};
+        toast("Copied to all four views");
+        return draw();
+      }
+      const b=e.target.closest(".frame-seg[data-opt] button");
       if(b){
         const token=b.closest(".frame-seg").dataset.opt==="side"?"right":"compact";
         if(b.dataset.v===token)layout.add(token);else layout.delete(token);
         return draw();
       }
       const act=e.target.closest("[data-act]")?.dataset.act;
-      if(act!=="done")return act&&close(null);
-      Object.assign(frames[cur],{x,y,fit,zoom});
-      close({urls:frames.map(f=>withFraming(f.url,f)),layout:layoutValue()});
+      if(act==="cancel")return close(null);
+      if(act==="done")close({urls:frames.map(f=>withFraming(f.url,f.v)),layout:layoutValue()});
     };
     overlay.classList.add("open");
     show(cur);
