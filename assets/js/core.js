@@ -17,7 +17,7 @@ const DB={feed:[],coaches:[],squads:[],roles:[],newsDefaults:[],welfare:[],commi
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",conditionsUrl:"conditions_url",conditionsLabel:"conditions_label",entryFileUrl:"entry_file_url",entryFileLabel:"entry_file_label",resultsFileUrl:"results_file_url",resultsFileLabel:"results_file_label",currentEntriesUrl:"current_entries_url",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body",visible:"visible"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",conditionsUrl:"conditions_url",conditionsLabel:"conditions_label",entryFileUrl:"entry_file_url",entryFileLabel:"entry_file_label",resultsFileUrl:"results_file_url",resultsFileLabel:"results_file_label",currentEntriesUrl:"current_entries_url",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card"};
 const FEED_TYPE_TO_ROW={meet:"meet",externalMeet:"external_meet",teamMeet:"team_meet",social:"social",news:"news",training:"training"};
 const FEED_TYPE_FROM_ROW=Object.fromEntries(Object.entries(FEED_TYPE_TO_ROW).map(([k,v])=>[v,k]));
 
@@ -112,26 +112,41 @@ function resolveNewsImage(img){
   if(img.indexOf("default:")===0){
     const d=DB.newsDefaults.find(x=>x.key===img.slice(8));
     if(!d)return null;
-    return d.img?{css:photoCss(d.img),icon:null}:{css:d.bg,icon:d.icon};
+    return d.img?photoLook(d.img):{css:d.bg,icon:d.icon,cls:"",vars:""};
   }
-  return {css:photoCss(img),icon:null};
+  return photoLook(img);
+}
+/* What a container needs to draw a photo with its framing: the background, plus -- when it's
+   zoomed -- the "photo-zoom" class and the two custom properties that class reads. Use as
+   class="thing ${r.cls}" style="background:${r.css};${r.vars}". */
+function photoLook(url){
+  const f=imgFraming(url);
+  const zoomed=!f.fit&&f.zoom>1;
+  return {css:photoCss(url),icon:null,cls:zoomed?"photo-zoom":"",vars:zoomed?`--z:${f.zoom};--fo:${f.x}% ${f.y}%`:""};
 }
 
 /* Framing. Every place crops a photo differently -- a wide strip on the homepage, near-square
    on phones, 16:10 on the article page -- so instead of one fixed crop an admin picks the spot
-   that must stay in view ("#focus=30,70", percent across,down), or asks for the whole photo
-   uncropped ("#fit", for posters and logos). It rides in the URL fragment, which never reaches
-   the server: the same URL loads the same file everywhere and no column had to change shape. */
+   that must stay in view ("#focus=30,70", percent across,down) and how far to zoom in on it
+   ("&zoom=1.6"), or asks for the whole photo uncropped ("#fit", for posters and logos). It
+   rides in the URL fragment, which never reaches the server: the same URL loads the same file
+   everywhere and no column had to change shape. Zooming happens around the focus point, so
+   that spot never drifts out of frame however far in the admin goes. */
+const ZOOM_MAX=3;
 function imgFraming(url){
   const p=new URLSearchParams(String(url||"").split("#")[1]||"");
   const [x,y]=(p.get("focus")||"").split(",").map(Number);
   const ok=n=>Number.isFinite(n)&&n>=0&&n<=100;
-  return ok(x)&&ok(y)?{x,y,fit:p.has("fit")}:{x:50,y:50,fit:p.has("fit")};
+  const z=Number(p.get("zoom"));
+  return {...(ok(x)&&ok(y)?{x,y}:{x:50,y:50}),fit:p.has("fit"),zoom:Number.isFinite(z)?Math.min(ZOOM_MAX,Math.max(1,z)):1};
 }
-function withFraming(url,{x,y,fit}){
+function withFraming(url,{x,y,fit,zoom=1}){
   const base=String(url).split("#")[0];
   if(fit)return `${base}#fit`;
-  return Math.round(x)===50&&Math.round(y)===50?base:`${base}#focus=${Math.round(x)},${Math.round(y)}`;
+  const parts=[];
+  if(Math.round(x)!==50||Math.round(y)!==50)parts.push(`focus=${Math.round(x)},${Math.round(y)}`);
+  if(zoom>1.001)parts.push(`zoom=${Math.round(zoom*100)/100}`);
+  return parts.length?`${base}#${parts.join("&")}`:base;
 }
 function photoCss(url){
   const f=imgFraming(url);
@@ -140,8 +155,22 @@ function photoCss(url){
 /* The same framing for an <img> (the article gallery), where object-fit does the cropping. */
 function photoImgStyle(url){
   const f=imgFraming(url);
-  return f.fit?"object-fit:contain":`object-position:${f.x}% ${f.y}%`;
+  if(f.fit)return "object-fit:contain";
+  const pos=`${f.x}% ${f.y}%`;
+  return `object-position:${pos}`+(f.zoom>1?`;transform:scale(${f.zoom});transform-origin:${pos}`:"");
 }
+
+/* Homepage hero card text for any feed item. Lives here rather than in site.js so the framing
+   editor in the members' area can put the real card over its homepage previews. */
+function heroFeedContent(it){
+  if(isMeet(it))return {tag:it.type==="teamMeet"?"Team Meet":"Open Meet",title:it.title,blurb:`${it.venue||"Venue TBC"} · ${fmtDate(it.start)}`,linkAttrs:'href="open-meets"',img:it.img||null};
+  if(it.type==="social")return {tag:"Club Calendar",title:it.title,blurb:it.blurb||fmtDate(it.start),linkAttrs:`href="article?id=${it.id}"`,img:it.img||null};
+  if(it.type==="training")return {tag:"Training change",title:it.title,blurb:it.note||fmtDate(it.start),linkAttrs:'href="club-calendar"',img:it.img||null};
+  return {tag:`${it.tag} · Club News`,title:it.title,blurb:it.blurb,linkAttrs:`href="article?id=${it.id}"`,img:it.img||null};
+}
+/* An item's hero_card setting ("right", "compact", both, or empty for the default left/full)
+   as the classes the card takes. Whitelisted, since it ends up in a class attribute. */
+const heroCardClasses=v=>String(v||"").split(/\s+/).filter(t=>t==="right"||t==="compact").map(t=>` card-${t}`).join("");
 
 /* Shown on the Welfare & Safeguarding page (and in its admin editor) until the welfare_page
    row loads or if it's ever emptied out — the real content is normally in the database, kept
@@ -214,7 +243,7 @@ function articleGalleryHtml(photos){
    at a time -- the public article page, or the admin preview overlay). It plays itself as a
    slideshow, looping, until someone touches it: from then on they're in charge. No autoplay
    for people who've asked their device for reduced motion. */
-const GALLERY_AUTOPLAY_MS=5000;
+const GALLERY_AUTOPLAY_MS=7000;
 function wireArticleGallery(n){
   const track=document.getElementById("agTrack");
   if(!track||!n||n<2)return;
@@ -252,7 +281,7 @@ function articleContentHtml(it){
   const dateLabel=it.start?fmtDate(it.start):"";
   const eyebrow=it.type==="news"?(it.tag||"Club News"):"Club Calendar · Social";
   const media=photos.length?articleGalleryHtml(photos)
-    :(cover?`<div class="article-cover" style="background:${cover.css}">${cover.icon?`<span class="news-thumb-icon">${cover.icon}</span>`:""}</div>`:"");
+    :(cover?`<div class="article-cover ${cover.cls}" style="background:${cover.css};${cover.vars}">${cover.icon?`<span class="news-thumb-icon">${cover.icon}</span>`:""}</div>`:"");
   const bodyHtml=sanitizeArticleHtml(it.body||"")||`<p>${esc(it.blurb||"")}</p>`;
   return `<div class="page-head">
       <p class="eyebrow">${esc(eyebrow)}</p>

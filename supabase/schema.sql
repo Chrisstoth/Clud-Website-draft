@@ -62,6 +62,8 @@ alter table public.feed add column if not exists live_url text;
 -- entry file, and from the human-readable results PDF that results_url points at.
 alter table public.feed add column if not exists results_file_url text;
 alter table public.feed add column if not exists results_file_label text;
+-- Homepage slide card layout for the item: "right" and/or "compact" (see migration 012).
+alter table public.feed add column if not exists hero_card text;
 
 create table if not exists public.coaches (
   id          bigint generated always as identity primary key,

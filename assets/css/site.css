@@ -22,6 +22,8 @@
      silently change angle every time the content changed. */
   --slant-deg:20deg;
   --slant-ratio:.364;
+  /* homepage hero card: shared by the real card and the framing editor's replica of it */
+  --hero-card-h:220px;--hero-card-h-compact:146px;--hero-card-gap:14px;
   /* The bevel used by the cards that can't afford a full parallelogram (Club Calendar rows,
      Open Meets). --cut is the horizontal run of the corner cut, --rise its vertical run, and
      --rise = --cut / --slant-ratio, so the cut edge sits at exactly --slant-deg NO MATTER how
@@ -367,7 +369,7 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 /* gallery photos stack here and cross-fade (cycleHeroPhotos in site.js); the ::after is the
    darkening that keeps the card legible over any photo */
 .hero-slide-media{position:absolute;inset:0}
-.hero-slide-photo{position:absolute;inset:0;opacity:0;transition:opacity 1.2s ease}
+.hero-slide-photo{position:absolute;inset:0;opacity:0;transition:opacity 1.6s ease}
 .hero-slide-photo.show{opacity:1}
 .hero-slide-media::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,rgba(16,16,20,.55),rgba(16,16,20,.15) 65%)}
 .hero-news-card{
@@ -376,15 +378,32 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
      height means the margin can be worked out: the slide's edge sits --slant-ratio px further
      right for every px up, and the card's skewed box is centred (28px + height/2) up from the
      bottom -- so this margin keeps a constant --card-gap between the two slants. */
-  --card-h:214px;--card-gap:14px;
+  --card-h:var(--hero-card-h);--card-gap:var(--hero-card-gap);
   position:relative;z-index:0;max-width:420px;height:var(--card-h);
   margin:0 0 28px calc(var(--card-gap) + (28px + var(--card-h) / 2) * var(--slant-ratio));
   display:flex;flex-direction:column;justify-content:center;
   color:#fff;transition:opacity .3s;padding:18px 48px;
 }
 .hero-news-card h3,.hero-news-card p:not(.eyebrow){display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
+/* the heights above are sized to fit the clamped lines exactly; never let flex squash a line in half */
+.hero-news-card>*,.fh-card>*{flex-shrink:0}
+.hero-news-card>.eyebrow,.fh-card>.eyebrow{margin-top:0}
 .hero-news-card h3{-webkit-line-clamp:2}
 .hero-news-card p:not(.eyebrow){-webkit-line-clamp:3}
+/* per-story layout, chosen in the framing editor (feed.hero_card): "compact" drops the summary
+   for a shorter card; "right" moves it to the other side, mirroring the margin sum above
+   against the slide's right-hand slant, which leans the same way but starts --slide-lean in */
+.hero-news-card.card-compact{--card-h:var(--hero-card-h-compact)}
+.hero-news-card.card-compact p:not(.eyebrow){display:none}
+@media(min-width:641px){
+  .hero-news-card.card-right{margin-left:auto;margin-right:calc(var(--card-gap) + var(--slide-lean) - (28px + var(--card-h) / 2) * var(--slant-ratio))}
+}
+
+/* Zoom (photoLook in core.js): the container keeps its framed background, and a copy of it on
+   ::before is scaled up around the focus point. Works on any box without changing its markup. */
+.photo-zoom{position:relative;overflow:hidden;isolation:isolate}
+.hero-slide-photo.photo-zoom{position:absolute}
+.photo-zoom::before{content:"";position:absolute;inset:0;z-index:-1;background:inherit;transform:scale(var(--z,1));transform-origin:var(--fo,50% 50%)}
 .hero-news-card::before{
   content:"";position:absolute;inset:0;z-index:-1;
   background:rgba(16,16,20,.55);border:1px solid rgba(255,255,255,.15);
@@ -1232,7 +1251,7 @@ body.theme-dark .article-body a{color:var(--ember)}
 .article-gallery{position:relative;margin-bottom:28px;border-radius:var(--radius);overflow:hidden;background:#000;box-shadow:var(--shadow)}
 .article-gallery-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-ms-overflow-style:none}
 .article-gallery-track::-webkit-scrollbar{display:none}
-.article-gallery-slide{flex:0 0 100%;scroll-snap-align:center;aspect-ratio:16/10}
+.article-gallery-slide{flex:0 0 100%;scroll-snap-align:center;aspect-ratio:16/10;overflow:hidden}
 .article-gallery-slide img{width:100%;height:100%;object-fit:cover;display:block;border-radius:0;margin:0}
 @media(max-width:640px){.article-gallery-slide{aspect-ratio:4/3}}
 .gallery-arrow{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;background:rgba(16,16,20,.45);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:1.3rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:3;transition:opacity .2s,background .2s}
@@ -1273,12 +1292,52 @@ body.theme-dark .article-body a{color:var(--ember)}
 .frame-stage.fit img{opacity:.55}
 .frame-marker{position:absolute;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px var(--flame),0 2px 10px rgba(0,0,0,.55);pointer-events:none}
 .frame-stage.fit .frame-marker{display:none}
-.frame-previews{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0}
-.frame-previews figure{margin:0}
+.frame-zoom{display:flex;align-items:center;gap:12px}
+.frame-zoom input{flex:1;accent-color:var(--flame)}
+.frame-zoom output{min-width:3.2em;text-align:right;font-weight:700;font-size:.85rem}
+.frame-label{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.frame-card-opts{display:grid;gap:10px;margin-top:-4px}
+.frame-card-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px}
+.frame-opt{display:inline-flex;align-items:center;gap:10px}
+.frame-seg{display:inline-flex;border:1.5px solid var(--line);border-radius:999px;overflow:hidden}
+.frame-seg button{background:none;border:none;padding:8px 16px;font:inherit;font-size:.85rem;font-weight:700;color:var(--muted);cursor:pointer;min-height:40px}
+.frame-seg button.on{background:var(--flame);color:#101014}
+.frame-previews{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:0;align-items:start}
+@media(max-width:560px){.frame-previews{grid-template-columns:1fr 1fr}}
+.frame-previews figure,.frame-hero-fig{margin:0}
 .frame-preview{border-radius:6px;background-color:#101014}
-/* the homepage strip on a computer cuts both sides at the site's slant; show the same cut */
-.frame-preview.slanted{border-radius:0;clip-path:polygon(17% 0,100% 0,83% 100%,0 100%)}
-.frame-previews figcaption{font-size:.78rem;color:var(--muted);margin-top:5px}
+.frame-previews figcaption,.frame-hero-fig figcaption{font-size:.78rem;color:var(--muted);margin-top:5px}
+
+/* Homepage replicas in the framing editor: laid out at a real slide's pixel size (set inline)
+   and scaled to fit (--s, from JS). Their rules are standalone rather than reusing .hero-slide
+   and .hero-news-card, because those follow the ADMIN's screen width -- on a phone they'd show
+   the phone layout in the "computer" preview. Keep in step with the hero rules above. */
+.fh{position:relative;overflow:hidden;border-radius:6px;background:#101014}
+.fh-inner{position:absolute;left:0;top:0;transform:scale(var(--s,.5));transform-origin:0 0;overflow:hidden}
+.fh-photo,.fh-shade{position:absolute;inset:0}
+.fh-photo.photo-zoom{position:absolute}
+.fh-shade{background:linear-gradient(160deg,rgba(16,16,20,.55),rgba(16,16,20,.15) 65%)}
+.frame-hero-desk .fh-inner{--slide-lean:calc(420px * var(--slant-ratio));clip-path:polygon(var(--slide-lean) 0,100% 0,calc(100% - var(--slide-lean)) 100%,0 100%)}
+.frame-hero-desk .fh{border-radius:0;background:#000}
+.fh-card{position:absolute;z-index:1;color:#fff;display:flex;flex-direction:column;justify-content:center}
+.fh-card .eyebrow{color:var(--ember)}
+.fh-card h3{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.15rem;margin-top:6px;line-height:1.2;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.fh-blurb{color:rgba(255,255,255,.82);font-size:.9rem;margin-top:8px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.fh-link{color:var(--ember);font-weight:600;font-size:.85rem;display:inline-block;margin-top:10px;text-decoration:underline}
+.fh-card.card-compact .fh-blurb{display:none}
+.fh-card::before{content:"";position:absolute;inset:0;z-index:-1;background:rgba(16,16,20,.55);border:1px solid rgba(255,255,255,.15);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.frame-hero-desk .fh-card{
+  --card-h:var(--hero-card-h);
+  max-width:420px;height:var(--card-h);padding:18px 48px;bottom:28px;
+  left:calc(var(--hero-card-gap) + (28px + var(--card-h) / 2) * var(--slant-ratio));
+}
+.frame-hero-desk .fh-card.card-compact{--card-h:var(--hero-card-h-compact)}
+.frame-hero-desk .fh-card.card-right{left:auto;right:calc(var(--hero-card-gap) + var(--slide-lean) - (28px + var(--card-h) / 2) * var(--slant-ratio))}
+.frame-hero-desk .fh-card::before{transform:skewX(calc(-1 * var(--slant-deg)))}
+.frame-hero-phone .fh-card{left:16px;right:16px;bottom:46px;padding:18px 22px}
+.frame-hero-phone .fh-card::before{border-radius:4px}
+.frame-hero-phone .fh-card .eyebrow{position:relative;z-index:0;align-self:flex-start;padding:5px 15px;margin:0 0 4px;color:#101014;font-size:.78rem}
+.frame-hero-phone .fh-card .eyebrow::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(100deg,var(--flame) 0%,var(--flame-dark) 100%);transform:skewX(calc(-1 * var(--slant-deg)))}
 .gallery-thumb-del{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(16,16,20,.7);color:#fff;border:none;font-size:.9rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .gallery-thumb-del:hover{background:var(--warn)}
 

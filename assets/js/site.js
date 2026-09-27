@@ -53,7 +53,7 @@ function renderMeets(){
       m.currentEntriesUrl?`Current entries: <a href="${esc(m.currentEntriesUrl)}">View entries</a>`:""
     ].filter(Boolean).map(line=>`<div class="link-line">${line}</div>`).join("");
     const r=resolveNewsImage(m.img);
-    const thumb=r?`<div class="news-thumb" style="background:${r.css}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
+    const thumb=r?`<div class="news-thumb ${r.cls}" style="background:${r.css};${r.vars}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
     return `<article class="card meet${meetLive(m)?" live":""}${done?" done":""}${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
       ${thumb}
       <div class="datebox"><div class="d">${dp.d}</div><div class="m">${dp.m}</div></div>
@@ -339,7 +339,7 @@ function renderSocials(){
     const artBg=r?`linear-gradient(160deg,rgba(16,16,20,.15),rgba(16,16,20,.65)),${r.css}`:it.color;
     return `
     <article class="card social-card">
-      <div class="art" style="background:${artBg}">${esc(it.title)}</div>
+      <div class="art ${r?r.cls:""}" style="background:${artBg};${r?r.vars:""}">${esc(it.title)}</div>
       <div class="body"><div class="when">${esc(fmtDate(it.start))}</div><p>${esc(it.blurb)}</p>
       ${it.link?`<div><a class="btn small" href="${esc(it.link)}">Details / tickets</a></div>`:""}
       <div><a class="btn small ghost" href="article?id=${it.id}">Read more →</a></div></div>
@@ -410,7 +410,7 @@ function newsEraFor(iso,today){
 }
 function newsCard(n,featured){
   const r=resolveNewsImage(n.img);
-  const thumb=r?`<div class="news-thumb" style="background:${r.css}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
+  const thumb=r?`<div class="news-thumb ${r.cls}" style="background:${r.css};${r.vars}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
   return `<article class="card news-card${featured?" is-latest":""}">${thumb}<p class="eyebrow">${esc(n.tag)}</p>
     <h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3>
     <p class="news-date"><time datetime="${esc(n.start)}">${fmtDate(n.start)}</time></p>
@@ -534,12 +534,6 @@ document.addEventListener("click",e=>{
 
 /* Hero carousel: pulls across the whole feed (meets, socials, news) so it reads as one connected
    "what's happening" strip rather than club news alone — sorted by closeness to today's date. */
-function heroFeedContent(it){
-  if(isMeet(it))return {tag:it.type==="teamMeet"?"Team Meet":"Open Meet",title:it.title,blurb:`${it.venue||"Venue TBC"} · ${fmtDate(it.start)}`,linkAttrs:'href="open-meets"',img:it.img||null};
-  if(it.type==="social")return {tag:"Club Calendar",title:it.title,blurb:it.blurb||fmtDate(it.start),linkAttrs:`href="article?id=${it.id}"`,img:it.img||null};
-  if(it.type==="training")return {tag:"Training change",title:it.title,blurb:it.note||fmtDate(it.start),linkAttrs:'href="club-calendar"',img:it.img||null};
-  return {tag:`${it.tag} · Club News`,title:it.title,blurb:it.blurb,linkAttrs:`href="article?id=${it.id}"`,img:it.img||null};
-}
 function renderHeroFeed(){
   if(!$("#heroSlides"))return;
   const today=new Date();
@@ -554,11 +548,11 @@ function renderHeroFeed(){
        anything else shows its single picture, or a club gradient if it has none. */
     const layers=((it.photos||[]).length?it.photos:[c.img]).map(resolveNewsImage).filter(Boolean);
     const media=layers.length?`<div class="hero-slide-media">${layers.map((r,j)=>
-      `<div class="hero-slide-photo${j===0?" show":""}" style="background:${r.css}"></div>`).join("")}</div>`:"";
+      `<div class="hero-slide-photo${j===0?" show":""} ${r.cls}" style="background:${r.css};${r.vars}"></div>`).join("")}</div>`:"";
     return `
     <div class="hero-slide" style="background:${layers.length?"#101014":HERO_SLIDE_BG[i%HERO_SLIDE_BG.length]}">
       ${media}
-      <div class="hero-news-card">
+      <div class="hero-news-card${heroCardClasses(it.heroCard)}">
         <p class="eyebrow">${esc(c.tag)}</p>
         <h3>${esc(c.title)}</h3>
         <p>${esc(c.blurb)}</p>
@@ -593,7 +587,7 @@ function updateHeroSlide(){
   $("#heroNext").disabled=heroIndex===n-1;
 }
 /* Only the slide in front cycles -- the ones either side are blurred out anyway. */
-const HERO_PHOTO_MS=4500;
+const HERO_PHOTO_MS=7000;
 function cycleHeroPhotos(){
   if(document.hidden)return;
   const photos=[...document.querySelectorAll(".hero-slide.active .hero-slide-photo")];
