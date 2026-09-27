@@ -390,13 +390,19 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 .hero-news-card>.eyebrow,.fh-card>.eyebrow{margin-top:0}
 .hero-news-card h3{-webkit-line-clamp:2}
 .hero-news-card p:not(.eyebrow){-webkit-line-clamp:3}
-/* per-story layout, chosen in the framing editor (feed.hero_card): "compact" drops the summary
-   for a shorter card; "right" moves it to the other side, mirroring the margin sum above
-   against the slide's right-hand slant, which leans the same way but starts --slide-lean in */
-.hero-news-card.card-compact{--card-h:var(--hero-card-h-compact)}
-.hero-news-card.card-compact p:not(.eyebrow){display:none}
+/* per-story layout, chosen in the framing editor (feed.hero_card), separately for computers and
+   phones (heroCardClasses in core.js). Computer: "compact" drops the summary for a shorter card;
+   "right" moves it to the other side, mirroring the margin sum above against the slide's
+   right-hand slant, which leans the same way but starts --slide-lean in. Phone (640px down, where
+   the card goes full width): "p-compact" drops the summary, "p-top" lifts the card to the top. */
 @media(min-width:641px){
+  .hero-news-card.card-compact{--card-h:var(--hero-card-h-compact)}
+  .hero-news-card.card-compact p:not(.eyebrow){display:none}
   .hero-news-card.card-right{margin-left:auto;margin-right:calc(var(--card-gap) + var(--slide-lean) - (28px + var(--card-h) / 2) * var(--slant-ratio))}
+}
+@media(max-width:640px){
+  .hero-news-card.card-p-compact p:not(.eyebrow){display:none}
+  .hero-news-card.card-p-top{align-self:flex-start;margin-top:16px}
 }
 
 /* Framed photos (photoLook in core.js). The photo is drawn on ::before so it can be zoomed --
@@ -409,7 +415,7 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
   background:var(--shade,none),var(--img) var(--pos,50% 50%)/var(--size,cover) no-repeat,#101014;
   transform:scale(var(--z,1));transform-origin:var(--pos,50% 50%)}
 .photo-hero,.photo-article{--pos:var(--pos-w);--size:var(--size-w);--z:var(--z-w)}
-@media(max-width:600px){.photo-hero{--pos:var(--pos-n);--size:var(--size-n);--z:var(--z-n)}}
+@media(max-width:640px){.photo-hero{--pos:var(--pos-n);--size:var(--size-n);--z:var(--z-n)}}
 @media(max-width:640px){.photo-article{--pos:var(--pos-n);--size:var(--size-n);--z:var(--z-n)}}
 .hero-slide-photo.photo{position:absolute}
 .hero-news-card::before{
@@ -1305,16 +1311,9 @@ body.theme-dark .article-body a{color:var(--ember)}
 .frame-strip button{flex:0 0 auto;width:64px;height:64px;padding:0;border:2px solid transparent;border-radius:8px;overflow:hidden;background:#101014;cursor:pointer;opacity:.6;transition:opacity .15s,border-color .15s}
 .frame-strip button.on{border-color:var(--flame);opacity:1}
 .frame-strip img{width:100%;height:100%;object-fit:cover;display:block;margin:0;border-radius:0}
-.frame-viewpick{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
-.frame-seg-views{flex-wrap:wrap;border-radius:14px}
+.frame-seg-views{flex-wrap:wrap;border-radius:14px;justify-self:start}
 .frame-seg-views button{padding:8px 12px}
 .frame-copy{background:none;border:none;padding:6px 2px;font:inherit;font-size:.8rem;font-weight:700;color:var(--ember);text-decoration:underline;cursor:pointer}
-/* every preview is also a button for its view; the one being adjusted is outlined */
-.frame-view{cursor:pointer}
-.frame-view .fh,.frame-view .frame-preview{outline:3px solid transparent;outline-offset:2px;transition:outline-color .15s}
-.frame-view.on .fh,.frame-view.on .frame-preview{outline-color:var(--flame)}
-.frame-editing{display:none;margin-left:8px;padding:1px 7px;border-radius:999px;background:var(--flame);color:#101014;font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
-.frame-view.on .frame-editing{display:inline-block}
 .frame-zoom{display:flex;align-items:center;gap:12px}
 .frame-zoom input{flex:1;accent-color:var(--flame)}
 .frame-zoom output{min-width:3.2em;text-align:right;font-weight:700;font-size:.85rem}
@@ -1325,11 +1324,12 @@ body.theme-dark .article-body a{color:var(--ember)}
 .frame-seg{display:inline-flex;border:1.5px solid var(--line);border-radius:999px;overflow:hidden}
 .frame-seg button{background:none;border:none;padding:8px 16px;font:inherit;font-size:.85rem;font-weight:700;color:var(--muted);cursor:pointer;min-height:40px}
 .frame-seg button.on{background:var(--flame);color:#101014}
-.frame-previews{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:0;align-items:start}
-@media(max-width:560px){.frame-previews{grid-template-columns:1fr 1fr}}
-.frame-previews figure,.frame-hero-fig{margin:0}
-.frame-preview{border-radius:6px;background-color:#101014}
-.frame-previews figcaption,.frame-hero-fig figcaption{font-size:.78rem;color:var(--muted);margin-top:5px}
+.frame-seg-views{align-self:start}
+.frame-copy{justify-self:start}
+.frame-controls{display:grid;gap:16px;padding-top:16px;border-top:1px solid var(--line)}
+/* the one preview: the phone views are shown at roughly phone size, not stretched to the editor */
+#framePreview .frame-preview{border-radius:6px;background-color:#101014}
+#framePreview .frame-preview[data-paint="ap"],#framePreview .frame-hero-phone{max-width:380px;margin:0 auto;width:100%}
 
 /* Homepage replicas in the framing editor: laid out at a real slide's pixel size (set inline)
    and scaled to fit (--s, from JS). Their rules are standalone rather than reusing .hero-slide
@@ -1347,7 +1347,8 @@ body.theme-dark .article-body a{color:var(--ember)}
 .fh-card h3{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.15rem;margin-top:6px;line-height:1.2;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .fh-blurb{color:rgba(255,255,255,.82);font-size:.9rem;margin-top:8px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
 .fh-link{color:var(--ember);font-weight:600;font-size:.85rem;display:inline-block;margin-top:10px;text-decoration:underline}
-.fh-card.card-compact .fh-blurb{display:none}
+.frame-hero-desk .fh-card.card-compact .fh-blurb,.frame-hero-phone .fh-card.card-p-compact .fh-blurb{display:none}
+.frame-hero-phone .fh-card.card-p-top{bottom:auto;top:16px}
 .fh-card::before{content:"";position:absolute;inset:0;z-index:-1;background:rgba(16,16,20,.55);border:1px solid rgba(255,255,255,.15);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .frame-hero-desk .fh-card{
   --card-h:var(--hero-card-h);

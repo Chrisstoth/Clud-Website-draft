@@ -711,23 +711,31 @@ function showArticlePreview(it){
   wireArticleGallery((it.photos||[]).length);
 }
 
-/* Framing editor. Each photo is framed separately for each of the four views an article is
-   seen in (FRAME_VIEWS in core.js): the admin picks a view, taps the spot that must stay in view,
-   zooms in on it if they like, or ticks "whole photo" for posters and logos -- and sees straight
-   away how every view crops it. The homepage previews are to-scale replicas of the real slides
-   with the story's card on top, slant and all, because on the homepage the card and the slanted
-   edges between them hide a good share of the photo; the card can be moved to the other side or
-   cut down to its title from here. A gallery is framed as a set: the strip along the top
-   switches photo. Framing is stored on each photo's URL (imgFraming in core.js), the card layout
-   on the story (feed.hero_card). Resolves to {urls, layout}, or null if they cancel. */
+/* Framing editor. Everything is set separately for each of the four views an article is seen in
+   (FRAME_VIEWS in core.js): the admin picks a view with the tabs, and the one preview shows that
+   view while they tap the spot that must stay in view, zoom in on it, or tick "whole photo" for
+   posters and logos. The homepage previews are to-scale replicas of the real slides with the
+   story's card on top, slant and all, and on those two tabs the card itself can be laid out
+   for that screen too (side and size on a computer, top/bottom and size on a phone). A gallery
+   is framed as a set: the strip along the top switches photo. Framing is stored on each photo's
+   URL (imgFraming in core.js), the card layout on the story (feed.hero_card, see
+   heroCardClasses). Resolves to {urls, layout}, or null if they cancel. */
 const isUploadedPhoto=v=>!!v&&!String(v).startsWith("default:");
 /* A real slide's size in px (see .hero-slide in site.css): drawn at that size, then scaled to fit. */
 const HERO_REPLICAS={hd:{w:900,h:420,cls:"frame-hero-desk"},hp:{w:360,h:340,cls:"frame-hero-phone"}};
 const ARTICLE_RATIOS={ad:"16/10",ap:"4/3"};
+/* The homepage card's options on each screen. Each row switches one hero_card word on or off. */
+const CARD_OPTIONS={
+  hd:[{label:"Position",token:"right",items:[["","Left"],["right","Right"]]},
+      {label:"Size",token:"compact",items:[["","Full"],["compact","Title only"]]}],
+  hp:[{label:"Position",token:"p-top",items:[["","Bottom"],["p-top","Top"]]},
+      {label:"Size",token:"p-compact",items:[["","Full"],["p-compact","Title only"]]}]
+};
 function framePreviewHtml(view,card){
-  const label=FRAME_VIEWS.find(v=>v.key===view).label;
   const r=HERO_REPLICAS[view];
-  const body=r?`<div class="fh" data-w="${r.w}" style="aspect-ratio:${r.w}/${r.h}">
+  if(!r)return `<div class="frame-preview photo" data-paint="${view}" style="aspect-ratio:${ARTICLE_RATIOS[view]}"></div>`;
+  return `<div class="frame-hero-fig ${r.cls}">
+    <div class="fh" data-w="${r.w}" style="aspect-ratio:${r.w}/${r.h}">
       <div class="fh-inner" style="width:${r.w}px;height:${r.h}px">
         <div class="fh-photo photo" data-paint="${view}"></div><div class="fh-shade"></div>
         ${card?`<div class="fh-card">
@@ -737,12 +745,8 @@ function framePreviewHtml(view,card){
           <span class="fh-link">Read more →</span>
         </div>`:""}
       </div>
-    </div>`
-    :`<div class="frame-preview photo" data-paint="${view}" style="aspect-ratio:${ARTICLE_RATIOS[view]}"></div>`;
-  return `<figure class="frame-view ${r?"frame-hero-fig "+r.cls:""}" data-view="${view}" title="Adjust ${label}">
-    ${body}
-    <figcaption>${label}<span class="frame-editing">Adjusting</span></figcaption>
-  </figure>`;
+    </div>
+  </div>`;
 }
 function openFramingEditor(urls,start,card){
   return new Promise(resolve=>{
@@ -750,7 +754,7 @@ function openFramingEditor(urls,start,card){
     let cur=Math.max(0,Math.min(start||0,frames.length-1));
     let view="hd";
     const fr=()=>frames[cur].v[view];
-    const layout=new Set(String(card?.layout||"").split(/\s+/).filter(Boolean));
+    const layout=new Set(String(card?.layout||"").split(/\s+/).filter(t=>HERO_CARD_TOKENS.includes(t)));
     let overlay=document.getElementById("framingOverlay");
     if(!overlay){
       overlay=document.createElement("div");
@@ -758,7 +762,6 @@ function openFramingEditor(urls,start,card){
       overlay.className="preview-overlay";
       document.body.appendChild(overlay);
     }
-    const seg=(opt,items)=>`<div class="frame-seg" data-opt="${opt}">${items.map(([v,l])=>`<button type="button" data-v="${v}">${l}</button>`).join("")}</div>`;
     overlay.innerHTML=`<div class="preview-overlay-inner" role="dialog" aria-label="Frame this photo">
       <div class="preview-overlay-bar">
         <span id="frameTitle">Frame this photo</span>
@@ -770,37 +773,30 @@ function openFramingEditor(urls,start,card){
       <div class="frame-body">
         ${frames.length>1?`<div class="frame-strip" id="frameStrip">${frames.map((f,i)=>
           `<button type="button" data-photo="${i}" aria-label="Photo ${i+1}"><img src="${esc(String(f.url).split("#")[0])}" alt="" style="${photoImgStyle(f.url)}"></button>`).join("")}</div>`:""}
-        <div class="frame-viewpick">
-          <span class="frame-label">Adjusting</span>
-          <div class="frame-seg frame-seg-views">${FRAME_VIEWS.map(v=>`<button type="button" data-view="${v.key}">${v.label}</button>`).join("")}</div>
-          <button type="button" class="frame-copy" id="frameCopy">Copy to all views</button>
-        </div>
-        <p class="hint" style="margin:0">Tap (or drag) on the part of the photo that must stay in view in <b id="frameViewName"></b> — zoom closes in on that spot. Each view keeps its own framing; tap a preview below to switch to it.</p>
-        <div class="frame-stage" id="frameStage"><img alt="" draggable="false"><span class="frame-marker" id="frameMarker"></span></div>
-        <div class="frame-zoom">
-          <span class="frame-label">Zoom</span>
-          <input type="range" id="frameZoom" min="1" max="${ZOOM_MAX}" step="0.05" aria-label="Zoom">
-          <output id="frameZoomOut"></output>
-        </div>
-        <label class="f checkbox-f"><input type="checkbox" id="frameFit"> Show the whole photo, uncropped</label>
-        <p class="hint" style="margin:-10px 0 0">Best for posters, logos and anything with writing on it. Any gap around the photo is filled in black.</p>
-        ${framePreviewHtml("hd",card)}
-        ${card?`<div class="frame-card-opts">
-          <p class="hint" style="margin:0">Homepage card for this story — the same for all its photos. Move it off whatever matters in the picture.</p>
-          <div class="frame-card-row">
-            <span class="frame-opt"><span class="frame-label">Position</span>${seg("side",[["left","Left"],["right","Right"]])}</span>
-            <span class="frame-opt"><span class="frame-label">Size</span>${seg("size",[["full","Full"],["compact","Title only"]])}</span>
+        <div class="frame-seg frame-seg-views" role="tablist">${FRAME_VIEWS.map(v=>`<button type="button" role="tab" data-view="${v.key}">${v.label}</button>`).join("")}</div>
+        <div id="framePreview"></div>
+        <div class="frame-card-opts" id="frameCardOpts"></div>
+        <div class="frame-controls">
+          <p class="hint" style="margin:0">Tap (or drag) on the part of the photo that must stay in view in <b id="frameViewName"></b> — zoom closes in on that spot. Every tab keeps its own settings.</p>
+          <div class="frame-stage" id="frameStage"><img alt="" draggable="false"><span class="frame-marker" id="frameMarker"></span></div>
+          <div class="frame-zoom">
+            <span class="frame-label">Zoom</span>
+            <input type="range" id="frameZoom" min="1" max="${ZOOM_MAX}" step="0.05" aria-label="Zoom">
+            <output id="frameZoomOut"></output>
           </div>
-        </div>`:""}
-        <div class="frame-previews">${["hp","ad","ap"].map(v=>framePreviewHtml(v,card)).join("")}</div>
+          <label class="f checkbox-f"><input type="checkbox" id="frameFit"> Show the whole photo, uncropped</label>
+          <p class="hint" style="margin:-10px 0 0">Best for posters, logos and anything with writing on it. Any gap around the photo is filled in black.</p>
+          <button type="button" class="frame-copy" id="frameCopy">Use this photo framing for all four views</button>
+        </div>
       </div>
     </div>`;
     const q=sel=>overlay.querySelector(sel);
     const stage=q("#frameStage"),marker=q("#frameMarker"),fitBox=q("#frameFit"),zoomIn=q("#frameZoom");
-    const layoutValue=()=>["right","compact"].filter(t=>layout.has(t)).join(" ");
-    /* The replicas are laid out at a real slide's pixel size and scaled down to their box, so
-       the card's type, padding and slant land exactly where they will on the live page. */
-    const fitReplicas=()=>overlay.querySelectorAll(".fh").forEach(fh=>fh.style.setProperty("--s",fh.clientWidth/fh.dataset.w));
+    const layoutValue=()=>HERO_CARD_TOKENS.filter(t=>layout.has(t)).join(" ");
+    /* The replica is laid out at a real slide's pixel size and scaled down to its box, so the
+       card's type, padding and slant land exactly where they will on the live page. */
+    const fitReplica=()=>overlay.querySelectorAll(".fh").forEach(fh=>fh.style.setProperty("--s",fh.clientWidth/fh.dataset.w));
+    const resizeObs=new ResizeObserver(fitReplica);
     const draw=()=>{
       const f=fr(),photo=frames[cur];
       marker.style.left=`${f.x}%`;marker.style.top=`${f.y}%`;
@@ -809,23 +805,38 @@ function openFramingEditor(urls,start,card){
       zoomIn.disabled=f.fit;
       zoomIn.value=f.zoom;
       q("#frameZoomOut").textContent=f.fit?"—":`${f.zoom.toFixed(1)}×`;
-      q("#frameViewName").textContent=FRAME_VIEWS.find(v=>v.key===view).label.toLowerCase();
-      overlay.querySelectorAll("[data-paint]").forEach(el=>{el.style.cssText=`${el.dataset.paint in ARTICLE_RATIOS?`aspect-ratio:${ARTICLE_RATIOS[el.dataset.paint]};`:""}${photoUrlVar(photo.url)};${frameVars(photo.v[el.dataset.paint])}`;});
-      overlay.querySelectorAll(".frame-view").forEach(el=>el.classList.toggle("on",el.dataset.view===view));
-      overlay.querySelectorAll(".frame-seg-views [data-view]").forEach(b=>b.classList.toggle("on",b.dataset.view===view));
+      overlay.querySelectorAll("[data-paint]").forEach(el=>{
+        const k=el.dataset.paint;
+        el.style.cssText=`${k in ARTICLE_RATIOS?`aspect-ratio:${ARTICLE_RATIOS[k]};`:""}${photoUrlVar(photo.url)};${frameVars(photo.v[k])}`;
+      });
+      overlay.querySelectorAll(".fh-card").forEach(el=>el.className="fh-card"+heroCardClasses(layoutValue()));
+      overlay.querySelectorAll("#frameCardOpts [data-token]").forEach(b=>
+        b.classList.toggle("on",b.dataset.v?layout.has(b.dataset.token):!layout.has(b.dataset.token)));
       /* the strip thumbnail of the photo being framed follows its article-page framing */
       const thumb=overlay.querySelector(`#frameStrip [data-photo="${cur}"] img`);
       if(thumb)thumb.style.cssText=photoImgStyle(withFraming(photo.url,photo.v));
-      overlay.querySelectorAll(".fh-card").forEach(el=>{
-        el.classList.toggle("card-right",layout.has("right"));
-        el.classList.toggle("card-compact",layout.has("compact"));
-      });
-      overlay.querySelectorAll(".frame-seg[data-opt]").forEach(sg=>{
-        const on=sg.dataset.opt==="side"?(layout.has("right")?"right":"left"):(layout.has("compact")?"compact":"full");
-        sg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===on));
-      });
     };
-    const show=i=>{
+    /* A tab swaps the one preview (and the card options, which only the homepage has). */
+    const showView=v=>{
+      view=v;
+      const label=FRAME_VIEWS.find(x=>x.key===view).label;
+      overlay.querySelectorAll(".frame-seg-views [data-view]").forEach(b=>{
+        b.classList.toggle("on",b.dataset.view===view);
+        b.setAttribute("aria-selected",b.dataset.view===view);
+      });
+      q("#frameViewName").textContent=label.toLowerCase();
+      resizeObs.disconnect();
+      q("#framePreview").innerHTML=framePreviewHtml(view,card);
+      overlay.querySelectorAll(".fh").forEach(fh=>resizeObs.observe(fh));
+      const opts=card&&CARD_OPTIONS[view];
+      q("#frameCardOpts").hidden=!opts;
+      q("#frameCardOpts").innerHTML=opts?`<p class="hint" style="margin:0">The story's card on ${view==="hd"?"a computer":"a phone"} — the same for all its photos. Move it off whatever matters in the picture.</p>
+        <div class="frame-card-row">${opts.map(o=>`<span class="frame-opt"><span class="frame-label">${o.label}</span>
+          <span class="frame-seg">${o.items.map(([v,l])=>`<button type="button" data-token="${o.token}" data-v="${v}">${l}</button>`).join("")}</span></span>`).join("")}</div>`:"";
+      draw();
+      fitReplica();
+    };
+    const showPhoto=i=>{
       cur=i;
       stage.querySelector("img").src=String(frames[cur].url).split("#")[0];
       if(frames.length>1)q("#frameTitle").textContent=`Frame photo ${cur+1} of ${frames.length}`;
@@ -844,8 +855,6 @@ function openFramingEditor(urls,start,card){
     stage.addEventListener("pointermove",e=>{if(stage.hasPointerCapture(e.pointerId))place(e);});
     fitBox.addEventListener("change",()=>{fr().fit=fitBox.checked;draw();});
     zoomIn.addEventListener("input",()=>{fr().zoom=+zoomIn.value;draw();});
-    const resizeObs=new ResizeObserver(fitReplicas);
-    overlay.querySelectorAll(".fh").forEach(fh=>resizeObs.observe(fh));
     const close=result=>{
       overlay.classList.remove("open");
       resizeObs.disconnect();
@@ -857,19 +866,18 @@ function openFramingEditor(urls,start,card){
     overlay.onclick=e=>{
       if(e.target===overlay)return close(null);
       const pick=e.target.closest("[data-photo]");
-      if(pick)return show(+pick.dataset.photo);
-      const pickView=e.target.closest("[data-view]");
-      if(pickView){view=pickView.dataset.view;return draw();}
+      if(pick)return showPhoto(+pick.dataset.photo);
+      const tab=e.target.closest("[data-view]");
+      if(tab)return showView(tab.dataset.view);
       if(e.target.closest("#frameCopy")){
         const f=fr();
         for(const v of FRAME_VIEWS)frames[cur].v[v.key]={...f};
-        toast("Copied to all four views");
+        toast("Photo framing copied to all four views");
         return draw();
       }
-      const b=e.target.closest(".frame-seg[data-opt] button");
-      if(b){
-        const token=b.closest(".frame-seg").dataset.opt==="side"?"right":"compact";
-        if(b.dataset.v===token)layout.add(token);else layout.delete(token);
+      const opt=e.target.closest("[data-token]");
+      if(opt){
+        if(opt.dataset.v)layout.add(opt.dataset.token);else layout.delete(opt.dataset.token);
         return draw();
       }
       const act=e.target.closest("[data-act]")?.dataset.act;
@@ -877,8 +885,8 @@ function openFramingEditor(urls,start,card){
       if(act==="done")close({urls:frames.map(f=>withFraming(f.url,f.v)),layout:layoutValue()});
     };
     overlay.classList.add("open");
-    show(cur);
-    fitReplicas();
+    showPhoto(cur);
+    showView(view);
   });
 }
 

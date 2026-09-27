@@ -197,9 +197,11 @@ function heroFeedContent(it){
   if(it.type==="training")return {tag:"Training change",title:it.title,blurb:it.note||fmtDate(it.start),linkAttrs:'href="club-calendar"',img:it.img||null};
   return {tag:`${it.tag} · Club News`,title:it.title,blurb:it.blurb,linkAttrs:`href="article?id=${it.id}"`,img:it.img||null};
 }
-/* An item's hero_card setting ("right", "compact", both, or empty for the default left/full)
-   as the classes the card takes. Whitelisted, since it ends up in a class attribute. */
-const heroCardClasses=v=>String(v||"").split(/\s+/).filter(t=>t==="right"||t==="compact").map(t=>` card-${t}`).join("");
+/* An item's hero_card setting as the classes the card takes: space-separated words, each for one
+   screen -- computer: "right", "compact"; phone: "p-top", "p-compact"; empty is the default
+   (left/bottom, full size). Whitelisted, since it ends up in a class attribute. */
+const HERO_CARD_TOKENS=["right","compact","p-top","p-compact"];
+const heroCardClasses=v=>String(v||"").split(/\s+/).filter(t=>HERO_CARD_TOKENS.includes(t)).map(t=>` card-${t}`).join("");
 
 /* Shown on the Welfare & Safeguarding page (and in its admin editor) until the welfare_page
    row loads or if it's ever emptied out — the real content is normally in the database, kept
