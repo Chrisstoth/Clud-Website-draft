@@ -464,6 +464,7 @@ function showForm(sec,id,forcedType){
           <label class="img-upload-btn">Upload your own photo<input type="file" accept="image/*" id="imgUploadInput" style="display:none"></label>
           <button type="button" class="img-clear-btn" id="imgClearBtn">No picture</button>
         </div>
+        <p class="hint" id="imgFromGallery" hidden style="margin:0">Using the first photo from the gallery below.</p>
         ${canFrame?`<button type="button" class="btn small ghost img-frame-btn" id="imgFrameBtn"${isUploadedPhoto(current)?"":" hidden"}>Adjust framing</button>`:""}
         <input type="hidden" name="${f.k}" id="imgHiddenInput" value="${val}">
       </div>`;
@@ -506,21 +507,28 @@ function showForm(sec,id,forcedType){
     <div style="display:flex;gap:10px"><button class="btn" type="submit">${id?"Save & publish":"Publish"}</button>
     <button class="btn ghost" type="button" id="cancelForm">Cancel</button></div></form>`;
   formTarget.scrollIntoView({behavior:"smooth",block:"nearest"});
-  /* Opens the framing editor on one photo. On a feed item it also carries the story's homepage
-     card (its live text from this form, and where it sits), since that card covers part of every
-     photo the homepage shows for the story. Returns the re-framed URL, or null on cancel. */
-  const frame=async url=>{
+  /* Opens the framing editor on a set of photos (the whole gallery, or the one picture), starting
+     at photo i. On a feed item it also carries the story's homepage card (its live text from this
+     form, and where it sits), since that card covers part of every photo the homepage shows for
+     the story. Returns the re-framed URLs, or null on cancel. */
+  const frame=async(urls,i=0)=>{
     const cardInput=$("#heroCardInput");
     let card=null;
     if(cardInput){
       const live=Object.fromEntries(new FormData(formTarget.querySelector("#adminForm")).entries());
       card={...heroFeedContent({...live,type}),layout:cardInput.value};
     }
-    const res=await openFramingEditor(url,card);
+    const res=await openFramingEditor(urls,i,card);
     if(!res)return null;
     if(cardInput)cardInput.value=res.layout;
-    return res.url;
+    return res.urls;
   };
+  /* With a gallery, its first photo IS the picture (it overwrites "img" on save), so the picture
+     field follows the gallery rather than offering choices that would be thrown away. */
+  const galleryField=SCHEMAS[schemaKey].find(f=>f.type==="gallery");
+  let galleryPhotos=galleryField?[...(it.photos||[])]:null;
+  let syncPicture=()=>{};
+  let setGallery=()=>{};
   const imgHidden=$("#imgHiddenInput");
   if(imgHidden){
     const preview=$("#imgPreview");
@@ -531,9 +539,23 @@ function showForm(sec,id,forcedType){
       preview.classList.toggle("empty",!r);
       if($("#imgFrameBtn"))$("#imgFrameBtn").hidden=!isUploadedPhoto(val);
     };
+    syncPicture=()=>{
+      const fromGallery=!!galleryPhotos?.length;
+      formTarget.querySelectorAll(".img-swatches,.img-picker .img-upload-btn,#imgClearBtn").forEach(el=>el.hidden=fromGallery);
+      $("#imgFromGallery").hidden=!fromGallery;
+      if(!fromGallery)return;
+      imgHidden.value=galleryPhotos[0];
+      formTarget.querySelectorAll(".img-swatch").forEach(b=>b.classList.remove("selected"));
+      setPreview(imgHidden.value);
+    };
     $("#imgFrameBtn")?.addEventListener("click",async()=>{
-      const framed=await frame(imgHidden.value);
-      if(framed){imgHidden.value=framed;setPreview(framed);}
+      if(galleryPhotos?.length){
+        const framed=await frame(galleryPhotos,0);
+        if(framed)setGallery(framed);
+        return;
+      }
+      const framed=await frame([imgHidden.value]);
+      if(framed){imgHidden.value=framed[0];setPreview(framed[0]);}
     });
     formTarget.querySelectorAll(".img-swatch").forEach(btn=>{
       btn.addEventListener("click",()=>{
@@ -567,25 +589,24 @@ function showForm(sec,id,forcedType){
       setPreview("");
     });
   }
-  const galleryField=SCHEMAS[schemaKey].find(f=>f.type==="gallery");
-  let galleryPhotos=galleryField?[...(it.photos||[])]:null;
   if(galleryField){
     const renderGalleryThumbs=()=>{
+      syncPicture();
       $("#galleryThumbs").innerHTML=galleryPhotos.length?galleryPhotos.map((url,i)=>
         `<div class="gallery-thumb"><img src="${esc(url)}" alt="" style="${photoImgStyle(url)}">
           <button type="button" class="gallery-thumb-del" data-photo-del="${i}" aria-label="Remove this photo">×</button>
           <button type="button" class="gallery-thumb-frame" data-photo-frame="${i}">Frame</button></div>`).join("")
         :`<p class="hint" style="margin:0">No photos yet.</p>`;
     };
+    setGallery=urls=>{galleryPhotos=urls;renderGalleryThumbs();};
     renderGalleryThumbs();
     $("#galleryThumbs").addEventListener("click",async e=>{
       const del=e.target.closest("[data-photo-del]");
       if(del){galleryPhotos.splice(+del.dataset.photoDel,1);renderGalleryThumbs();return;}
       const frameBtn=e.target.closest("[data-photo-frame]");
       if(!frameBtn)return;
-      const i=+frameBtn.dataset.photoFrame;
-      const framed=await frame(galleryPhotos[i]);
-      if(framed){galleryPhotos[i]=framed;renderGalleryThumbs();}
+      const framed=await frame(galleryPhotos,+frameBtn.dataset.photoFrame);
+      if(framed)setGallery(framed);
     });
     $("#galleryAddInput").addEventListener("change",async e=>{
       const files=[...e.target.files];
@@ -695,7 +716,8 @@ function showArticlePreview(it){
    the story's card on top, because on a wide slide the card hides a good third of the photo;
    the card can be moved to the other side or cut down to its title from here. Framing is stored
    on the photo's URL (imgFraming in core.js), the card layout on the story (feed.hero_card).
-   Resolves to {url, layout}, or null if they cancel. */
+   A gallery is framed as a set: the strip along the top switches photo, each keeps its own
+   framing, and Done saves them all. Resolves to {urls, layout}, or null if they cancel. */
 const FRAME_SMALL_PREVIEWS=[
   {label:"Article page",ratio:"16/10"},
   {label:"Article page — phone",ratio:"4/3"}
@@ -720,9 +742,11 @@ function heroReplicaHtml(kind,card){
     <figcaption>${r.label}</figcaption>
   </figure>`;
 }
-function openFramingEditor(url,card){
+function openFramingEditor(urls,start,card){
   return new Promise(resolve=>{
-    let {x,y,fit,zoom}=imgFraming(url);
+    const frames=urls.map(u=>({url:u,...imgFraming(u)}));
+    let cur=Math.max(0,Math.min(start||0,frames.length-1));
+    let {x,y,fit,zoom}=frames[cur];
     const layout=new Set(String(card?.layout||"").split(/\s+/).filter(Boolean));
     let overlay=document.getElementById("framingOverlay");
     if(!overlay){
@@ -734,7 +758,7 @@ function openFramingEditor(url,card){
     const seg=(opt,items)=>`<div class="frame-seg" data-opt="${opt}">${items.map(([v,l])=>`<button type="button" data-v="${v}">${l}</button>`).join("")}</div>`;
     overlay.innerHTML=`<div class="preview-overlay-inner" role="dialog" aria-label="Frame this photo">
       <div class="preview-overlay-bar">
-        <span>Frame this photo</span>
+        <span id="frameTitle">Frame this photo</span>
         <span style="display:flex;gap:8px">
           <button type="button" class="btn small ghost" data-act="cancel">Cancel</button>
           <button type="button" class="btn small" data-act="done">Done</button>
@@ -742,7 +766,9 @@ function openFramingEditor(url,card){
       </div>
       <div class="frame-body">
         <p class="hint" style="margin:0">Tap (or drag) on the part of the photo that must always stay in view — faces, a banner, the pool. Every page crops around that spot, and zooming closes in on it. The previews below update as you go.</p>
-        <div class="frame-stage" id="frameStage"><img src="${esc(String(url).split("#")[0])}" alt="" draggable="false"><span class="frame-marker" id="frameMarker"></span></div>
+        ${frames.length>1?`<div class="frame-strip" id="frameStrip">${frames.map((f,i)=>
+          `<button type="button" data-photo="${i}" aria-label="Photo ${i+1}"><img src="${esc(String(f.url).split("#")[0])}" alt="" style="${photoImgStyle(f.url)}"></button>`).join("")}</div>`:""}
+        <div class="frame-stage" id="frameStage"><img alt="" draggable="false"><span class="frame-marker" id="frameMarker"></span></div>
         <div class="frame-zoom">
           <span class="frame-label">Zoom</span>
           <input type="range" id="frameZoom" min="1" max="${ZOOM_MAX}" step="0.05" aria-label="Zoom">
@@ -768,9 +794,19 @@ function openFramingEditor(url,card){
     </div>`;
     const q=sel=>overlay.querySelector(sel);
     const stage=q("#frameStage"),marker=q("#frameMarker"),fitBox=q("#frameFit"),zoomIn=q("#frameZoom");
-    fitBox.checked=fit;
-    zoomIn.value=zoom;
-    const current=()=>withFraming(url,{x,y,fit,zoom});
+    const current=()=>withFraming(frames[cur].url,{x,y,fit,zoom});
+    /* Switch the editor to photo i, keeping what was done to the one being left. */
+    const show=i=>{
+      Object.assign(frames[cur],{x,y,fit,zoom});
+      cur=i;
+      ({x,y,fit,zoom}=frames[cur]);
+      stage.querySelector("img").src=String(frames[cur].url).split("#")[0];
+      fitBox.checked=fit;
+      zoomIn.value=zoom;
+      if(frames.length>1)q("#frameTitle").textContent=`Frame photo ${cur+1} of ${frames.length}`;
+      overlay.querySelectorAll("#frameStrip [data-photo]").forEach((b,j)=>b.classList.toggle("on",j===cur));
+      draw();
+    };
     const layoutValue=()=>["right","compact"].filter(t=>layout.has(t)).join(" ");
     /* The replicas are laid out at a real slide's pixel size and scaled down to their box, so
        the card's type, padding and slant land exactly where they will on the live page. */
@@ -787,6 +823,9 @@ function openFramingEditor(url,card){
       zoomIn.disabled=fit;
       q("#frameZoomOut").textContent=fit?"—":`${zoom.toFixed(1)}×`;
       const look=photoLook(current());
+      /* the strip thumbnail of the photo being framed follows along */
+      const thumb=overlay.querySelector(`#frameStrip [data-photo="${cur}"] img`);
+      if(thumb)thumb.style.cssText=photoImgStyle(current());
       overlay.querySelectorAll(".frame-preview").forEach(el=>paint(el,"frame-preview",look));
       overlay.querySelectorAll(".fh-photo").forEach(el=>paint(el,"fh-photo",look));
       overlay.querySelectorAll(".fh-card").forEach(el=>{
@@ -821,6 +860,8 @@ function openFramingEditor(url,card){
     document.addEventListener("keydown",onKey);
     overlay.onclick=e=>{
       if(e.target===overlay)return close(null);
+      const pick=e.target.closest("[data-photo]");
+      if(pick)return show(+pick.dataset.photo);
       const b=e.target.closest(".frame-seg button");
       if(b){
         const token=b.closest(".frame-seg").dataset.opt==="side"?"right":"compact";
@@ -828,10 +869,12 @@ function openFramingEditor(url,card){
         return draw();
       }
       const act=e.target.closest("[data-act]")?.dataset.act;
-      if(act)close(act==="done"?{url:current(),layout:layoutValue()}:null);
+      if(act!=="done")return act&&close(null);
+      Object.assign(frames[cur],{x,y,fit,zoom});
+      close({urls:frames.map(f=>withFraming(f.url,f)),layout:layoutValue()});
     };
     overlay.classList.add("open");
-    draw();
+    show(cur);
     fitReplicas();
   });
 }
