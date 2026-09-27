@@ -239,9 +239,9 @@ on conflict (id) do nothing;
 create policy "images public read" on storage.objects for select
   using (bucket_id = 'site-images');
 create policy "images club write" on storage.objects for insert to authenticated
-  with check (bucket_id = 'site-images' and public.current_member() is not null);
+  with check (bucket_id = 'site-images' and (public.current_member()).email is not null);
 create policy "images club delete" on storage.objects for delete to authenticated
-  using (bucket_id = 'site-images' and public.current_member() is not null);
+  using (bucket_id = 'site-images' and (public.current_member()).email is not null);
 
 -- Seed the Welfare & Safeguarding page with the content carried across from the old
 -- WordPress site (basildonswimming.org/welfare/) so the page isn't blank on first run.

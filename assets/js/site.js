@@ -550,10 +550,14 @@ function renderHeroFeed(){
     .map(x=>x.it);
   $("#heroSlides").innerHTML=items.map((it,i)=>{
     const c=heroFeedContent(it);
-    const r=c.img?resolveNewsImage(c.img):null;
-    const bg=r?`linear-gradient(160deg,rgba(16,16,20,.55),rgba(16,16,20,.15) 65%),${r.css}`:HERO_SLIDE_BG[i%HERO_SLIDE_BG.length];
+    /* An article with a gallery shows all of it here, cross-fading (see cycleHeroPhotos);
+       anything else shows its single picture, or a club gradient if it has none. */
+    const layers=((it.photos||[]).length?it.photos:[c.img]).map(resolveNewsImage).filter(Boolean);
+    const media=layers.length?`<div class="hero-slide-media">${layers.map((r,j)=>
+      `<div class="hero-slide-photo${j===0?" show":""}" style="background:${r.css}"></div>`).join("")}</div>`:"";
     return `
-    <div class="hero-slide" style="background:${bg}">
+    <div class="hero-slide" style="background:${layers.length?"#101014":HERO_SLIDE_BG[i%HERO_SLIDE_BG.length]}">
+      ${media}
       <div class="hero-news-card">
         <p class="eyebrow">${esc(c.tag)}</p>
         <h3>${esc(c.title)}</h3>
@@ -588,7 +592,18 @@ function updateHeroSlide(){
   $("#heroPrev").disabled=heroIndex===0;
   $("#heroNext").disabled=heroIndex===n-1;
 }
+/* Only the slide in front cycles -- the ones either side are blurred out anyway. */
+const HERO_PHOTO_MS=4500;
+function cycleHeroPhotos(){
+  if(document.hidden)return;
+  const photos=[...document.querySelectorAll(".hero-slide.active .hero-slide-photo")];
+  if(photos.length<2)return;
+  const cur=photos.findIndex(el=>el.classList.contains("show"));
+  photos[cur]?.classList.remove("show");
+  photos[(cur+1)%photos.length].classList.add("show");
+}
 if($("#heroPhotoStrip")){
+  if(!matchMedia("(prefers-reduced-motion: reduce)").matches)setInterval(cycleHeroPhotos,HERO_PHOTO_MS);
   $("#heroPrev").addEventListener("click",()=>{heroIndex--;updateHeroSlide();});
   $("#heroNext").addEventListener("click",()=>{heroIndex++;updateHeroSlide();});
   $("#heroDots").addEventListener("click",e=>{const b=e.target.closest(".hero-dot");if(b){heroIndex=+b.dataset.i;updateHeroSlide();}});

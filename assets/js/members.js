@@ -458,6 +458,7 @@ function showForm(sec,id,forcedType){
           <label class="img-upload-btn">Upload your own photo<input type="file" accept="image/*" id="imgUploadInput" style="display:none"></label>
           <button type="button" class="img-clear-btn" id="imgClearBtn">No picture</button>
         </div>
+        <button type="button" class="btn small ghost img-frame-btn" id="imgFrameBtn"${isUploadedPhoto(current)?"":" hidden"}>Adjust framing</button>
         <input type="hidden" name="${f.k}" id="imgHiddenInput" value="${val}">
       </div>`;
     }
@@ -466,7 +467,7 @@ function showForm(sec,id,forcedType){
         <div class="gallery-picker">
           <div class="gallery-thumbs" id="galleryThumbs"></div>
           <label class="img-upload-btn">Add photos<input type="file" accept="image/*" multiple id="galleryAddInput" style="display:none"></label>
-          <p class="hint" style="margin-top:2px">Photos are compressed automatically. The first photo doubles as the card thumbnail. Use × to remove one.</p>
+          <p class="hint" style="margin-top:2px">Photos are compressed automatically. The first photo doubles as the card thumbnail. Tap <b>Frame</b> to choose what stays in view when a page crops it; × removes one.</p>
         </div>
       </div>`;
     }
@@ -506,7 +507,12 @@ function showForm(sec,id,forcedType){
       preview.style.background=r?r.css:"";
       preview.innerHTML=r&&r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:"";
       preview.classList.toggle("empty",!r);
+      $("#imgFrameBtn").hidden=!isUploadedPhoto(val);
     };
+    $("#imgFrameBtn").addEventListener("click",async()=>{
+      const framed=await openFramingEditor(imgHidden.value);
+      if(framed){imgHidden.value=framed;setPreview(framed);}
+    });
     formTarget.querySelectorAll(".img-swatch").forEach(btn=>{
       btn.addEventListener("click",()=>{
         imgHidden.value="default:"+btn.dataset.default;
@@ -544,14 +550,20 @@ function showForm(sec,id,forcedType){
   if(galleryField){
     const renderGalleryThumbs=()=>{
       $("#galleryThumbs").innerHTML=galleryPhotos.length?galleryPhotos.map((url,i)=>
-        `<div class="gallery-thumb"><img src="${esc(url)}" alt=""><button type="button" class="gallery-thumb-del" data-i="${i}" aria-label="Remove this photo">×</button></div>`).join("")
+        `<div class="gallery-thumb"><img src="${esc(url)}" alt="" style="${photoImgStyle(url)}">
+          <button type="button" class="gallery-thumb-del" data-del="${i}" aria-label="Remove this photo">×</button>
+          <button type="button" class="gallery-thumb-frame" data-frame="${i}">Frame</button></div>`).join("")
         :`<p class="hint" style="margin:0">No photos yet.</p>`;
     };
     renderGalleryThumbs();
-    $("#galleryThumbs").addEventListener("click",e=>{
-      const b=e.target.closest("[data-i]");if(!b)return;
-      galleryPhotos.splice(+b.dataset.i,1);
-      renderGalleryThumbs();
+    $("#galleryThumbs").addEventListener("click",async e=>{
+      const del=e.target.closest("[data-del]");
+      if(del){galleryPhotos.splice(+del.dataset.del,1);renderGalleryThumbs();return;}
+      const frame=e.target.closest("[data-frame]");
+      if(!frame)return;
+      const i=+frame.dataset.frame;
+      const framed=await openFramingEditor(galleryPhotos[i]);
+      if(framed){galleryPhotos[i]=framed;renderGalleryThumbs();}
     });
     $("#galleryAddInput").addEventListener("change",async e=>{
       const files=[...e.target.files];
@@ -653,6 +665,81 @@ function showArticlePreview(it){
   overlay.classList.add("open");
   document.getElementById("previewClose").addEventListener("click",()=>overlay.classList.remove("open"));
   wireArticleGallery((it.photos||[]).length);
+}
+
+/* Framing editor: the admin taps the spot in a photo that must always stay in view, or ticks
+   "whole photo" for posters and logos, and sees straight away how each page will crop it. The
+   choice is stored on the photo's URL -- see imgFraming in core.js. Resolves to the re-framed
+   URL, or null if they cancel. */
+const FRAME_PREVIEWS=[
+  {label:"Homepage — computer",ratio:"15/7",slanted:true},
+  {label:"Homepage — phone",ratio:"1/1"},
+  {label:"Article page & news cards",ratio:"16/10"},
+  {label:"Article page — phone",ratio:"4/3"}
+];
+const isUploadedPhoto=v=>!!v&&!String(v).startsWith("default:");
+function openFramingEditor(url){
+  return new Promise(resolve=>{
+    let {x,y,fit}=imgFraming(url);
+    let overlay=document.getElementById("framingOverlay");
+    if(!overlay){
+      overlay=document.createElement("div");
+      overlay.id="framingOverlay";
+      overlay.className="preview-overlay";
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML=`<div class="preview-overlay-inner" role="dialog" aria-label="Frame this photo">
+      <div class="preview-overlay-bar">
+        <span>Frame this photo</span>
+        <span style="display:flex;gap:8px">
+          <button type="button" class="btn small ghost" data-act="cancel">Cancel</button>
+          <button type="button" class="btn small" data-act="done">Done</button>
+        </span>
+      </div>
+      <div class="frame-body">
+        <p class="hint" style="margin:0">Tap (or drag) on the part of the photo that must always stay in view — faces, a banner, the pool. Every page crops around that spot; the previews below update as you go.</p>
+        <div class="frame-stage" id="frameStage"><img src="${esc(String(url).split("#")[0])}" alt="" draggable="false"><span class="frame-marker" id="frameMarker"></span></div>
+        <label class="f checkbox-f"><input type="checkbox" id="frameFit"> Show the whole photo, uncropped</label>
+        <p class="hint" style="margin:-10px 0 0">Best for posters, logos and anything with writing on it. Any gap around the photo is filled in black.</p>
+        <div class="frame-previews">${FRAME_PREVIEWS.map(p=>`<figure>
+          <div class="frame-preview${p.slanted?" slanted":""}" style="aspect-ratio:${p.ratio}"></div>
+          <figcaption>${p.label}</figcaption></figure>`).join("")}</div>
+      </div>
+    </div>`;
+    const stage=overlay.querySelector("#frameStage"),marker=overlay.querySelector("#frameMarker"),fitBox=overlay.querySelector("#frameFit");
+    fitBox.checked=fit;
+    const current=()=>withFraming(url,{x,y,fit});
+    const draw=()=>{
+      marker.style.left=`${x}%`;marker.style.top=`${y}%`;
+      stage.classList.toggle("fit",fit);
+      const css=photoCss(current());
+      overlay.querySelectorAll(".frame-preview").forEach(el=>el.style.background=css);
+    };
+    const place=e=>{
+      if(fit)return;
+      const r=stage.querySelector("img").getBoundingClientRect();
+      x=Math.max(0,Math.min(100,(e.clientX-r.left)/r.width*100));
+      y=Math.max(0,Math.min(100,(e.clientY-r.top)/r.height*100));
+      draw();
+    };
+    stage.addEventListener("pointerdown",e=>{stage.setPointerCapture(e.pointerId);place(e);});
+    stage.addEventListener("pointermove",e=>{if(stage.hasPointerCapture(e.pointerId))place(e);});
+    fitBox.addEventListener("change",()=>{fit=fitBox.checked;draw();});
+    const close=result=>{
+      overlay.classList.remove("open");
+      document.removeEventListener("keydown",onKey);
+      resolve(result);
+    };
+    const onKey=e=>{if(e.key==="Escape")close(null);};
+    document.addEventListener("keydown",onKey);
+    overlay.onclick=e=>{
+      if(e.target===overlay)return close(null);
+      const act=e.target.closest("[data-act]")?.dataset.act;
+      if(act)close(act==="done"?current():null);
+    };
+    draw();
+    overlay.classList.add("open");
+  });
 }
 
 /* The Welfare & Safeguarding page is a single document rather than a list of items, so it

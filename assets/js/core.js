@@ -29,9 +29,11 @@ function feedFromRow(row){
 function feedToRow(it){
   const row={type:FEED_TYPE_TO_ROW[it.type]};
   for(const [key,col] of Object.entries(FEED_FIELDS))if(key!=="type")row[col]=it[key]===""||it[key]===undefined?null:it[key];
-  /* "visible" is a not-null column; types whose form has no visibility checkbox never set it,
-     so treat "not provided" as visible rather than writing a null the database would reject. */
+  /* "visible" and "photos" are not-null columns; types whose form has no visibility checkbox
+     or gallery (meets, training) never set them, so fill in the column default rather than
+     writing a null the database would reject. */
   if(row.visible===null)row.visible=true;
+  if(row.photos===null)row.photos=[];
   return row;
 }
 const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads:r.squads||[],photo:r.photo||""});
@@ -110,9 +112,35 @@ function resolveNewsImage(img){
   if(img.indexOf("default:")===0){
     const d=DB.newsDefaults.find(x=>x.key===img.slice(8));
     if(!d)return null;
-    return d.img?{css:`url('${esc(d.img)}') center/cover no-repeat`,icon:null}:{css:d.bg,icon:d.icon};
+    return d.img?{css:photoCss(d.img),icon:null}:{css:d.bg,icon:d.icon};
   }
-  return {css:`url('${esc(img)}') center/cover no-repeat`,icon:null};
+  return {css:photoCss(img),icon:null};
+}
+
+/* Framing. Every place crops a photo differently -- a wide strip on the homepage, near-square
+   on phones, 16:10 on the article page -- so instead of one fixed crop an admin picks the spot
+   that must stay in view ("#focus=30,70", percent across,down), or asks for the whole photo
+   uncropped ("#fit", for posters and logos). It rides in the URL fragment, which never reaches
+   the server: the same URL loads the same file everywhere and no column had to change shape. */
+function imgFraming(url){
+  const p=new URLSearchParams(String(url||"").split("#")[1]||"");
+  const [x,y]=(p.get("focus")||"").split(",").map(Number);
+  const ok=n=>Number.isFinite(n)&&n>=0&&n<=100;
+  return ok(x)&&ok(y)?{x,y,fit:p.has("fit")}:{x:50,y:50,fit:p.has("fit")};
+}
+function withFraming(url,{x,y,fit}){
+  const base=String(url).split("#")[0];
+  if(fit)return `${base}#fit`;
+  return Math.round(x)===50&&Math.round(y)===50?base:`${base}#focus=${Math.round(x)},${Math.round(y)}`;
+}
+function photoCss(url){
+  const f=imgFraming(url);
+  return f.fit?`url('${esc(url)}') center/contain no-repeat,#101014`:`url('${esc(url)}') ${f.x}% ${f.y}%/cover no-repeat`;
+}
+/* The same framing for an <img> (the article gallery), where object-fit does the cropping. */
+function photoImgStyle(url){
+  const f=imgFraming(url);
+  return f.fit?"object-fit:contain":`object-position:${f.x}% ${f.y}%`;
 }
 
 /* Shown on the Welfare & Safeguarding page (and in its admin editor) until the welfare_page
@@ -174,7 +202,7 @@ function articleGalleryHtml(photos){
   if(!photos||!photos.length)return "";
   return `<div class="article-gallery">
     <div class="article-gallery-track" id="agTrack">
-      ${photos.map(p=>`<div class="article-gallery-slide"><img src="${esc(p)}" alt=""></div>`).join("")}
+      ${photos.map(p=>`<div class="article-gallery-slide"><img src="${esc(p)}" alt="" style="${photoImgStyle(p)}"></div>`).join("")}
     </div>
     ${photos.length>1?`
     <button type="button" class="gallery-arrow prev" id="agPrev" aria-label="Previous photo">‹</button>
@@ -183,28 +211,37 @@ function articleGalleryHtml(photos){
   </div>`;
 }
 /* Wires up whichever gallery was just inserted into the DOM (there is only ever one on screen
-   at a time — the public article page, or the admin preview overlay). */
+   at a time -- the public article page, or the admin preview overlay). It plays itself as a
+   slideshow, looping, until someone touches it: from then on they're in charge. No autoplay
+   for people who've asked their device for reduced motion. */
+const GALLERY_AUTOPLAY_MS=5000;
 function wireArticleGallery(n){
   const track=document.getElementById("agTrack");
   if(!track||!n||n<2)return;
-  let idx=0;
-  const dots=()=>document.querySelectorAll(".gallery-dot");
-  const update=()=>{
-    dots().forEach((d,i)=>d.classList.toggle("active",i===idx));
-    const prev=document.getElementById("agPrev"),next=document.getElementById("agNext");
-    if(prev)prev.disabled=idx===0;
-    if(next)next.disabled=idx===n-1;
+  let idx=0,auto=null;
+  const stop=()=>{clearInterval(auto);auto=null;};
+  const update=()=>document.querySelectorAll(".gallery-dot").forEach((d,i)=>d.classList.toggle("active",i===idx));
+  const go=(i,byUser)=>{
+    if(byUser)stop();
+    idx=(i+n)%n;
+    track.scrollTo({left:track.clientWidth*idx,behavior:"smooth"});
+    update();
   };
-  const go=i=>{idx=Math.max(0,Math.min(i,n-1));track.scrollTo({left:track.clientWidth*idx,behavior:"smooth"});update();};
-  document.getElementById("agPrev")?.addEventListener("click",()=>go(idx-1));
-  document.getElementById("agNext")?.addEventListener("click",()=>go(idx+1));
-  document.getElementById("agDots")?.addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(b)go(+b.dataset.i);});
+  document.getElementById("agPrev")?.addEventListener("click",()=>go(idx-1,true));
+  document.getElementById("agNext")?.addEventListener("click",()=>go(idx+1,true));
+  document.getElementById("agDots")?.addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(b)go(+b.dataset.i,true);});
+  ["pointerdown","wheel"].forEach(ev=>track.addEventListener(ev,stop,{passive:true}));
   let scrollTimer;
   track.addEventListener("scroll",()=>{
     clearTimeout(scrollTimer);
     scrollTimer=setTimeout(()=>{idx=Math.round(track.scrollLeft/track.clientWidth);update();},80);
   },{passive:true});
   update();
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+  auto=setInterval(()=>{
+    if(!track.isConnected)return stop();   // the admin preview was closed or re-rendered
+    if(!document.hidden)go(idx+1);
+  },GALLERY_AUTOPLAY_MS);
 }
 /* Full article view: eyebrow/title/date, gallery (falls back to the single cover picture used
    elsewhere on the site when there's no gallery yet), then the rich body (or the summary, for an

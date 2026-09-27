@@ -82,12 +82,12 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
   nav.main a::before,.nav-dropdown-toggle::before{
     content:"";position:absolute;inset:0;z-index:-1;
     clip-path:polygon(16px 0,100% 0,calc(100% - 16px) 100%,0 100%);
-    background:linear-gradient(100deg,var(--flame) 0%,var(--flame-dark) 62%,rgba(201,102,10,0) 100%);
+    background:var(--flame);
     opacity:0;transform:translateX(-8px);transition:opacity .2s ease,transform .2s ease;
   }
-  /* hover previews the fill at partial strength; the current page keeps it at full, so
-     the two still read differently */
-  nav.main a:hover:not(.active,.cta)::before{opacity:.5;transform:translateX(0)}
+  /* hover and the current page both use the solid banner orange (.hero), so the bar, the
+     Join Us button and the banner all read as the same colour */
+  nav.main a:hover:not(.active,.cta)::before{opacity:1;transform:translateX(0)}
   nav.main a:hover:not(.active,.cta){color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.3)}
   nav.main a.active{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.3)}
   nav.main a.active::before{opacity:1;transform:translateX(0)}
@@ -99,7 +99,7 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
   }
 
   .nav-dropdown-toggle{z-index:0;padding:0 18px}
-  .nav-dropdown-toggle:hover:not(.active)::before{opacity:.5;transform:translateX(0)}
+  .nav-dropdown-toggle:hover:not(.active)::before{opacity:1;transform:translateX(0)}
   .nav-dropdown-toggle:hover:not(.active){color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.3)}
   .nav-dropdown.open .nav-dropdown-toggle,.nav-dropdown-toggle.active{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.3)}
   .nav-dropdown.open .nav-dropdown-toggle::before,.nav-dropdown-toggle.active::before{opacity:1;transform:translateX(0)}
@@ -135,21 +135,20 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
     content:"";order:-1;flex:0 0 auto;width:4px;height:18px;
     background:var(--flame);opacity:.6;transform:skewX(calc(-1 * var(--slant-deg)));transition:opacity .18s,background .18s;
   }
-  /* opacity and transform have to be restated here: `nav.main a:hover::before` above is a more
-     specific match than the resting rule, so without them a hovered row picked up that rule's
-     opacity:.5 (translucent) and translateX (which replaced the skew, squaring the row off).
-     The fill is the flat flame gradient the bar's own filled pills use -- the bar version fades
-     to transparent at its tail, which on a row this wide read as a wash rather than orange. */
+  /* transform has to be restated here: `nav.main a:hover::before` above is a more specific
+     match than the resting rule, so without it a hovered row picked up that rule's
+     translateX (which replaced the skew, squaring the row off).
+     The fill is the same solid banner orange the bar links and Join Us use. */
   nav.main .nav-dropdown-menu a:hover::before,nav.main .nav-dropdown-menu a:focus-visible::before,nav.main .nav-dropdown-menu a.active::before{
     opacity:1;transform:skewX(calc(-1 * var(--slant-deg)));
-    background:linear-gradient(100deg,var(--flame) 0%,var(--flame-dark) 100%);border-color:transparent;
+    background:var(--flame);border-color:transparent;
     box-shadow:0 8px 18px rgba(201,102,10,.3);
   }
   .nav-dropdown-menu a:hover::after,.nav-dropdown-menu a:focus-visible::after,.nav-dropdown-menu a.active::after{opacity:1;background:#fff}
   .nav-dropdown-menu a:hover,.nav-dropdown-menu a:focus-visible,.nav-dropdown-menu a.active{color:#fff;font-weight:700;text-shadow:0 1px 4px rgba(0,0,0,.4)}
 
   nav.main a.cta{
-    margin-left:4px;background:linear-gradient(100deg,var(--flame) 0%,var(--flame-dark) 100%);
+    margin-left:4px;background:var(--flame);
     clip-path:polygon(16px 0,100% 0,calc(100% - 16px) 100%,0 100%);
     color:#101014;font-weight:700;padding:0 20px;
   }
@@ -294,7 +293,7 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
   .nav-dropdown.open .nav-dropdown-toggle{color:#fff;font-weight:700;text-shadow:none}
   nav.main a.active::before,nav.main a.cta::before,.nav-dropdown-toggle.active::before,
   .nav-dropdown.open .nav-dropdown-toggle::before{
-    background:linear-gradient(100deg,var(--flame) 0%,var(--flame-dark) 100%);border-color:transparent;
+    background:var(--flame);border-color:transparent;
   }
   nav.main a.cta{margin:4px 0 0;justify-content:center;clip-path:none;filter:none}
   .nav-dropdown{width:100%}
@@ -365,10 +364,27 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 }
 .hero-slide+.hero-slide{margin-left:calc(8px - var(--slide-lean))}
 .hero-slide.active{filter:none;opacity:1;pointer-events:auto}
+/* gallery photos stack here and cross-fade (cycleHeroPhotos in site.js); the ::after is the
+   darkening that keeps the card legible over any photo */
+.hero-slide-media{position:absolute;inset:0}
+.hero-slide-photo{position:absolute;inset:0;opacity:0;transition:opacity 1.2s ease}
+.hero-slide-photo.show{opacity:1}
+.hero-slide-media::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,rgba(16,16,20,.55),rgba(16,16,20,.15) 65%)}
 .hero-news-card{
-  position:relative;z-index:0;max-width:420px;margin:0 0 28px 28px;
-  color:#fff;transition:opacity .3s;min-height:150px;padding:18px 48px;
+  /* a fixed height, with the title and summary clamped to fit it, so a long story can't grow
+     the card up into the slide's slanted left edge and lose its first letters. knowing the
+     height means the margin can be worked out: the slide's edge sits --slant-ratio px further
+     right for every px up, and the card's skewed box is centred (28px + height/2) up from the
+     bottom -- so this margin keeps a constant --card-gap between the two slants. */
+  --card-h:214px;--card-gap:14px;
+  position:relative;z-index:0;max-width:420px;height:var(--card-h);
+  margin:0 0 28px calc(var(--card-gap) + (28px + var(--card-h) / 2) * var(--slant-ratio));
+  display:flex;flex-direction:column;justify-content:center;
+  color:#fff;transition:opacity .3s;padding:18px 48px;
 }
+.hero-news-card h3,.hero-news-card p:not(.eyebrow){display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
+.hero-news-card h3{-webkit-line-clamp:2}
+.hero-news-card p:not(.eyebrow){-webkit-line-clamp:3}
 .hero-news-card::before{
   content:"";position:absolute;inset:0;z-index:-1;
   background:rgba(16,16,20,.55);border:1px solid rgba(255,255,255,.15);
@@ -1104,7 +1120,7 @@ body.theme-dark .brand .name .line-two{color:var(--ember)}
   body.theme-dark nav.main .nav-dropdown-menu a:hover::before,
   body.theme-dark nav.main .nav-dropdown-menu a:focus-visible::before,
   body.theme-dark nav.main .nav-dropdown-menu a.active::before{
-    background:linear-gradient(100deg,var(--flame) 0%,var(--flame-dark) 100%);border-color:transparent;
+    background:var(--flame);border-color:transparent;
     box-shadow:0 8px 18px rgba(0,0,0,.5);
   }
   body.theme-dark .nav-dropdown-menu a:hover,
@@ -1127,7 +1143,7 @@ body.theme-dark .brand .name .line-two{color:var(--ember)}
   body.theme-dark nav.main a.cta::before,
   body.theme-dark .nav-dropdown-toggle.active::before,
   body.theme-dark .nav-dropdown.open .nav-dropdown-toggle::before{
-    background:linear-gradient(100deg,var(--flame) 0%,var(--flame-dark) 100%);border-color:transparent;
+    background:var(--flame);border-color:transparent;
   }
   body.theme-dark nav.main a.active,body.theme-dark nav.main a.cta,
   body.theme-dark .nav-dropdown-toggle.active,body.theme-dark .nav-dropdown.open .nav-dropdown-toggle{color:#101014}
@@ -1170,8 +1186,11 @@ body.theme-dark label.f input:focus,body.theme-dark label.f select:focus,body.th
    none of the width cost. this block sits last in the file so it also lands over the dark
    theme's own .eyebrow colour. */
 @media(max-width:640px){
-  .hero-news-card{max-width:none;margin:0 16px 46px;padding:18px 22px}
+  .hero-news-card{max-width:none;height:auto;margin:0 16px 46px;padding:18px 22px}
   .hero-news-card::before{transform:none;border-radius:4px}
+  /* the card is square from here down, so the slide it sits on has to be too (the 600px rule
+     above only squares it from 600) or the slant eats the card's top-left corner */
+  .hero-slide{clip-path:none}
 
   .pointed-card .eyebrow,.next-meet .eyebrow,.hero-news-card .eyebrow,
   body.theme-dark .pointed-card .eyebrow,body.theme-dark .next-meet .eyebrow,body.theme-dark .hero-news-card .eyebrow{
@@ -1241,7 +1260,25 @@ body.theme-dark .article-body a{color:var(--ember)}
 .gallery-picker{display:grid;gap:10px}
 .gallery-thumbs{display:flex;flex-wrap:wrap;gap:10px}
 .gallery-thumb{position:relative;width:76px;height:76px;border-radius:9px;overflow:hidden;border:1.5px solid var(--line)}
-.gallery-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.gallery-thumb img{width:100%;height:100%;object-fit:cover;display:block;background:#101014}
+.gallery-thumb-frame{position:absolute;left:0;right:0;bottom:0;padding:5px 0;background:rgba(16,16,20,.72);color:#fff;border:none;font-size:.7rem;font-weight:700;letter-spacing:.04em;cursor:pointer}
+.gallery-thumb-frame:hover{background:var(--flame-dark)}
+.img-frame-btn{margin-top:8px}
+
+/* framing editor (openFramingEditor in members.js) */
+.frame-body{padding:18px 20px 24px;display:grid;gap:16px}
+.frame-stage{position:relative;justify-self:center;max-width:100%;line-height:0;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none}
+.frame-stage img{max-width:100%;max-height:52vh;display:block;border-radius:8px;margin:0}
+.frame-stage.fit{cursor:default}
+.frame-stage.fit img{opacity:.55}
+.frame-marker{position:absolute;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 2px var(--flame),0 2px 10px rgba(0,0,0,.55);pointer-events:none}
+.frame-stage.fit .frame-marker{display:none}
+.frame-previews{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0}
+.frame-previews figure{margin:0}
+.frame-preview{border-radius:6px;background-color:#101014}
+/* the homepage strip on a computer cuts both sides at the site's slant; show the same cut */
+.frame-preview.slanted{border-radius:0;clip-path:polygon(17% 0,100% 0,83% 100%,0 100%)}
+.frame-previews figcaption{font-size:.78rem;color:var(--muted);margin-top:5px}
 .gallery-thumb-del{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:rgba(16,16,20,.7);color:#fff;border:none;font-size:.9rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .gallery-thumb-del:hover{background:var(--warn)}
 
@@ -1399,7 +1436,8 @@ main{overflow-x:clip}
 @media(max-width:900px) and (max-height:520px) and (orientation:landscape){
   .hero-photo-strip{height:min(340px,62vh)}
   .hero{padding:26px 0 32px}
-  .hero-news-card{min-height:0;margin-bottom:22px;padding:14px 20px}
+  .hero-news-card{height:auto;margin-bottom:22px;padding:14px 20px}
+  .hero-news-card p:not(.eyebrow){-webkit-line-clamp:2}
   nav.main{max-height:var(--drawer-max,72dvh)}
 }
 
