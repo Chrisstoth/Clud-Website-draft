@@ -372,7 +372,9 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 .hero-slide.active{filter:none;opacity:1;pointer-events:auto}
 /* gallery photos stack here and cross-fade (cycleHeroPhotos in site.js); the ::after is the
    darkening that keeps the card legible over any photo */
-.hero-slide-media{position:absolute;inset:0}
+/* its own stacking layer, so the photos' z-index (for the cross-fade below) stays inside it and
+   can never rise over the card */
+.hero-slide-media{position:absolute;inset:0;z-index:0;isolation:isolate}
 /* a story with its own pictures for one screen draws both sets; show the one for this screen
    (640px: the same point the card and the photo framing switch at) */
 @media(max-width:640px){.hero-slide-media.only-wide{display:none}}
