@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=47">
+<link rel="stylesheet" href="assets/css/site.css?v=51">
 </head>
 <body class="theme-dark">
 <script>try{if(localStorage.getItem("bpsc_theme")==="light")document.body.classList.remove("theme-dark")}catch(e){}</script>
@@ -93,6 +93,17 @@
       <div class="lane-rope"></div>
       <p style="color:var(--muted)">Newest first &mdash; this week is at the top, and the archive runs back from there. Sample announcements — the real feed will be editable from the members' area.</p>
     </div>
+    <div class="cat-row-wrap ig-wrap" id="igWrap" hidden>
+      <div class="ig-head">
+        <h3 class="display">Latest from Instagram</h3>
+        <a class="ig-follow" href="https://www.instagram.com/basildonphoenix_swim/" target="_blank" rel="noopener">Follow @basildonphoenix_swim →</a>
+      </div>
+      <div class="cat-row-scroll">
+        <button class="cat-arrow prev" data-row="igList" aria-label="Scroll Instagram posts left">‹</button>
+        <div class="cat-row" id="igList"></div>
+        <button class="cat-arrow next" data-row="igList" aria-label="Scroll Instagram posts right">›</button>
+      </div>
+    </div>
     <div class="news-tag-chips" id="newsTagChips"></div>
     <div class="news-jump" id="newsJump" hidden>
       <button type="button" class="news-jump-arrow" data-dir="newer" aria-label="Jump to newer news">&uarr; Newer</button>
@@ -138,7 +149,7 @@
 
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
-<script src="assets/js/core.js?v=17"></script>
-<script src="assets/js/site.js?v=20"></script>
+<script src="assets/js/core.js?v=19"></script>
+<script src="assets/js/site.js?v=24"></script>
 </body>
 </html>

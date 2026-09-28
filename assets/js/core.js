@@ -17,7 +17,7 @@ const DB={feed:[],coaches:[],squads:[],roles:[],newsDefaults:[],welfare:[],commi
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",conditionsUrl:"conditions_url",conditionsLabel:"conditions_label",entryFileUrl:"entry_file_url",entryFileLabel:"entry_file_label",resultsFileUrl:"results_file_url",resultsFileLabel:"results_file_label",currentEntriesUrl:"current_entries_url",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",conditionsUrl:"conditions_url",conditionsLabel:"conditions_label",entryFileUrl:"entry_file_url",entryFileLabel:"entry_file_label",resultsFileUrl:"results_file_url",resultsFileLabel:"results_file_label",currentEntriesUrl:"current_entries_url",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos"};
 const FEED_TYPE_TO_ROW={meet:"meet",externalMeet:"external_meet",teamMeet:"team_meet",social:"social",news:"news",training:"training"};
 const FEED_TYPE_FROM_ROW=Object.fromEntries(Object.entries(FEED_TYPE_TO_ROW).map(([k,v])=>[v,k]));
 
@@ -352,6 +352,36 @@ const meetLive=m=>!!m.liveUrl&&meetRunning(m);
    hosted by someone else (county champs etc.), "teamMeet" = league/team gala (no entries or volunteers). */
 const MEET_TYPES=["meet","externalMeet","teamMeet"];
 const isMeet=it=>MEET_TYPES.includes(it.type);
+
+/* ================= INSTAGRAM (via Behold) =================
+   Behold (behold.so) holds the club's Instagram login and serves its latest posts as JSON.
+   Which feed to read, and which posts an editor has hidden, live in the single-row
+   instagram_settings table -- kept out of SECTIONS/loadContent on purpose, so a missing table
+   only switches the Instagram row off rather than failing every page's content load. */
+/* how many posts the News page row shows (the members' area quotes it too) */
+const IG_MAX_POSTS=12;
+async function loadInstagramSettings(){
+  const {data,error}=await sb.from("instagram_settings").select("*").eq("id",1).maybeSingle();
+  if(error)throw error;
+  return {feedId:(data&&data.feed_id)||"",hidden:(data&&data.hidden_posts)||[]};
+}
+/* Accepts the feed ID on its own or the whole feed URL Behold shows (https://feeds.behold.so/<id>). */
+function beholdFeedId(input){
+  const s=String(input||"").trim();
+  const m=s.match(/feeds\.behold\.so\/([A-Za-z0-9_-]+)/);
+  return m?m[1]:/^[A-Za-z0-9_-]+$/.test(s)?s:"";
+}
+async function fetchBeholdPosts(feedId){
+  const r=await fetch(`https://feeds.behold.so/${encodeURIComponent(feedId)}`);
+  if(!r.ok)throw new Error(r.status===404?"Behold doesn't recognise that feed ID":`Behold replied with an error (${r.status})`);
+  const data=await r.json();
+  /* newer Behold feeds wrap the posts with profile details; older ones are a bare array */
+  return (Array.isArray(data)?data:data.posts||[]).filter(p=>p&&p.id&&p.permalink);
+}
+/* videos/reels carry their still in thumbnailUrl; Behold's resized copies are lighter */
+const igPostImage=p=>(p.sizes&&p.sizes.medium&&p.sizes.medium.mediaUrl)||(p.mediaType==="VIDEO"?p.thumbnailUrl:p.mediaUrl)||p.thumbnailUrl||"";
+const igPostCaption=p=>(p.prunedCaption||p.caption||"").trim();
+const igPostBadge=p=>p.mediaType==="VIDEO"?(p.isReel?"Reel":"Video"):p.mediaType==="CAROUSEL_ALBUM"?"Album":"";
 
 const TT_DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const TT_DAY_NAMES={Mon:"Monday",Tue:"Tuesday",Wed:"Wednesday",Thu:"Thursday",Fri:"Friday",Sat:"Saturday",Sun:"Sunday"};

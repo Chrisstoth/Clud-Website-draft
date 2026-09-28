@@ -18,12 +18,15 @@
   /* one lean for the whole site. --slant-deg is the real source of truth: a skew transform
      holds the angle exactly, whatever height the element ends up. --slant-ratio is its
      tangent, only for the few places that need a px offset against a KNOWN height (the
-     44px nav bar, the 420px hero strip) -- a px offset on an auto-height element would
+     44px nav bar, the --hero-strip-h photo strip) -- a px offset on an auto-height element would
      silently change angle every time the content changed. */
   --slant-deg:20deg;
   --slant-ratio:.364;
   /* homepage hero card: shared by the real card and the framing editor's replica of it */
   --hero-card-h:220px;--hero-card-h-compact:146px;--hero-card-gap:14px;
+  /* the homepage photo strip's height on computers (phones set their own below). The framing
+     editor's computer replica is drawn at 900 x this (HERO_REPLICAS in members.js) -- keep in step. */
+  --hero-strip-h:520px;
   /* The bevel used by the cards that can't afford a full parallelogram (Club Calendar rows,
      Open Meets). --cut is the horizontal run of the corner cut, --rise its vertical run, and
      --rise = --cut / --slant-ratio, so the cut edge sits at exactly --slant-deg NO MATTER how
@@ -350,16 +353,16 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 }
 
 /* ---------- hero ---------- */
-.hero{background:var(--flame);color:var(--ink);padding:26px 0;position:relative;overflow:hidden;box-shadow:0 8px 16px -6px rgba(16,16,20,.4);z-index:1}
-.hero-photo-strip{height:420px;position:relative;overflow:hidden;background:#000;box-shadow:inset 0 10px 16px -10px rgba(0,0,0,.6),inset 0 -10px 16px -10px rgba(0,0,0,.6)}
+.hero{background:var(--flame);color:var(--ink);padding:16px 0;position:relative;overflow:hidden;box-shadow:0 8px 16px -6px rgba(16,16,20,.4);z-index:1}
+.hero-photo-strip{height:var(--hero-strip-h);position:relative;overflow:hidden;background:#000;box-shadow:inset 0 10px 16px -10px rgba(0,0,0,.6),inset 0 -10px 16px -10px rgba(0,0,0,.6)}
 .hero-carousel-inner{height:100%;position:relative;overflow:hidden}
 .hero-slides{display:flex;height:100%;gap:0;transition:transform .45s cubic-bezier(.4,0,.2,1)}
 .hero-slide{
   /* photos can't be skewed (it would distort the image), so this one keeps a clip-path --
-     but the strip's height IS fixed at 420px, so the offset can be derived from it and the
+     but the strip's height IS fixed (--hero-strip-h), so the offset can be derived from it and the
      angle still lands exactly on --slant-deg. the slides then overlap by nearly that offset
      so what shows between them is a thin constant seam, not a wide black wedge. */
-  --slide-lean:calc(420px * var(--slant-ratio));
+  --slide-lean:calc(var(--hero-strip-h) * var(--slant-ratio));
   flex:0 0 clamp(460px,74vw,900px);height:100%;position:relative;display:flex;align-items:flex-end;
   filter:blur(3px) brightness(.55);opacity:.92;transition:filter .35s,opacity .35s;pointer-events:none;
   clip-path:polygon(var(--slide-lean) 0,100% 0,calc(100% - var(--slide-lean)) 100%,0 100%);
@@ -369,6 +372,10 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 /* gallery photos stack here and cross-fade (cycleHeroPhotos in site.js); the ::after is the
    darkening that keeps the card legible over any photo */
 .hero-slide-media{position:absolute;inset:0}
+/* a story with its own pictures for one screen draws both sets; show the one for this screen
+   (640px: the same point the card and the photo framing switch at) */
+@media(max-width:640px){.hero-slide-media.only-wide{display:none}}
+@media(min-width:641px){.hero-slide-media.only-narrow{display:none}}
 .hero-slide-photo{position:absolute;inset:0;opacity:0;transition:opacity 1.6s ease}
 .hero-slide-photo.show{opacity:1}
 .hero-slide-media::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,rgba(16,16,20,.55),rgba(16,16,20,.15) 65%)}
@@ -468,11 +475,11 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 .card.meet.live{outline:2px solid #c81e2c;outline-offset:-2px}
 @media(prefers-reduced-motion:reduce){.live-results,.btn.live::before,.pill.live .live-dot{animation:none}}
 
-.hero-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:44px;align-items:center;position:relative}
-.hero h1{font-size:clamp(2rem,4.6vw,3.2rem);color:var(--ink)}
+.hero-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:40px;align-items:center;position:relative}
+.hero h1{font-size:clamp(1.9rem,3.6vw,2.6rem);color:var(--ink);margin-top:4px}
 
 .next-meet{
-  position:relative;z-index:0;color:#101014;min-height:190px;padding:24px 60px;
+  position:relative;z-index:0;color:#101014;padding:18px 58px;
 }
 .next-meet::before{
   content:"";position:absolute;inset:0;z-index:-1;
@@ -480,8 +487,8 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
   transform:skewX(calc(-1 * var(--slant-deg)));
 }
 .next-meet .eyebrow{color:var(--flame-dark)}
-.next-meet h3{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.4rem;margin-top:8px;line-height:1.15;letter-spacing:-.01em}
-.next-meet .meta{color:#5c5c63;font-size:.92rem;margin-top:10px}
+.next-meet h3{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.3rem;margin-top:6px;line-height:1.15;letter-spacing:-.01em}
+.next-meet .meta{color:#5c5c63;font-size:.92rem;margin-top:6px}
 .next-meet .meta div{margin-top:3px}
 @media(max-width:820px){.hero-grid{grid-template-columns:1fr}.hero{padding:42px 0 50px}}
 @media(max-width:640px){.next-meet{padding:22px}.next-meet::before{transform:none;border-radius:4px}}
@@ -489,6 +496,8 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 /* ---------- sections & cards ---------- */
 main{min-height:60vh}
 section.page{padding:52px 0 72px}
+/* the homepage's orange banner sits almost straight under the partners strip, not a full gap down */
+section.page#page-home{padding-top:14px}
 .page-head{margin-bottom:34px;max-width:70ch}
 .page-head h2{font-size:clamp(1.7rem,3.8vw,2.4rem)}
 /* a second, subordinate heading part-way down a page (e.g. Academy coaches) */
@@ -832,6 +841,20 @@ body.theme-dark .committee-item.active .t{color:var(--ember)}
 .social-card .when{font-weight:700;color:var(--flame-dark);font-size:.9rem;text-transform:uppercase;letter-spacing:.06em}
 .social-card p{font-size:.94rem;color:var(--body2);flex:1}
 
+/* Instagram row on the News page: the social card, with the post's photo bled to the card's
+   edges the same way .social-card .art is. Taller than .art because Instagram posts are square
+   or portrait -- a 132px strip would crop most of them down to a sliver. */
+.ig-wrap{margin:8px 0 38px}
+.ig-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px 16px;flex-wrap:wrap}
+.ig-follow{font-size:.9rem;font-weight:600;color:var(--flame-dark)}
+.ig-follow:hover{text-decoration:underline}
+.ig-card .ig-photo{position:relative;display:block;height:220px;margin:-22px -38px 14px -34px;background:var(--line);overflow:hidden}
+.ig-card .ig-photo img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
+.ig-card .ig-photo:hover img{transform:scale(1.04)}
+.ig-badge{position:absolute;top:12px;right:14px;background:rgba(16,16,20,.7);color:#fff;font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:4px}
+.ig-card .ig-caption{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden;white-space:pre-line}
+@media(max-width:640px){.ig-card .ig-photo{height:200px;margin:-18px -20px 14px -20px;border-radius:var(--radius) var(--radius) 0 0}}
+
 /* calendar */
 /* Bevelled like the other Club Calendar cards (--cut-sm/--rise-sm, same scale as the info
    accordions): the month grid is dense and its height swings 4-6 rows, so the full --cut/--rise
@@ -1089,6 +1112,24 @@ footer.site a:hover{color:var(--ember)}
 .item-row .t{font-weight:700;color:var(--text)}
 .item-row .s{font-size:.85rem;color:var(--muted);margin-top:2px}
 .item-row .acts{display:flex;gap:8px}
+/* Instagram section: the one-off setup guide folds away once a feed is connected, and each
+   post row is a thumbnail + caption with its "Show on website" tick. An unticked post fades
+   so hidden ones stand out when scanning the list. */
+.ig-setup{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0 18px;max-width:760px}
+.ig-setup>summary{cursor:pointer;padding:14px 0;font-weight:700;color:var(--text)}
+.ig-setup[open]>summary{border-bottom:1px solid var(--line)}
+.ig-setup-body{padding:12px 0 16px;font-size:.92rem;color:var(--body2);line-height:1.55}
+.ig-setup-body ol,.ig-setup-body ul{padding-left:22px;display:grid;gap:8px;margin:0 0 12px}
+.ig-setup-body a{color:var(--flame-dark);text-decoration:underline}
+.ig-setup-body code{font-size:.85em;background:var(--field);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.ig-admin-row{margin-bottom:10px;transition:opacity .2s}
+.ig-admin-row.is-hidden{opacity:.5}
+.ig-admin-post{display:flex;gap:14px;align-items:center;flex:1 1 320px;min-width:0}
+.ig-admin-post img,.ig-admin-noimg{width:64px;height:64px;object-fit:cover;border-radius:8px;flex:0 0 64px;background:var(--line)}
+.ig-admin-post>div{min-width:0}
+.ig-admin-caption{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.ig-admin-row a.s{display:inline-block;color:var(--flame-dark)}
+.ig-admin-row label.checkbox-f{white-space:nowrap}
 .edit-slot:not(:empty){background:var(--card);border:1px solid var(--line);border-top:none;border-radius:0 0 12px 12px;padding:2px 18px 18px}
 .edit-slot form.stack{margin-top:0!important}
 #admin form.stack{max-width:640px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px}
@@ -1312,6 +1353,13 @@ body.theme-dark .article-body a{color:var(--ember)}
 .frame-strip button.on{border-color:var(--flame);opacity:1}
 .frame-strip img{width:100%;height:100%;object-fit:cover;display:block;margin:0;border-radius:0}
 .frame-seg-views{flex-wrap:wrap;border-radius:14px;justify-self:start}
+/* homepage pictures in the edit form: one row per screen */
+.hero-sets{display:grid;gap:14px}
+.hero-set{display:grid;gap:10px;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px}
+.hero-set-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px}
+.hero-set-title{font-size:.8rem;font-weight:700;text-transform:none;letter-spacing:normal}
+.hero-set .frame-seg button{text-transform:none;letter-spacing:normal}
+.hero-set .img-upload-btn{justify-self:start}
 .frame-seg-views button{padding:8px 12px}
 .frame-copy{background:none;border:none;padding:6px 2px;font:inherit;font-size:.8rem;font-weight:700;color:var(--ember);text-decoration:underline;cursor:pointer}
 .frame-zoom{display:flex;align-items:center;gap:12px}
@@ -1340,7 +1388,7 @@ body.theme-dark .article-body a{color:var(--ember)}
 .fh-photo,.fh-shade{position:absolute;inset:0}
 .fh-photo.photo{position:absolute}
 .fh-shade{background:linear-gradient(160deg,rgba(16,16,20,.55),rgba(16,16,20,.15) 65%)}
-.frame-hero-desk .fh-inner{--slide-lean:calc(420px * var(--slant-ratio));clip-path:polygon(var(--slide-lean) 0,100% 0,calc(100% - var(--slide-lean)) 100%,0 100%)}
+.frame-hero-desk .fh-inner{--slide-lean:calc(var(--hero-strip-h) * var(--slant-ratio));clip-path:polygon(var(--slide-lean) 0,100% 0,calc(100% - var(--slide-lean)) 100%,0 100%)}
 .frame-hero-desk .fh{border-radius:0;background:#000}
 .fh-card{position:absolute;z-index:1;color:#fff;display:flex;flex-direction:column;justify-content:center}
 .fh-card .eyebrow{color:var(--ember)}

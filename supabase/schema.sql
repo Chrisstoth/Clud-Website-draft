@@ -64,6 +64,8 @@ alter table public.feed add column if not exists results_file_url text;
 alter table public.feed add column if not exists results_file_label text;
 -- Homepage slide card layout for the item: "right" and/or "compact" (see migration 012).
 alter table public.feed add column if not exists hero_card text;
+-- Homepage pictures per screen when they differ from the gallery: {"hd":[…],"hp":[…]} (migration 013).
+alter table public.feed add column if not exists hero_photos jsonb;
 
 create table if not exists public.coaches (
   id          bigint generated always as identity primary key,
@@ -142,6 +144,18 @@ create table if not exists public.committee_roles (
   updated_at  timestamptz not null default now()
 );
 
+-- Instagram row on the News page: a single row holding the Behold feed ID (behold.so serves
+-- the club's latest Instagram posts as JSON) and the post IDs an editor has chosen to hide.
+-- Posts show unless listed in hidden_posts, so new posts appear automatically.
+create table if not exists public.instagram_settings (
+  id            smallint primary key default 1,
+  feed_id       text,
+  hidden_posts  text[] not null default '{}',
+  updated_at    timestamptz not null default now(),
+  constraint instagram_settings_single_row check (id = 1)
+);
+insert into public.instagram_settings (id) values (1) on conflict (id) do nothing;
+
 -- Who may edit what. Rows are added by hand in the dashboard; there is no sign-up.
 -- feed_types limits which feed items a role may write (null = all of them).
 create table if not exists public.members (
@@ -172,6 +186,7 @@ language sql stable security definer set search_path = public as $$
         or (section = 'roles'     and m.role = 'volunteers')
         or (section = 'welfare'   and m.role = 'welfare')
         or (section = 'committee' and m.role = 'secretary')
+        or (section = 'instagram' and m.role in ('comms', 'socials'))
       )
   );
 $$;
@@ -183,6 +198,7 @@ alter table public.volunteer_roles enable row level security;
 alter table public.news_defaults   enable row level security;
 alter table public.welfare_page    enable row level security;
 alter table public.committee_roles enable row level security;
+alter table public.instagram_settings enable row level security;
 alter table public.members         enable row level security;
 
 -- Anyone may read published content; the public site uses the publishable key.
@@ -193,6 +209,7 @@ create policy "public read roles"     on public.volunteer_roles for select using
 create policy "public read pictures"  on public.news_defaults   for select using (true);
 create policy "public read welfare"   on public.welfare_page    for select using (true);
 create policy "public read committee" on public.committee_roles for select using (true);
+create policy "public read instagram" on public.instagram_settings for select using (true);
 
 -- Signed-in club accounts may see their own membership row (drives the members' area menu).
 create policy "read own membership" on public.members for select
@@ -218,6 +235,8 @@ create policy "welfare write" on public.welfare_page for all to authenticated
   using (public.can_edit('welfare')) with check (public.can_edit('welfare'));
 create policy "committee write" on public.committee_roles for all to authenticated
   using (public.can_edit('committee')) with check (public.can_edit('committee'));
+create policy "instagram write" on public.instagram_settings for all to authenticated
+  using (public.can_edit('instagram')) with check (public.can_edit('instagram'));
 
 create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $$
@@ -226,7 +245,7 @@ begin new.updated_at = now(); return new; end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['feed','coaches','squads','volunteer_roles','news_defaults','welfare_page','committee_roles'] loop
+  foreach t in array array['feed','coaches','squads','volunteer_roles','news_defaults','welfare_page','committee_roles','instagram_settings'] loop
     execute format('drop trigger if exists touch_%1$s on public.%1$I', t);
     execute format('create trigger touch_%1$s before update on public.%1$I
                     for each row execute function public.touch_updated_at()', t);

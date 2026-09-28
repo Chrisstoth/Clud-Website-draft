@@ -91,7 +91,7 @@ function renderMeets(){
     <p class="eyebrow">Next ${isHome(next)?"Basildon ":""}meet</p>
     <h3>${esc(next.title)}</h3>
     <div class="meta"><div>${esc(next.venue)}</div><div>${fmtDate(next.start)}${next.closing?` · entries close ${fmtDate(next.closing)}`:""}</div></div>
-    <div style="margin-top:16px"><a class="btn small" href="open-meets">Details &amp; entry pack</a></div>`
+    <div style="margin-top:12px"><a class="btn small" href="open-meets">Details &amp; entry pack</a></div>`
     :`<p class="eyebrow">Next Basildon meet</p><h3>Dates coming soon</h3>
     <div class="meta"><div>The next season's meets will be published here once confirmed.</div></div>`;
 }
@@ -378,13 +378,46 @@ document.querySelectorAll(".cat-arrow").forEach(btn=>{
   });
   row.addEventListener("scroll",()=>updateCatArrows(rowId));
 });
-window.addEventListener("resize",()=>["socialsList","compList","leagueList"].forEach(updateCatArrows));
+window.addEventListener("resize",()=>["socialsList","compList","leagueList","igList"].forEach(updateCatArrows));
+
+/* ================= INSTAGRAM ROW (News page) =================
+   The club's latest Instagram posts, drawn as our own cards rather than a foreign widget.
+   The feed ID and any hidden posts are set in the members' area (see core.js). Until a feed
+   is set -- or if Behold can't be reached -- the whole row stays hidden, so the page never
+   shows a broken or empty section. */
+function igCard(p){
+  const img=igPostImage(p),caption=igPostCaption(p),badge=igPostBadge(p);
+  const day=(p.timestamp||"").slice(0,10);
+  return `<article class="card social-card ig-card">
+    <a class="ig-photo" href="${esc(p.permalink)}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+      ${img?`<img src="${esc(img)}" alt="" loading="lazy">`:""}${badge?`<span class="ig-badge">${badge}</span>`:""}</a>
+    <div class="body">${day?`<div class="when"><time datetime="${esc(day)}">${esc(fmtDate(day))}</time></div>`:""}
+      <p class="ig-caption">${esc(caption)}</p>
+      <div><a class="btn small ghost" href="${esc(p.permalink)}" target="_blank" rel="noopener">View on Instagram →</a></div></div>
+  </article>`;
+}
+async function renderInstagram(){
+  const wrap=$("#igWrap");
+  if(!wrap)return;
+  try{
+    const {feedId,hidden}=await loadInstagramSettings();
+    if(!feedId)return;
+    const posts=(await fetchBeholdPosts(feedId)).filter(p=>!hidden.includes(p.id)).slice(0,IG_MAX_POSTS);
+    if(!posts.length)return;
+    $("#igList").innerHTML=posts.map(igCard).join("");
+    wrap.hidden=false;
+    updateCatArrows("igList");
+  }catch(e){console.warn("Instagram feed unavailable",e);}
+}
+renderInstagram();
 const HERO_SLIDE_BG=[
   "linear-gradient(160deg,rgba(16,16,20,.5),rgba(16,16,20,.1) 65%),repeating-linear-gradient(120deg,rgba(255,255,255,.05) 0 3px,transparent 3px 6px),linear-gradient(135deg,#3a5570,#1c2c3d)",
   "linear-gradient(160deg,rgba(16,16,20,.5),rgba(16,16,20,.1) 65%),repeating-linear-gradient(120deg,rgba(255,255,255,.05) 0 3px,transparent 3px 6px),linear-gradient(135deg,#4a5a3a,#1c2c22)",
   "linear-gradient(160deg,rgba(16,16,20,.5),rgba(16,16,20,.1) 65%),repeating-linear-gradient(120deg,rgba(255,255,255,.05) 0 3px,transparent 3px 6px),linear-gradient(135deg,#5a4a3a,#2c1c1c)"
 ];
 let heroIndex=0;
+const HERO_AUTO_MS=10000;
+let heroAutoTimer=null,heroHeld=false;
 let newsTagFilter=null;
 
 /* ================= NEWS TIMELINE =================
@@ -548,12 +581,18 @@ function renderHeroFeed(){
   $("#heroSlides").innerHTML=items.map((it,i)=>{
     const c=heroFeedContent(it);
     /* An article with a gallery shows all of it here, cross-fading (see cycleHeroPhotos);
-       anything else shows its single picture, or a club gradient if it has none. */
-    const layers=((it.photos||[]).length?it.photos:[c.img]).map(src=>resolveNewsImage(src,"hero")).filter(Boolean);
-    const media=layers.length?`<div class="hero-slide-media">${layers.map((r,j)=>
+       anything else shows its single picture, or a club gradient if it has none. Either screen
+       can have its own pictures instead (feed.hero_photos) -- then both sets are drawn and CSS
+       shows the one for the screen size. */
+    const base=(it.photos||[]).length?it.photos:[c.img];
+    const layersOf=list=>list.map(src=>resolveNewsImage(src,"hero")).filter(Boolean);
+    const mediaOf=(layers,cls)=>layers.length?`<div class="hero-slide-media${cls}">${layers.map((r,j)=>
       `<div class="hero-slide-photo${j===0?" show":""} ${r.cls}" style="${r.style}"></div>`).join("")}</div>`:"";
+    const own=it.heroPhotos||{};
+    const wide=layersOf(own.hd?.length?own.hd:base),narrow=layersOf(own.hp?.length?own.hp:base);
+    const media=own.hd?.length||own.hp?.length?mediaOf(wide," only-wide")+mediaOf(narrow," only-narrow"):mediaOf(wide,"");
     return `
-    <div class="hero-slide" style="background:${layers.length?"#101014":HERO_SLIDE_BG[i%HERO_SLIDE_BG.length]}">
+    <div class="hero-slide" style="background:${wide.length||narrow.length?"#101014":HERO_SLIDE_BG[i%HERO_SLIDE_BG.length]}">
       ${media}
       <div class="hero-news-card${heroCardClasses(it.heroCard)}">
         <p class="eyebrow">${esc(c.tag)}</p>
@@ -566,6 +605,7 @@ function renderHeroFeed(){
   $("#heroDots").innerHTML=items.map((_,i)=>`<button class="hero-dot" data-i="${i}" aria-label="Story ${i+1} of ${items.length}"></button>`).join("");
   heroIndex=0;
   updateHeroSlide();
+  restartHeroAuto();
 }
 function updateHeroSlide(){
   const n=$("#heroSlides").children.length;
@@ -589,21 +629,44 @@ function updateHeroSlide(){
   $("#heroPrev").disabled=heroIndex===0;
   $("#heroNext").disabled=heroIndex===n-1;
 }
-/* Only the slide in front cycles -- the ones either side are blurred out anyway. */
+/* Only the slide in front cycles -- the ones either side are blurred out anyway. Each set of
+   pictures in it (computer and phone, when they differ) steps on independently. */
 const HERO_PHOTO_MS=7000;
 function cycleHeroPhotos(){
   if(document.hidden)return;
-  const photos=[...document.querySelectorAll(".hero-slide.active .hero-slide-photo")];
-  if(photos.length<2)return;
-  const cur=photos.findIndex(el=>el.classList.contains("show"));
-  photos[cur]?.classList.remove("show");
-  photos[(cur+1)%photos.length].classList.add("show");
+  document.querySelectorAll(".hero-slide.active .hero-slide-media").forEach(media=>{
+    const photos=[...media.querySelectorAll(".hero-slide-photo")];
+    if(photos.length<2)return;
+    const cur=photos.findIndex(el=>el.classList.contains("show"));
+    photos[cur]?.classList.remove("show");
+    photos[(cur+1)%photos.length].classList.add("show");
+  });
+}
+/* The stories themselves step on every HERO_AUTO_MS, wrapping from the last back to the first.
+   It holds while the pointer or keyboard focus is on the strip (someone's reading or about to
+   click), and any manual move restarts the count so the next story doesn't jump in straight after. */
+function restartHeroAuto(){
+  clearInterval(heroAutoTimer);
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+  heroAutoTimer=setInterval(()=>{
+    const n=$("#heroSlides").children.length;
+    if(document.hidden||heroHeld||n<2)return;
+    heroIndex=(heroIndex+1)%n;
+    updateHeroSlide();
+  },HERO_AUTO_MS);
 }
 if($("#heroPhotoStrip")){
   if(!matchMedia("(prefers-reduced-motion: reduce)").matches)setInterval(cycleHeroPhotos,HERO_PHOTO_MS);
-  $("#heroPrev").addEventListener("click",()=>{heroIndex--;updateHeroSlide();});
-  $("#heroNext").addEventListener("click",()=>{heroIndex++;updateHeroSlide();});
-  $("#heroDots").addEventListener("click",e=>{const b=e.target.closest(".hero-dot");if(b){heroIndex=+b.dataset.i;updateHeroSlide();}});
+  $("#heroPrev").addEventListener("click",()=>{heroIndex--;updateHeroSlide();restartHeroAuto();});
+  $("#heroNext").addEventListener("click",()=>{heroIndex++;updateHeroSlide();restartHeroAuto();});
+  $("#heroDots").addEventListener("click",e=>{const b=e.target.closest(".hero-dot");if(b){heroIndex=+b.dataset.i;updateHeroSlide();restartHeroAuto();}});
+  const strip=$("#heroPhotoStrip");
+  /* mouse only: a tap on a phone fires an enter with no leave, which would stall it for good */
+  strip.addEventListener("pointerenter",e=>{if(e.pointerType==="mouse")heroHeld=true;});
+  strip.addEventListener("pointerleave",e=>{if(e.pointerType==="mouse"){heroHeld=false;restartHeroAuto();}});
+  /* keyboard focus only (:focus-visible) -- a tapped arrow keeps focus too, and shouldn't stop it */
+  strip.addEventListener("focusin",e=>{if(e.target.matches(":focus-visible"))heroHeld=true;});
+  strip.addEventListener("focusout",e=>{if(!strip.contains(e.relatedTarget)){heroHeld=false;restartHeroAuto();}});
   let heroResizeTimer;
   window.addEventListener("resize",()=>{clearTimeout(heroResizeTimer);heroResizeTimer=setTimeout(updateHeroSlide,100);});
 }
@@ -615,7 +678,7 @@ if($("#heroPhotoStrip")){
   strip.addEventListener("touchmove",e=>{if(!dragging)return;deltaX=e.touches[0].clientX-startX;},{passive:true});
   strip.addEventListener("touchend",()=>{if(!dragging)return;dragging=false;
     if(deltaX<-40)heroIndex++;else if(deltaX>40)heroIndex--;
-    deltaX=0;updateHeroSlide();});
+    deltaX=0;updateHeroSlide();restartHeroAuto();});
 })();
 (function(){
   const title=$("#heroTitle");

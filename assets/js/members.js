@@ -3,13 +3,13 @@ const ROLES = {
   meets:      {label:"Open Meets Secretary", desc:"Add club, external & team meets, entry packs & results", sections:["feed"], feedTypes:["meet","externalMeet","teamMeet"]},
   coaching:   {label:"Coaching Lead",        desc:"Edit coach profiles & squad timetables", sections:["coaches","squads"]},
   volunteers: {label:"Volunteer Coordinator",desc:"Edit volunteer role explainers",   sections:["roles"]},
-  socials:    {label:"Socials Team",         desc:"Add events, links & graphics",     sections:["feed"], feedTypes:["social"]},
-  comms:      {label:"Comms / Club News",    desc:"Post club news & announcements",   sections:["feed"], feedTypes:["news"]},
+  socials:    {label:"Socials Team",         desc:"Add events, links & graphics",     sections:["feed","instagram"], feedTypes:["social"]},
+  comms:      {label:"Comms / Club News",    desc:"Post club news & announcements",   sections:["feed","instagram"], feedTypes:["news"]},
   training:   {label:"Coaching / Training Changes", desc:"Post key training schedule changes", sections:["feed"], feedTypes:["training"]},
   membership: {label:"Membership Team",      desc:"View trial & squad enquiries",     sections:["enquiries"]},
   welfare:    {label:"Welfare Officer",      desc:"Edit the Welfare & Safeguarding page", sections:["welfare"]},
   secretary:  {label:"Club Secretary",       desc:"Edit the Club Committee page",     sections:["committee"]},
-  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","coaches","squads","roles","enquiries","newsDefaults","welfare","committee"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
+  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","instagram"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
 };
 const SECTION_META = {
   feed:{name:"Club Feed", empty:"Nothing published yet — add the first item."},
@@ -19,7 +19,8 @@ const SECTION_META = {
   enquiries:{name:"Trial Enquiries (inbox)", empty:"No enquiries yet — the public Join Us form feeds this inbox."},
   newsDefaults:{name:"Default News Pictures", empty:"No default picture categories yet."},
   welfare:{name:"Welfare & Safeguarding Page", empty:""},
-  committee:{name:"Club Committee", empty:"No committee roles yet."}
+  committee:{name:"Club Committee", empty:"No committee roles yet."},
+  instagram:{name:"Instagram on the News Page", empty:""}
 };
 /* One type per feed item; a role's feedTypes controls which of these it can add/see */
 const FEED_TYPE_META = {
@@ -138,6 +139,7 @@ const SCHEMAS = {
       ["linear-gradient(135deg,#d4551a,#101014)","Ember fade"]]},
     {k:"img",label:"Picture (optional, replaces card graphic)",type:"imagepicker"},
     {k:"photos",label:"Photo gallery (shown as a slideshow on the article page)",type:"gallery"},
+    {k:"heroPhotos",label:"Homepage pictures",type:"heropics"},
     {k:"body",label:"Full write-up (shown on the article page)",type:"richtext"}
   ],
   news:[
@@ -147,6 +149,7 @@ const SCHEMAS = {
     {k:"blurb",label:"Summary (shown in the news list and homepage)",type:"textarea",req:1},
     {k:"img",label:"Picture (thumbnail; used as the cover if there's no gallery yet)",type:"imagepicker"},
     {k:"photos",label:"Photo gallery (shown as a slideshow on the article page)",type:"gallery"},
+    {k:"heroPhotos",label:"Homepage pictures",type:"heropics"},
     {k:"body",label:"Article content",type:"richtext"}
   ],
   training:[
@@ -275,6 +278,10 @@ function renderAdminSection(){
   }
   if(sec==="welfare"){
     showWelfareForm();
+    return;
+  }
+  if(sec==="instagram"){
+    showInstagramSection();
     return;
   }
   const items=sec==="feed"?feedItemsForRole(role):DB[sec];
@@ -469,6 +476,12 @@ function showForm(sec,id,forcedType){
         <input type="hidden" name="${f.k}" id="imgHiddenInput" value="${val}">
       </div>`;
     }
+    if(f.type==="heropics"){
+      return `<div class="f">${f.label}
+        <p class="hint" style="margin:0">Normally the homepage slideshow uses the gallery above. If you've made a version of a picture that suits the homepage better — a wide banner for the slanted computer slide, say, or a squarer one for phones — give that screen its own pictures.</p>
+        <div class="hero-sets" id="heroSets">${["hd","hp"].map(k=>`<div class="hero-set" data-set="${k}"></div>`).join("")}</div>
+      </div>`;
+    }
     if(f.type==="gallery"){
       return `<div class="f">${f.label}
         <div class="gallery-picker">
@@ -507,18 +520,19 @@ function showForm(sec,id,forcedType){
     <div style="display:flex;gap:10px"><button class="btn" type="submit">${id?"Save & publish":"Publish"}</button>
     <button class="btn ghost" type="button" id="cancelForm">Cancel</button></div></form>`;
   formTarget.scrollIntoView({behavior:"smooth",block:"nearest"});
-  /* Opens the framing editor on a set of photos (the whole gallery, or the one picture), starting
-     at photo i. On a feed item it also carries the story's homepage card (its live text from this
-     form, and where it sits), since that card covers part of every photo the homepage shows for
-     the story. Returns the re-framed URLs, or null on cancel. */
-  const frame=async(urls,i=0)=>{
+  /* Opens the framing editor on a set of photos (the gallery, one screen's own homepage pictures,
+     or the one picture), starting at photo i, showing only the views those photos appear in. On
+     a feed item it also carries the story's homepage card (its live text from this form, and
+     where it sits), since that card covers part of every photo the homepage shows for the story.
+     Returns the re-framed URLs, or null on cancel. */
+  const frame=async(urls,i=0,views)=>{
     const cardInput=$("#heroCardInput");
     let card=null;
     if(cardInput){
       const live=Object.fromEntries(new FormData(formTarget.querySelector("#adminForm")).entries());
       card={...heroFeedContent({...live,type}),layout:cardInput.value};
     }
-    const res=await openFramingEditor(urls,i,card);
+    const res=await openFramingEditor(urls,i,card,views);
     if(!res)return null;
     if(cardInput)cardInput.value=res.layout;
     return res.urls;
@@ -527,6 +541,15 @@ function showForm(sec,id,forcedType){
      field follows the gallery rather than offering choices that would be thrown away. */
   const galleryField=SCHEMAS[schemaKey].find(f=>f.type==="gallery");
   let galleryPhotos=galleryField?[...(it.photos||[])]:null;
+  /* A homepage screen ("hd" computer, "hp" phone) can have its own pictures instead of the
+     gallery's. Switching back to "same as gallery" only sets them aside -- they come back if the
+     admin changes their mind before saving. An own set left empty also falls back to the gallery. */
+  const heroSetsField=SCHEMAS[schemaKey].find(f=>f.type==="heropics");
+  const heroSets={hd:[...(it.heroPhotos?.hd||[])],hp:[...(it.heroPhotos?.hp||[])]};
+  const heroOwn={hd:heroSets.hd.length>0,hp:heroSets.hp.length>0};
+  const heroUsed=k=>heroOwn[k]&&heroSets[k].length>0;
+  /* the views the gallery (or the single picture) actually shows up in */
+  const galleryViews=()=>FRAME_VIEWS.map(v=>v.key).filter(k=>!heroUsed(k));
   let syncPicture=()=>{};
   let setGallery=()=>{};
   const imgHidden=$("#imgHiddenInput");
@@ -551,11 +574,11 @@ function showForm(sec,id,forcedType){
     };
     $("#imgFrameBtn")?.addEventListener("click",async()=>{
       if(galleryPhotos?.length){
-        const framed=await frame(galleryPhotos,0);
+        const framed=await frame(galleryPhotos,0,galleryViews());
         if(framed)setGallery(framed);
         return;
       }
-      const framed=await frame([imgHidden.value]);
+      const framed=await frame([imgHidden.value],0,galleryViews());
       if(framed){imgHidden.value=framed[0];setPreview(framed[0]);}
     });
     formTarget.querySelectorAll(".img-swatch").forEach(btn=>{
@@ -606,7 +629,7 @@ function showForm(sec,id,forcedType){
       if(del){galleryPhotos.splice(+del.dataset.photoDel,1);renderGalleryThumbs();return;}
       const frameBtn=e.target.closest("[data-photo-frame]");
       if(!frameBtn)return;
-      const framed=await frame(galleryPhotos,+frameBtn.dataset.photoFrame);
+      const framed=await frame(galleryPhotos,+frameBtn.dataset.photoFrame,galleryViews());
       if(framed)setGallery(framed);
     });
     $("#galleryAddInput").addEventListener("change",async e=>{
@@ -620,6 +643,49 @@ function showForm(sec,id,forcedType){
       }
       label.firstChild.nodeValue=original;
       e.target.value="";
+    });
+  }
+  if(heroSetsField){
+    const SET_LABELS={hd:"On a computer — the wide, slanted slide",hp:"On a phone"};
+    const renderHeroSet=k=>{
+      const own=heroOwn[k],list=heroSets[k];
+      formTarget.querySelector(`.hero-set[data-set="${k}"]`).innerHTML=`<div class="hero-set-head">
+          <span class="hero-set-title">${SET_LABELS[k]}</span>
+          <span class="frame-seg"><button type="button" data-set-mode="" class="${own?"":"on"}">Same as gallery</button><button type="button" data-set-mode="own" class="${own?"on":""}">Own pictures</button></span>
+        </div>
+        ${own?`<div class="gallery-thumbs">${list.length?list.map((url,i)=>
+          `<div class="gallery-thumb"><img src="${esc(url)}" alt="" style="${photoImgStyle(withFraming(url,{...imgFraming(url),ad:imgFraming(url)[k]}))}">
+            <button type="button" class="gallery-thumb-del" data-set-del="${i}" aria-label="Remove this photo">×</button>
+            <button type="button" class="gallery-thumb-frame" data-set-frame="${i}">Frame</button></div>`).join("")
+          :`<p class="hint" style="margin:0">No pictures yet — the gallery is used here until you add some.</p>`}</div>
+        <label class="img-upload-btn">Add photos<input type="file" accept="image/*" multiple data-set-add style="display:none"></label>`:""}`;
+    };
+    ["hd","hp"].forEach(renderHeroSet);
+    $("#heroSets").addEventListener("click",async e=>{
+      const box=e.target.closest(".hero-set");if(!box)return;
+      const k=box.dataset.set;
+      const mode=e.target.closest("[data-set-mode]");
+      if(mode){heroOwn[k]=!!mode.dataset.setMode;return renderHeroSet(k);}
+      const del=e.target.closest("[data-set-del]");
+      if(del){heroSets[k].splice(+del.dataset.setDel,1);return renderHeroSet(k);}
+      const fb=e.target.closest("[data-set-frame]");
+      if(fb){
+        const framed=await frame(heroSets[k],+fb.dataset.setFrame,[k]);
+        if(framed){heroSets[k]=framed;renderHeroSet(k);}
+      }
+    });
+    $("#heroSets").addEventListener("change",async e=>{
+      if(!e.target.matches("[data-set-add]"))return;
+      const k=e.target.closest(".hero-set").dataset.set;
+      const files=[...e.target.files];
+      if(!files.length)return;
+      const label=e.target.closest("label");
+      label.firstChild.nodeValue="Uploading…";
+      for(const file of files){
+        try{heroSets[k].push(await uploadImage(file));}
+        catch(err){toast(err.message||"Couldn't upload that photo");}
+      }
+      renderHeroSet(k);
     });
   }
   const rteEditor=$("#rteEditor");
@@ -672,6 +738,10 @@ function showForm(sec,id,forcedType){
     }
     if(isFeed)data.type=type;
     if(galleryField)data.photos=galleryPhotos;
+    if(heroSetsField){
+      const own=Object.fromEntries(["hd","hp"].filter(heroUsed).map(k=>[k,heroSets[k]]));
+      data.heroPhotos=Object.keys(own).length?own:null;
+    }
     if(rteEditor)data.body=sanitizeArticleHtml(rteEditor.innerHTML);
     if(galleryField&&galleryPhotos.length)data.img=galleryPhotos[0];
     if(!id&&sec==="newsDefaults"){
@@ -719,10 +789,12 @@ function showArticlePreview(it){
    for that screen too (side and size on a computer, top/bottom and size on a phone). A gallery
    is framed as a set: the strip along the top switches photo. Framing is stored on each photo's
    URL (imgFraming in core.js), the card layout on the story (feed.hero_card, see
-   heroCardClasses). Resolves to {urls, layout}, or null if they cancel. */
+   heroCardClasses). "only" limits the tabs to the views these photos are actually used in -- a
+   computer-only homepage picture has nothing to frame for phones or the article page.
+   Resolves to {urls, layout}, or null if they cancel. */
 const isUploadedPhoto=v=>!!v&&!String(v).startsWith("default:");
 /* A real slide's size in px (see .hero-slide in site.css): drawn at that size, then scaled to fit. */
-const HERO_REPLICAS={hd:{w:900,h:420,cls:"frame-hero-desk"},hp:{w:360,h:340,cls:"frame-hero-phone"}};
+const HERO_REPLICAS={hd:{w:900,h:520,cls:"frame-hero-desk"},hp:{w:360,h:340,cls:"frame-hero-phone"}};
 const ARTICLE_RATIOS={ad:"16/10",ap:"4/3"};
 /* The homepage card's options on each screen. Each row switches one hero_card word on or off. */
 const CARD_OPTIONS={
@@ -748,11 +820,12 @@ function framePreviewHtml(view,card){
     </div>
   </div>`;
 }
-function openFramingEditor(urls,start,card){
+function openFramingEditor(urls,start,card,only){
   return new Promise(resolve=>{
     const frames=urls.map(u=>({url:u,v:imgFraming(u)}));
     let cur=Math.max(0,Math.min(start||0,frames.length-1));
-    let view="hd";
+    const views=FRAME_VIEWS.filter(v=>!only||only.includes(v.key));
+    let view=views[0].key;
     const fr=()=>frames[cur].v[view];
     const layout=new Set(String(card?.layout||"").split(/\s+/).filter(t=>HERO_CARD_TOKENS.includes(t)));
     let overlay=document.getElementById("framingOverlay");
@@ -773,7 +846,7 @@ function openFramingEditor(urls,start,card){
       <div class="frame-body">
         ${frames.length>1?`<div class="frame-strip" id="frameStrip">${frames.map((f,i)=>
           `<button type="button" data-photo="${i}" aria-label="Photo ${i+1}"><img src="${esc(String(f.url).split("#")[0])}" alt="" style="${photoImgStyle(f.url)}"></button>`).join("")}</div>`:""}
-        <div class="frame-seg frame-seg-views" role="tablist">${FRAME_VIEWS.map(v=>`<button type="button" role="tab" data-view="${v.key}">${v.label}</button>`).join("")}</div>
+        <div class="frame-seg frame-seg-views" role="tablist">${views.map(v=>`<button type="button" role="tab" data-view="${v.key}">${v.label}</button>`).join("")}</div>
         <div id="framePreview"></div>
         <div class="frame-card-opts" id="frameCardOpts"></div>
         <div class="frame-controls">
@@ -786,7 +859,7 @@ function openFramingEditor(urls,start,card){
           </div>
           <label class="f checkbox-f"><input type="checkbox" id="frameFit"> Show the whole photo, uncropped</label>
           <p class="hint" style="margin:-10px 0 0">Best for posters, logos and anything with writing on it. Any gap around the photo is filled in black.</p>
-          <button type="button" class="frame-copy" id="frameCopy">Use this photo framing for all four views</button>
+          ${views.length>1?`<button type="button" class="frame-copy" id="frameCopy">Use this photo framing for all ${views.length===4?"four":views.length} views</button>`:""}
         </div>
       </div>
     </div>`;
@@ -871,8 +944,8 @@ function openFramingEditor(urls,start,card){
       if(tab)return showView(tab.dataset.view);
       if(e.target.closest("#frameCopy")){
         const f=fr();
-        for(const v of FRAME_VIEWS)frames[cur].v[v.key]={...f};
-        toast("Photo framing copied to all four views");
+        for(const v of views)frames[cur].v[v.key]={...f};
+        toast("Photo framing copied to every view");
         return draw();
       }
       const opt=e.target.closest("[data-token]");
@@ -974,6 +1047,105 @@ function showWelfarePreview(body){
   </div>`;
   overlay.classList.add("open");
   document.getElementById("previewClose").addEventListener("click",()=>overlay.classList.remove("open"));
+}
+
+/* ================= INSTAGRAM =================
+   Not a list of items like the other sections: one setting (which Behold feed to read) plus a
+   tick per post. The table stores the posts that are HIDDEN rather than the ones shown, so
+   anything newly posted on Instagram goes on the News page without anyone visiting here. */
+const IG_SETUP_HTML=`<ol>
+  <li><strong>Make the club's Instagram a professional account</strong> (skip this if it already is). In the Instagram app: <em>Settings → Account type and tools → Switch to professional account</em>, and pick Business or Creator. It's free and followers won't notice any difference.</li>
+  <li>Go to <a href="https://behold.so" target="_blank" rel="noopener">behold.so</a> and sign up for a free account.</li>
+  <li>Connect <strong>@basildonphoenix_swim</strong>. Behold sends you to Instagram (or Facebook, if the account is linked to a Facebook Page) to sign in with the club's login and approve access.</li>
+  <li>Create a feed for that account. When it asks what kind, choose <strong>JSON</strong>, not a widget. The website draws the cards itself so they match the rest of the site.</li>
+  <li>In the feed's settings, set the number of posts as high as the plan allows, so there are still plenty to show if you hide a few.</li>
+  <li>Copy the feed link (it looks like <code>https://feeds.behold.so/AbC123xyz</code>), paste it in the box below and press <em>Save feed link</em>.</li>
+</ol>
+<p><strong>After that:</strong></p>
+<ul>
+  <li>New posts appear on the News page by themselves. Behold checks Instagram on a schedule, so a new post can take up to about a day to show on the free plan.</li>
+  <li>To keep a post off the website, untick it in the list below. It stays on Instagram; this only changes our site.</li>
+  <li>If posts stop updating (for example after the Instagram password changes), sign in to Behold and reconnect the account.</li>
+</ul>`;
+async function showInstagramSection(){
+  const main=$("#adminMain"),name=SECTION_META.instagram.name;
+  main.innerHTML=`<h2>${name}</h2><p style="color:var(--muted);margin-top:16px">Loading…</p>`;
+  let settings;
+  try{settings=await loadInstagramSettings();}
+  catch(e){
+    if(adminSection!=="instagram")return;
+    main.innerHTML=`<h2>${name}</h2>
+      <div class="admin-note">The Instagram settings haven't been set up in the database yet. The webmaster needs to run <code>supabase/migrations/014_instagram_settings.sql</code> in the Supabase SQL Editor. (${esc(e.message||e)})</div>`;
+    return;
+  }
+  /* the loads above are async -- if someone clicked another section meanwhile, leave it be */
+  if(adminSection!=="instagram")return;
+  let hidden=settings.hidden;
+  const feedUrl=settings.feedId?`https://feeds.behold.so/${settings.feedId}`:"";
+  main.innerHTML=`<h2>${name}</h2>
+    <div class="admin-note">The News page shows the club's latest Instagram posts as a row of cards, brought in automatically through a free service called Behold. New posts are shown by default; untick any you'd rather keep off the website. Changes publish straight away.</div>
+    <details class="ig-setup"${settings.feedId?"":" open"}>
+      <summary>How to connect the club's Instagram (one-off setup)</summary>
+      <div class="ig-setup-body">${IG_SETUP_HTML}</div>
+    </details>
+    <form class="stack" id="igFeedForm" style="margin-top:22px">
+      <label class="f">Behold feed link<input name="feed" value="${esc(feedUrl)}" placeholder="https://feeds.behold.so/…" autocomplete="off"></label>
+      <p class="hint" style="margin-top:-8px">Paste the whole link or just the code at the end. Clear the box and save to turn the Instagram row off.</p>
+      <div><button class="btn" type="submit">Save feed link</button></div>
+    </form>
+    <h3 class="admin-sub">Posts</h3>
+    <div id="igPosts">${settings.feedId?`<p style="color:var(--muted)">Loading posts from Instagram…</p>`
+      :`<p style="color:var(--muted)">Once the feed link is saved, the latest posts appear here, each with a tick to show or hide it.</p>`}</div>`;
+
+  $("#igFeedForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const raw=e.target.feed.value.trim(),id=beholdFeedId(raw);
+    if(raw&&!id)return toast("That doesn't look like a Behold feed link");
+    const btn=e.target.querySelector('button[type="submit"]');
+    btn.disabled=true;
+    try{
+      /* check the feed actually answers before publishing it, so a typo can't blank the row */
+      if(id)await fetchBeholdPosts(id);
+      const {error}=await sb.from("instagram_settings").upsert({id:1,feed_id:id||null});
+      if(error)throw new Error(saveErrorMessage(error));
+      toast(id?"Feed saved — Instagram posts are now on the News page":"Instagram row turned off");
+      showInstagramSection();
+    }catch(err){toast(err.message||"Couldn't save the feed link");btn.disabled=false;}
+  });
+
+  if(!settings.feedId)return;
+  const list=$("#igPosts");
+  let posts;
+  try{posts=await fetchBeholdPosts(settings.feedId);}
+  catch(e){list.innerHTML=`<p style="color:var(--muted)">Couldn't load the posts from Behold: ${esc(e.message)}. Check the feed link above, or try again later.</p>`;return;}
+  if(!posts.length){list.innerHTML=`<p style="color:var(--muted)">Behold hasn't returned any posts yet. If the account was only just connected, give it a little while.</p>`;return;}
+  list.innerHTML=`<p class="hint" style="margin-bottom:12px">Newest first. The News page shows the newest ${IG_MAX_POSTS} ticked posts.</p>`+posts.map(p=>{
+    const img=igPostImage(p),badge=igPostBadge(p),day=(p.timestamp||"").slice(0,10),shown=!hidden.includes(p.id);
+    return `<div class="item-row ig-admin-row${shown?"":" is-hidden"}">
+      <div class="ig-admin-post">
+        ${img?`<img src="${esc(img)}" alt="" loading="lazy">`:`<span class="ig-admin-noimg"></span>`}
+        <div><div class="t">${day?esc(fmtDate(day)):"Instagram post"}${badge?` · ${badge}`:""}</div>
+          <div class="s ig-admin-caption">${esc(igPostCaption(p))||"<em>No caption</em>"}</div>
+          <a class="s" href="${esc(p.permalink)}" target="_blank" rel="noopener">Open on Instagram ↗</a></div>
+      </div>
+      <label class="f checkbox-f"><input type="checkbox" data-ig-post="${esc(p.id)}"${shown?" checked":""}> Show on website</label>
+    </div>`;
+  }).join("");
+  /* Saves are queued one after another so two quick ticks can't each start from the same old
+     list and undo each other. */
+  let queue=Promise.resolve();
+  list.addEventListener("change",e=>{
+    const box=e.target.closest("[data-ig-post]");if(!box)return;
+    const id=box.dataset.igPost,show=box.checked,row=box.closest(".ig-admin-row");
+    row.classList.toggle("is-hidden",!show);
+    queue=queue.then(async()=>{
+      const next=show?hidden.filter(h=>h!==id):[...new Set([...hidden,id])];
+      const {error}=await sb.from("instagram_settings").upsert({id:1,hidden_posts:next});
+      if(error){box.checked=!show;row.classList.toggle("is-hidden",show);return toast(saveErrorMessage(error));}
+      hidden=next;
+      toast(show?"Showing on the News page":"Hidden from the News page");
+    });
+  });
 }
 
 /* Photos go to the shared image store, so every visitor loads the same file rather than a
