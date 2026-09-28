@@ -25,12 +25,12 @@ const SECTION_META = {
 };
 /* One type per feed item; a role's feedTypes controls which of these it can add/see */
 const FEED_TYPE_META = {
-  meet:{label:"Open Meet — hosted by BPSC"},
-  externalMeet:{label:"Open Meet — other host (e.g. county champs)"},
-  teamMeet:{label:"Team Meet (e.g. Arena League, Essex League)"},
-  social:{label:"Social / Event"},
-  news:{label:"Club News"},
-  training:{label:"Key Training Change"}
+  meet:{label:"Open Meet — hosted by BPSC",short:"BPSC Open Meets"},
+  externalMeet:{label:"Open Meet — other host (e.g. county champs)",short:"Other Open Meets"},
+  teamMeet:{label:"Team Meet (e.g. Arena League, Essex League)",short:"Team Meets"},
+  social:{label:"Social / Event",short:"Socials"},
+  news:{label:"Club News",short:"Club News"},
+  training:{label:"Key Training Change",short:"Training Changes"}
 };
 
 
@@ -173,6 +173,9 @@ const SCHEMAS = {
    tampered page still cannot write anything this account isn't allowed to. */
 let session=null;
 let adminSection=null, editingId=null;
+/* Club Feed list filter: item type and (for Club News) category tag; "" means all. Kept across
+   saves so the list doesn't jump back to everything after each edit. */
+let feedFilter={type:"",tag:""};
 
 function renderLogin(message){
   $("#whoAmI").innerHTML="";
@@ -300,17 +303,34 @@ function renderAdminSection(){
       <button class="btn small dangerous" data-del="${it.id}">Delete</button></div></div>
       <div class="edit-slot" id="editSlot-${it.id}"></div>
       </div>`;};
+  /* Feed: filter chips for type (when the role has more than one) and Club News category, then
+     upcoming in date order, anything whose last day has passed in its own section below (most recent first) */
+  const feedListHtml=()=>{
+    const galasOnly=role.feedTypes.every(t=>MEET_TYPES.includes(t));
+    if(feedFilter.type&&!role.feedTypes.includes(feedFilter.type))feedFilter={type:"",tag:""};
+    const newsShown=role.feedTypes.includes("news")&&(feedFilter.type==="news"||role.feedTypes.length===1);
+    const tags=newsShown?[...new Set(items.filter(it=>it.type==="news"&&it.tag).map(it=>it.tag))].sort((a,b)=>a.localeCompare(b)):[];
+    if(!tags.includes(feedFilter.tag))feedFilter.tag="";
+    const chip=(attr,val,label,n,on)=>`<button type="button" class="news-tag-chip${on?" active":""}" ${attr}="${esc(val)}">${esc(label)} <span class="chip-n">${n}</span></button>`;
+    const typeChips=role.feedTypes.length>1?`<div class="news-tag-chips admin-filter" id="feedTypeChips">
+        ${chip("data-ftype","","All",items.length,!feedFilter.type)}
+        ${role.feedTypes.map(t=>[t,items.filter(it=>it.type===t).length]).filter(([t,n])=>n||feedFilter.type===t)
+          .map(([t,n])=>chip("data-ftype",t,FEED_TYPE_META[t].short,n,feedFilter.type===t)).join("")}</div>`:"";
+    const newsItems=items.filter(it=>it.type==="news");
+    const tagChips=tags.length>1?`<div class="news-tag-chips admin-filter" id="feedTagChips"><span class="admin-filter-label">Category</span>
+        ${chip("data-ftag","","All",newsItems.length,!feedFilter.tag)}
+        ${tags.map(t=>chip("data-ftag",t,t,newsItems.filter(it=>it.tag===t).length,feedFilter.tag===t)).join("")}</div>`:"";
+    const shown=items.filter(it=>(!feedFilter.type||it.type===feedFilter.type)&&(!feedFilter.tag||it.tag===feedFilter.tag));
+    const byDate=[...shown].sort((a,b)=>(a.start||"").localeCompare(b.start||""));
+    const upcoming=byDate.filter(it=>!it.start||!meetDone(it)),past=byDate.filter(it=>it.start&&meetDone(it)).reverse();
+    return `${typeChips}${tagChips}
+      <h3 class="admin-sub">${galasOnly?"Upcoming galas":"Upcoming"}</h3>
+      ${upcoming.length?upcoming.map(rowHtml).join(""):`<p style="color:var(--muted)">Nothing upcoming${shown.length<items.length?" matching this filter":""}.</p>`}
+      ${past.length?`<h3 class="admin-sub">${galasOnly?"Past galas":"Past items"}</h3>${past.map(rowHtml).join("")}`:""}`;
+  };
   let listHtml;
   if(!items.length)listHtml=`<p style="color:var(--muted)">${SECTION_META[sec].empty}</p>`;
-  else if(sec==="feed"){
-    /* Feed: upcoming in date order, anything whose last day has passed in its own section below (most recent first) */
-    const galasOnly=role.feedTypes.every(t=>MEET_TYPES.includes(t));
-    const byDate=[...items].sort((a,b)=>(a.start||"").localeCompare(b.start||""));
-    const upcoming=byDate.filter(it=>!it.start||!meetDone(it)),past=byDate.filter(it=>it.start&&meetDone(it)).reverse();
-    listHtml=`<h3 class="admin-sub">${galasOnly?"Upcoming galas":"Upcoming"}</h3>
-      ${upcoming.length?upcoming.map(rowHtml).join(""):`<p style="color:var(--muted)">Nothing upcoming.</p>`}
-      ${past.length?`<h3 class="admin-sub">${galasOnly?"Past galas":"Past items"}</h3>${past.map(rowHtml).join("")}`:""}`;
-  }
+  else if(sec==="feed")listHtml=feedListHtml();
   else listHtml=items.map(rowHtml).join("");
   main.innerHTML=`<h2>${SECTION_META[sec].name}</h2>
     <div class="admin-note">${note}</div>
@@ -327,6 +347,15 @@ function renderAdminSection(){
     /* The edit form opens inside this list, so its own buttons bubble up to here -- they must
        never be mistaken for the list's Edit/Delete buttons. */
     if(e.target.closest("#adminForm"))return;
+    /* Filter chips redraw just the list, closing any edit form open inside it */
+    const fchip=e.target.closest("[data-ftype],[data-ftag]");
+    if(fchip){
+      if(fchip.dataset.ftype!==undefined)feedFilter={type:fchip.dataset.ftype,tag:""};
+      else feedFilter.tag=fchip.dataset.ftag;
+      editingId=null;
+      $("#itemList").innerHTML=feedListHtml();
+      return;
+    }
     const ed=e.target.closest("[data-edit]"),del=e.target.closest("[data-del]");
     if(ed){
       const clickedId=+ed.dataset.edit,wasOpen=editingId===clickedId;

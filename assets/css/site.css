@@ -1112,6 +1112,12 @@ footer.site a:hover{color:var(--ember)}
 .item-block{margin-bottom:12px}
 .admin-sub{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:26px 0 10px}
 #itemList>.admin-sub:first-child{margin-top:0}
+/* Club Feed filter rows: the News page's tag chips, a touch smaller, with a count in each */
+.admin-filter{gap:8px;margin:0 0 12px;align-items:center}
+.admin-filter .news-tag-chip{font-size:.72rem;padding:7px 14px}
+.admin-filter .chip-n{opacity:.6;font-weight:600;margin-left:3px}
+.admin-filter-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-right:4px}
+.admin-filter+.admin-sub{margin-top:22px}
 .item-block .item-row{margin-bottom:0}
 .item-block:has(.edit-slot:not(:empty)) .item-row{border-radius:12px 12px 0 0;border-bottom-color:transparent}
 .item-row{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap}
