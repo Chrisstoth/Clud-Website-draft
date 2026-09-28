@@ -1360,6 +1360,16 @@ button.img-upload-btn{background:none;font-family:inherit}
 .library-item.on .library-num{display:flex}
 .library-date{position:absolute;left:0;right:0;bottom:0;padding:3px 0;background:rgba(16,16,20,.72);color:#fff;font-size:.68rem;text-align:center}
 .library-more{justify-self:start}
+/* Manage Images section (showImagesSection in members.js) */
+.img-manage-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin-bottom:14px}
+.img-manage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}
+.img-manage-card{display:flex;flex-direction:column;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+.img-manage-thumb{display:block;aspect-ratio:4/3;border-radius:8px;overflow:hidden;background:#101014}
+.img-manage-thumb img{width:100%;height:100%;object-fit:cover;display:block;margin:0;border-radius:0}
+.img-manage-info{flex:1;display:grid;gap:4px;font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
+.img-manage-uses b{color:var(--text)}
+.img-manage-unused{font-style:italic}
+.img-manage-card .btn{align-self:flex-start}
 @media(max-width:640px){.library-body{padding:16px 16px 24px}.library-grid{grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px}}
 
 /* framing editor (openFramingEditor in members.js) */
@@ -1472,6 +1482,21 @@ button.img-upload-btn{background:none;font-family:inherit}
 .mission-item p{color:var(--body2);font-size:.95rem}
 .mission-foot{margin-top:24px;color:var(--muted);font-size:.95rem}
 body.theme-dark .page-tabs button.active{color:#101014}
+
+/* ---------- member guides ----------
+   Four guides as .page-tabs over one full-width panel. Four labels don't fit one row on a
+   phone, so below 680px the switch becomes a 2x2 grid instead of squeezing the text. */
+.guide-tabs{flex-wrap:wrap}
+@media(max-width:680px){.guide-tabs{display:grid;grid-template-columns:1fr 1fr;width:100%}.guide-tabs button{padding:11px 6px;font-size:.88rem}}
+.guide-panel{padding:30px 32px}
+.guide-panel h3{font-size:1.35rem}
+.guide-intro{margin-top:8px;color:var(--muted)}
+/* the steps flow into columns so a guide uses the width rather than one long narrow list */
+.guide-lines{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));column-gap:34px;margin-top:14px;color:var(--muted);font-size:.95rem}
+.guide-lines .link-line{padding:14px 0;border-top:1px solid var(--line)}
+.guide-lines a{font-weight:700;color:var(--flame-dark);text-decoration:underline;text-underline-offset:3px}
+.guide-lines a:hover{color:var(--flame)}
+@media(max-width:520px){.guide-panel{padding:22px 18px}}
 body.theme-dark .mission-num{opacity:.75}
 
 /* The timeline rail is a lane rope stood on its end: same flame/ink alternation as .lane-rope,

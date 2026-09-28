@@ -9,7 +9,7 @@ const ROLES = {
   membership: {label:"Membership Team",      desc:"View trial & squad enquiries",     sections:["enquiries"]},
   welfare:    {label:"Welfare Officer",      desc:"Edit the Welfare & Safeguarding page", sections:["welfare"]},
   secretary:  {label:"Club Secretary",       desc:"Edit the Club Committee page",     sections:["committee"]},
-  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","instagram"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
+  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","instagram","images"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
 };
 const SECTION_META = {
   feed:{name:"Club Feed", empty:"Nothing published yet — add the first item."},
@@ -20,7 +20,8 @@ const SECTION_META = {
   newsDefaults:{name:"Default News Pictures", empty:"No default picture categories yet."},
   welfare:{name:"Welfare & Safeguarding Page", empty:""},
   committee:{name:"Club Committee", empty:"No committee roles yet."},
-  instagram:{name:"Instagram on the News Page", empty:""}
+  instagram:{name:"Instagram on the News Page", empty:""},
+  images:{name:"Manage Images", empty:""}
 };
 /* One type per feed item; a role's feedTypes controls which of these it can add/see */
 const FEED_TYPE_META = {
@@ -282,6 +283,10 @@ function renderAdminSection(){
   }
   if(sec==="instagram"){
     showInstagramSection();
+    return;
+  }
+  if(sec==="images"){
+    showImagesSection();
     return;
   }
   const items=sec==="feed"?feedItemsForRole(role):DB[sec];
@@ -1096,6 +1101,89 @@ const IG_SETUP_HTML=`<ol>
   <li>To keep a post off the website, untick it in the list below. It stays on Instagram; this only changes our site.</li>
   <li>If posts stop updating (for example after the Instagram password changes), sign in to Behold and reconnect the account.</li>
 </ul>`;
+/* ================= MANAGE IMAGES =================
+   Every photo in the image store, with where each one is used, so the webmaster can clear out
+   ones nothing needs. A photo is "used" when its file name appears anywhere in the site's
+   content -- a card picture, gallery, homepage set, article text, coach or committee photo. */
+function photoUses(name){
+  const uses=[];
+  const has=it=>JSON.stringify(it).includes(name);
+  for(const it of DB.feed)if(has(it))uses.push(`${FEED_TYPE_META[it.type]?.label.split(" — ")[0]||"Feed"}: ${it.title}`);
+  for(const it of DB.coaches)if(has(it))uses.push(`Coach: ${it.name}`);
+  for(const it of DB.committee)if(has(it))uses.push(`Committee: ${it.title}`);
+  for(const it of DB.newsDefaults)if(has(it))uses.push(`Default news picture: ${it.label}`);
+  if(DB.welfare.some(has))uses.push("Welfare & Safeguarding page");
+  for(const k of ["squads","roles"])if(DB[k].some(has))uses.push(SECTION_META[k].name);
+  return uses;
+}
+async function listAllImages(){
+  const store=sb.storage.from("site-images"),all=[];
+  for(let offset=0;;offset+=100){
+    const {data,error}=await store.list("",{limit:100,offset,sortBy:{column:"created_at",order:"desc"}});
+    if(error)throw error;
+    all.push(...data.filter(f=>f.id&&!f.name.startsWith(".")));
+    if(data.length<100)return all;
+  }
+}
+async function showImagesSection(){
+  const main=$("#adminMain"),name=SECTION_META.images.name;
+  main.innerHTML=`<h2>${name}</h2><p style="color:var(--muted);margin-top:16px">Loading…</p>`;
+  let files;
+  try{files=await listAllImages();}
+  catch(e){
+    if(adminSection!=="images")return;
+    main.innerHTML=`<h2>${name}</h2><div class="admin-note">Couldn't load the photos: ${esc(saveErrorMessage(e))}</div>`;
+    return;
+  }
+  if(adminSection!=="images")return;
+  const store=sb.storage.from("site-images");
+  const photos=files.map(f=>({name:f.name,url:store.getPublicUrl(f.name).data.publicUrl,day:fmtDate((f.created_at||"").slice(0,10)),uses:photoUses(f.name)}));
+  let unusedOnly=false;
+  main.innerHTML=`<h2>${name}</h2>
+    <div class="admin-note">Every photo uploaded to the site, newest first. Deleting one removes it for good — anywhere it's still used will show a gap instead, so check the <b>Used in</b> list first.</div>
+    <div id="imgManager"></div>`;
+  const box=$("#imgManager");
+  const render=()=>{
+    const unused=photos.filter(p=>!p.uses.length).length;
+    const shown=unusedOnly?photos.filter(p=>!p.uses.length):photos;
+    box.innerHTML=`<div class="img-manage-bar">
+        <span class="hint" style="margin:0">${photos.length} photo${photos.length===1?"":"s"} · ${unused} not used anywhere</span>
+        <label class="f checkbox-f"><input type="checkbox" id="imgUnusedOnly"${unusedOnly?" checked":""}> Only show unused photos</label>
+      </div>
+      ${shown.length?`<div class="img-manage-grid">${shown.map(p=>`<div class="img-manage-card">
+          <a href="${esc(p.url)}" target="_blank" rel="noopener" class="img-manage-thumb"><img src="${esc(p.url)}" alt="" loading="lazy"></a>
+          <div class="img-manage-info">
+            <div class="s">Uploaded ${esc(p.day)}</div>
+            ${p.uses.length?`<div class="s img-manage-uses"><b>Used in:</b> ${p.uses.map(esc).join("; ")}</div>`:`<div class="s img-manage-unused">Not used anywhere</div>`}
+          </div>
+          <button type="button" class="btn small dangerous" data-img-del="${esc(p.name)}">Delete</button>
+        </div>`).join("")}</div>`
+      :`<p style="color:var(--muted)">${photos.length?"Every photo is in use.":"No photos have been uploaded yet."}</p>`}`;
+  };
+  render();
+  box.addEventListener("change",e=>{if(e.target.id==="imgUnusedOnly"){unusedOnly=e.target.checked;render();}});
+  box.addEventListener("click",async e=>{
+    const btn=e.target.closest("[data-img-del]");if(!btn)return;
+    const photo=photos.find(p=>p.name===btn.dataset.imgDel);
+    const warning=photo.uses.length
+      ?`This photo is still used in:\n\n• ${photo.uses.join("\n• ")}\n\nDeleting it will leave a gap in those places. Delete it anyway?`
+      :"Delete this photo for good? This can't be undone.";
+    if(!confirm(warning))return;
+    btn.disabled=true;
+    btn.textContent="Deleting…";
+    /* a refused delete comes back as an empty list rather than an error */
+    const {data,error}=await store.remove([photo.name]);
+    if(error||!data?.length){
+      btn.disabled=false;
+      btn.textContent="Delete";
+      return toast(error?saveErrorMessage(error):"Your account isn't allowed to delete photos. Ask the webmaster if this looks wrong.");
+    }
+    photos.splice(photos.indexOf(photo),1);
+    render();
+    toast("Photo deleted");
+  });
+}
+
 async function showInstagramSection(){
   const main=$("#adminMain"),name=SECTION_META.instagram.name;
   main.innerHTML=`<h2>${name}</h2><p style="color:var(--muted);margin-top:16px">Loading…</p>`;
