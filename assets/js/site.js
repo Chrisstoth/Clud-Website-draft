@@ -569,15 +569,29 @@ document.addEventListener("click",e=>{
 });
 
 /* Hero carousel: pulls across the whole feed (meets, socials, news) so it reads as one connected
-   "what's happening" strip rather than club news alone — sorted by closeness to today's date. */
+   "what's happening" strip rather than club news alone. Two kinds of item, two rules:
+   - events (meets, socials, training changes -- and a news story written ahead of its date,
+     e.g. a preview of a gala) are about a day: soonest first, gone once that day (or the end
+     date) has passed;
+   - announcements (any other news story) are about when they went up: newest first, until
+     newer ones push them out.
+   Order: anything pinned (feed.pin_until, still in date), then the next HERO_UPCOMING events,
+   then the latest news -- with more events filling in if there isn't enough news, and vice versa. */
+const HERO_SLOTS=6,HERO_UPCOMING=3;
+function heroFeedItems(){
+  const today=isoToday();
+  const pinned=DB.feed.filter(it=>it.start&&it.pinUntil&&it.pinUntil>=today).sort((a,b)=>a.start<b.start?1:-1);
+  const rest=DB.feed.filter(it=>it.start&&!pinned.includes(it));
+  const isEvent=it=>it.type!=="news"||it.start>(it.created||today);
+  const upcoming=rest.filter(it=>isEvent(it)&&(it.end||it.start)>=today).sort((a,b)=>a.start<b.start?-1:1);
+  const news=rest.filter(it=>!isEvent(it)).sort((a,b)=>a.start<b.start?1:-1);
+  const room=HERO_SLOTS-pinned.length;
+  const nUp=Math.min(upcoming.length,Math.max(HERO_UPCOMING,room-news.length));
+  return pinned.concat(upcoming.slice(0,nUp),news).slice(0,HERO_SLOTS);
+}
 function renderHeroFeed(){
   if(!$("#heroSlides"))return;
-  const today=new Date();
-  const items=DB.feed.filter(it=>it.start)
-    .map(it=>({it,diff:Math.abs(new Date(it.start+"T12:00:00")-today)}))
-    .sort((a,b)=>a.diff-b.diff)
-    .slice(0,6)
-    .map(x=>x.it);
+  const items=heroFeedItems();
   $("#heroSlides").innerHTML=items.map((it,i)=>{
     const c=heroFeedContent(it);
     /* An article with a gallery shows all of it here, cross-fading (see cycleHeroPhotos);
@@ -638,8 +652,10 @@ function cycleHeroPhotos(){
     const photos=[...media.querySelectorAll(".hero-slide-photo")];
     if(photos.length<2)return;
     const cur=photos.findIndex(el=>el.classList.contains("show"));
-    photos[cur]?.classList.remove("show");
-    photos[(cur+1)%photos.length].classList.add("show");
+    const old=photos[cur],next=photos[(cur+1)%photos.length];
+    /* keep the old one fully shown beneath until the new one has finished fading in over it */
+    if(old){old.classList.add("was");old.classList.remove("show");setTimeout(()=>old.classList.remove("was"),1700);}
+    next.classList.add("show");
   });
 }
 /* The stories themselves step on every HERO_AUTO_MS, wrapping from the last back to the first.

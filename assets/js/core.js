@@ -17,13 +17,16 @@ const DB={feed:[],coaches:[],squads:[],roles:[],newsDefaults:[],welfare:[],commi
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",conditionsUrl:"conditions_url",conditionsLabel:"conditions_label",entryFileUrl:"entry_file_url",entryFileLabel:"entry_file_label",resultsFileUrl:"results_file_url",resultsFileLabel:"results_file_label",currentEntriesUrl:"current_entries_url",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",conditionsUrl:"conditions_url",conditionsLabel:"conditions_label",entryFileUrl:"entry_file_url",entryFileLabel:"entry_file_label",resultsFileUrl:"results_file_url",resultsFileLabel:"results_file_label",currentEntriesUrl:"current_entries_url",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until"};
 const FEED_TYPE_TO_ROW={meet:"meet",externalMeet:"external_meet",teamMeet:"team_meet",social:"social",news:"news",training:"training"};
 const FEED_TYPE_FROM_ROW=Object.fromEntries(Object.entries(FEED_TYPE_TO_ROW).map(([k,v])=>[v,k]));
 
 function feedFromRow(row){
   const it={id:row.id,type:FEED_TYPE_FROM_ROW[row.type]};
   for(const [key,col] of Object.entries(FEED_FIELDS))if(key!=="type"&&row[col]!==null)it[key]=row[col];
+  /* The day it was first saved (read-only, never written back): tells the homepage whether a news
+     story was written ahead of its date -- i.e. it's about something coming up (renderHeroFeed). */
+  if(row.created_at)it.created=isoDay(new Date(row.created_at));
   return it;
 }
 function feedToRow(it){
@@ -332,7 +335,8 @@ function fmtDate(iso){if(!iso)return"";const d=new Date(iso+"T12:00:00");return 
 function dateParts(iso){const d=new Date(iso+"T12:00:00");return{d:d.getDate(),m:d.toLocaleDateString("en-GB",{month:"short"})};}
 
 /* A meet moves to "Completed galas" automatically once its last day (end, or start for one-day meets) has passed. */
-function isoToday(){const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`;}
+function isoDay(n){return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`;}
+function isoToday(){return isoDay(new Date());}
 const meetDone=m=>(m.end||m.start)<isoToday();
 
 /* Open meets (BPSC-hosted or another club's) aren't published with entries/officials/volunteering

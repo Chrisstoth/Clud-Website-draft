@@ -141,6 +141,7 @@ const SCHEMAS = {
     {k:"img",label:"Picture (optional, replaces card graphic)",type:"imagepicker"},
     {k:"photos",label:"Photo gallery (shown as a slideshow on the article page)",type:"gallery"},
     {k:"heroPhotos",label:"Homepage pictures",type:"heropics"},
+    {k:"pinUntil",label:"Pin to front of homepage until (optional — leave blank for the normal order)",type:"date"},
     {k:"body",label:"Full write-up (shown on the article page)",type:"richtext"}
   ],
   news:[
@@ -151,6 +152,7 @@ const SCHEMAS = {
     {k:"img",label:"Picture (thumbnail; used as the cover if there's no gallery yet)",type:"imagepicker"},
     {k:"photos",label:"Photo gallery (shown as a slideshow on the article page)",type:"gallery"},
     {k:"heroPhotos",label:"Homepage pictures",type:"heropics"},
+    {k:"pinUntil",label:"Pin to front of homepage until (optional — leave blank for the normal order)",type:"date"},
     {k:"body",label:"Article content",type:"richtext"}
   ],
   training:[

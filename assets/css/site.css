@@ -377,9 +377,15 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
    (640px: the same point the card and the photo framing switch at) */
 @media(max-width:640px){.hero-slide-media.only-wide{display:none}}
 @media(min-width:641px){.hero-slide-media.only-narrow{display:none}}
+/* the incoming photo fades in ON TOP of the outgoing one, which stays fully shown underneath
+   (.was) until it's covered -- fading one out while the other fades in let the black behind show
+   through mid-change, so every change dipped the picture dark for a second */
 .hero-slide-photo{position:absolute;inset:0;opacity:0;transition:opacity 1.6s ease}
-.hero-slide-photo.show{opacity:1}
-.hero-slide-media::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,rgba(16,16,20,.55),rgba(16,16,20,.15) 65%)}
+.hero-slide-photo.was{opacity:1;transition:none}
+.hero-slide-photo.show{opacity:1;z-index:1}
+/* just enough shade along the bottom for the dots; the card carries its own dark glass, so the
+   photo itself isn't dimmed */
+.hero-slide-media::after{content:"";position:absolute;inset:0;z-index:2;background:linear-gradient(to top,rgba(16,16,20,.35),rgba(16,16,20,0) 30%)}
 .hero-news-card{
   /* a fixed height, with the title and summary clamped to fit it, so a long story can't grow
      the card up into the slide's slanted left edge and lose its first letters. knowing the

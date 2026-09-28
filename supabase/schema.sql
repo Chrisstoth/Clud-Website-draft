@@ -66,6 +66,8 @@ alter table public.feed add column if not exists results_file_label text;
 alter table public.feed add column if not exists hero_card text;
 -- Homepage pictures per screen when they differ from the gallery: {"hd":[…],"hp":[…]} (migration 013).
 alter table public.feed add column if not exists hero_photos jsonb;
+-- Homepage slideshow: keep this item in front until this date; null = normal order (migration 015).
+alter table public.feed add column if not exists pin_until date;
 
 create table if not exists public.coaches (
   id          bigint generated always as identity primary key,
