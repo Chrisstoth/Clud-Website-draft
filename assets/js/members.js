@@ -468,7 +468,10 @@ function showForm(sec,id,forcedType){
         <div class="img-picker">
           <div class="img-preview${r?" "+r.cls:" empty"}" id="imgPreview" style="${r?r.style:""}">${r&&r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>
           ${showSwatches?`<div class="img-swatches">${swatches}</div>`:""}
-          <label class="img-upload-btn">Upload your own photo<input type="file" accept="image/*" id="imgUploadInput" style="display:none"></label>
+          <div class="img-add-row">
+            <label class="img-upload-btn">Upload your own photo<input type="file" accept="image/*" id="imgUploadInput" style="display:none"></label>
+            <button type="button" class="img-upload-btn" id="imgLibraryBtn">Choose from library</button>
+          </div>
           <button type="button" class="img-clear-btn" id="imgClearBtn">No picture</button>
         </div>
         <p class="hint" id="imgFromGallery" hidden style="margin:0">Using the first photo from the gallery below.</p>
@@ -486,7 +489,10 @@ function showForm(sec,id,forcedType){
       return `<div class="f">${f.label}
         <div class="gallery-picker">
           <div class="gallery-thumbs" id="galleryThumbs"></div>
-          <label class="img-upload-btn">Add photos<input type="file" accept="image/*" multiple id="galleryAddInput" style="display:none"></label>
+          <div class="img-add-row">
+            <label class="img-upload-btn">Add photos<input type="file" accept="image/*" multiple id="galleryAddInput" style="display:none"></label>
+            <button type="button" class="img-upload-btn" id="galleryLibraryBtn">Choose from library</button>
+          </div>
           <p class="hint" style="margin-top:2px">Photos are compressed automatically. The first photo doubles as the card thumbnail. Tap <b>Frame</b> to choose what stays in view when a page crops it; × removes one.</p>
         </div>
       </div>`;
@@ -502,6 +508,7 @@ function showForm(sec,id,forcedType){
           <button type="button" data-cmd="insertOrderedList" title="Numbered list">1.—</button>
           <button type="button" data-cmd="createLink" title="Insert link">🔗</button>
           <label class="rte-img-btn" title="Insert photo">🖼️ Photo<input type="file" accept="image/*" id="rteImgInput" style="display:none"></label>
+          <button type="button" data-rte-library title="Insert a photo that's already been uploaded">🗂️ Library</button>
         </div>
         <div class="rte-editor article-body" id="rteEditor" contenteditable="true">${sanitizeArticleHtml(it[f.k])}</div>
         <p class="hint" style="margin-top:6px">This box shows exactly how the article text will look on the page.</p>
@@ -565,7 +572,7 @@ function showForm(sec,id,forcedType){
     };
     syncPicture=()=>{
       const fromGallery=!!galleryPhotos?.length;
-      formTarget.querySelectorAll(".img-swatches,.img-picker .img-upload-btn,#imgClearBtn").forEach(el=>el.hidden=fromGallery);
+      formTarget.querySelectorAll(".img-swatches,.img-picker .img-add-row,#imgClearBtn").forEach(el=>el.hidden=fromGallery);
       $("#imgFromGallery").hidden=!fromGallery;
       if(!fromGallery)return;
       imgHidden.value=galleryPhotos[0];
@@ -607,6 +614,13 @@ function showForm(sec,id,forcedType){
         e.target.value="";
       }
     });
+    $("#imgLibraryBtn").addEventListener("click",async()=>{
+      const urls=await pickLibraryImages({single:true});
+      if(!urls)return;
+      imgHidden.value=urls[0];
+      formTarget.querySelectorAll(".img-swatch").forEach(b=>b.classList.remove("selected"));
+      setPreview(imgHidden.value);
+    });
     $("#imgClearBtn").addEventListener("click",()=>{
       imgHidden.value="";
       formTarget.querySelectorAll(".img-swatch").forEach(b=>b.classList.remove("selected"));
@@ -631,6 +645,10 @@ function showForm(sec,id,forcedType){
       if(!frameBtn)return;
       const framed=await frame(galleryPhotos,+frameBtn.dataset.photoFrame,galleryViews());
       if(framed)setGallery(framed);
+    });
+    $("#galleryLibraryBtn").addEventListener("click",async()=>{
+      const urls=await pickLibraryImages();
+      if(urls){addNewPhotos(galleryPhotos,urls);renderGalleryThumbs();}
     });
     $("#galleryAddInput").addEventListener("change",async e=>{
       const files=[...e.target.files];
@@ -658,7 +676,10 @@ function showForm(sec,id,forcedType){
             <button type="button" class="gallery-thumb-del" data-set-del="${i}" aria-label="Remove this photo">×</button>
             <button type="button" class="gallery-thumb-frame" data-set-frame="${i}">Frame</button></div>`).join("")
           :`<p class="hint" style="margin:0">No pictures yet — the gallery is used here until you add some.</p>`}</div>
-        <label class="img-upload-btn">Add photos<input type="file" accept="image/*" multiple data-set-add style="display:none"></label>`:""}`;
+        <div class="img-add-row">
+          <label class="img-upload-btn">Add photos<input type="file" accept="image/*" multiple data-set-add style="display:none"></label>
+          <button type="button" class="img-upload-btn" data-set-library>Choose from library</button>
+        </div>`:""}`;
     };
     ["hd","hp"].forEach(renderHeroSet);
     $("#heroSets").addEventListener("click",async e=>{
@@ -666,6 +687,11 @@ function showForm(sec,id,forcedType){
       const k=box.dataset.set;
       const mode=e.target.closest("[data-set-mode]");
       if(mode){heroOwn[k]=!!mode.dataset.setMode;return renderHeroSet(k);}
+      if(e.target.closest("[data-set-library]")){
+        const urls=await pickLibraryImages();
+        if(urls){addNewPhotos(heroSets[k],urls);renderHeroSet(k);}
+        return;
+      }
       const del=e.target.closest("[data-set-del]");
       if(del){heroSets[k].splice(+del.dataset.setDel,1);return renderHeroSet(k);}
       const fb=e.target.closest("[data-set-frame]");
@@ -691,6 +717,7 @@ function showForm(sec,id,forcedType){
   const rteEditor=$("#rteEditor");
   if(rteEditor){
     $("#rteToolbar").addEventListener("click",e=>{
+      if(e.target.closest("[data-rte-library]"))return insertLibraryImages(rteEditor);
       const b=e.target.closest("[data-cmd]");if(!b)return;
       rteEditor.focus();
       if(b.dataset.cmd==="createLink"){
@@ -794,7 +821,7 @@ function showArticlePreview(it){
    Resolves to {urls, layout}, or null if they cancel. */
 const isUploadedPhoto=v=>!!v&&!String(v).startsWith("default:");
 /* A real slide's size in px (see .hero-slide in site.css): drawn at that size, then scaled to fit. */
-const HERO_REPLICAS={hd:{w:900,h:520,cls:"frame-hero-desk"},hp:{w:360,h:340,cls:"frame-hero-phone"}};
+const HERO_REPLICAS={hd:{w:1100,h:520,cls:"frame-hero-desk"},hp:{w:360,h:340,cls:"frame-hero-phone"}};
 const ARTICLE_RATIOS={ad:"16/10",ap:"4/3"};
 /* The homepage card's options on each screen. Each row switches one hero_card word on or off. */
 const CARD_OPTIONS={
@@ -982,6 +1009,7 @@ function showWelfareForm(){
           <button type="button" data-cmd="insertOrderedList" title="Numbered list">1.—</button>
           <button type="button" data-cmd="createLink" title="Insert link">🔗</button>
           <label class="rte-img-btn" title="Insert photo">🖼️ Photo<input type="file" accept="image/*" id="rteImgInput" style="display:none"></label>
+          <button type="button" data-rte-library title="Insert a photo that's already been uploaded">🗂️ Library</button>
         </div>
         <div class="rte-editor article-body" id="rteEditor" contenteditable="true">${sanitizeArticleHtml(current?current.body:WELFARE_DEFAULT_BODY)}</div>
         <p class="hint" style="margin-top:6px">This box shows exactly how the page text will look — headings, bold, links, lists and photos, in place.</p>
@@ -993,6 +1021,7 @@ function showWelfareForm(){
     </form>`;
   const rteEditor=$("#rteEditor");
   $("#rteToolbar").addEventListener("click",e=>{
+    if(e.target.closest("[data-rte-library]"))return insertLibraryImages(rteEditor);
     const b=e.target.closest("[data-cmd]");if(!b)return;
     rteEditor.focus();
     if(b.dataset.cmd==="createLink"){
@@ -1157,6 +1186,107 @@ async function uploadImage(file){
   const {error}=await sb.storage.from("site-images").upload(name,blob,{contentType:"image/jpeg",cacheControl:"31536000"});
   if(error)throw new Error(saveErrorMessage(error));
   return sb.storage.from("site-images").getPublicUrl(name).data.publicUrl;
+}
+
+/* The photo library: every photo already in the image store, newest first, so a picture can be
+   used again without uploading it twice. Nothing ever deletes from the store, so sharing a photo
+   between items is safe, and framing lives in each item's copy of the link, so every use frames
+   it separately. Resolves with the chosen links (in the order picked), or null if cancelled. */
+const LIBRARY_PAGE=60;
+function pickLibraryImages({single=false}={}){
+  return new Promise(resolve=>{
+    let overlay=document.getElementById("libraryOverlay");
+    if(!overlay){
+      overlay=document.createElement("div");
+      overlay.id="libraryOverlay";
+      overlay.className="preview-overlay";
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML=`<div class="preview-overlay-inner" role="dialog" aria-label="Choose from the photo library">
+      <div class="preview-overlay-bar">
+        <span>${single?"Choose a photo":"Choose photos"}</span>
+        <span style="display:flex;gap:8px">
+          <button type="button" class="btn small ghost" data-act="cancel">Cancel</button>
+          ${single?"":`<button type="button" class="btn small" data-act="done" disabled>Add photos</button>`}
+        </span>
+      </div>
+      <div class="library-body">
+        <p class="hint" style="margin:0">Every photo already uploaded to the site, newest first. ${single?"Tap one to use it.":"Tap to pick one or more — they're added in the order you pick them."}</p>
+        <div class="library-grid" id="libraryGrid"></div>
+        <p class="hint" id="libraryStatus" style="margin:0">Loading…</p>
+        <button type="button" class="btn small ghost library-more" data-act="more" hidden>Load more</button>
+      </div>
+    </div>`;
+    const q=sel=>overlay.querySelector(sel);
+    const grid=q("#libraryGrid"),status=q("#libraryStatus"),more=q("[data-act=more]"),done=q("[data-act=done]");
+    const store=sb.storage.from("site-images");
+    const chosen=[];
+    let offset=0;
+    const load=async()=>{
+      more.hidden=true;
+      status.hidden=false;
+      status.textContent="Loading…";
+      const {data,error}=await store.list("",{limit:LIBRARY_PAGE,offset,sortBy:{column:"created_at",order:"desc"}});
+      if(error){status.textContent=`Couldn't load the library: ${saveErrorMessage(error)}`;return;}
+      offset+=data.length;
+      /* folders come back without an id; Supabase's ".emptyFolderPlaceholder" isn't a photo */
+      grid.insertAdjacentHTML("beforeend",data.filter(f=>f.id&&!f.name.startsWith(".")).map(f=>{
+        const url=store.getPublicUrl(f.name).data.publicUrl,day=fmtDate((f.created_at||"").slice(0,10));
+        return `<button type="button" class="library-item" data-url="${esc(url)}" aria-label="Photo uploaded ${esc(day)}">
+          <img src="${esc(url)}" alt="" loading="lazy"><span class="library-num"></span><span class="library-date">${esc(day)}</span></button>`;
+      }).join(""));
+      status.hidden=grid.children.length>0;
+      status.textContent="No photos have been uploaded yet.";
+      more.hidden=data.length<LIBRARY_PAGE;
+    };
+    const paint=()=>{
+      grid.querySelectorAll("[data-url]").forEach(b=>{
+        const i=chosen.indexOf(b.dataset.url);
+        b.classList.toggle("on",i>=0);
+        b.querySelector(".library-num").textContent=i>=0?i+1:"";
+      });
+      done.disabled=!chosen.length;
+      done.textContent=chosen.length>1?`Add ${chosen.length} photos`:chosen.length?"Add 1 photo":"Add photos";
+    };
+    const close=result=>{
+      overlay.classList.remove("open");
+      document.removeEventListener("keydown",onKey);
+      resolve(result);
+    };
+    const onKey=e=>{if(e.key==="Escape")close(null);};
+    document.addEventListener("keydown",onKey);
+    overlay.onclick=e=>{
+      if(e.target===overlay)return close(null);
+      const item=e.target.closest("[data-url]");
+      if(item){
+        if(single)return close([item.dataset.url]);
+        const i=chosen.indexOf(item.dataset.url);
+        if(i>=0)chosen.splice(i,1);else chosen.push(item.dataset.url);
+        return paint();
+      }
+      const act=e.target.closest("[data-act]")?.dataset.act;
+      if(act==="cancel")return close(null);
+      if(act==="done")return close(chosen.slice());
+      if(act==="more")load();
+    };
+    overlay.classList.add("open");
+    overlay.scrollTop=0;
+    load();
+  });
+}
+/* Adds library photos to a list, skipping any it already has (whatever their framing). */
+const addNewPhotos=(list,urls)=>{
+  for(const u of urls)if(!list.some(p=>String(p).split("#")[0]===u))list.push(u);
+};
+/* The library opens over the text editor, so remember where the caret was and put the photos there. */
+async function insertLibraryImages(editor){
+  const sel=getSelection();
+  const range=sel.rangeCount&&editor.contains(sel.anchorNode)?sel.getRangeAt(0).cloneRange():null;
+  const urls=await pickLibraryImages();
+  if(!urls)return;
+  editor.focus();
+  if(range){sel.removeAllRanges();sel.addRange(range);}
+  document.execCommand("insertHTML",false,urls.map(u=>`<img src="${esc(u)}" alt="">`).join(""));
 }
 
 /* ================= INIT =================

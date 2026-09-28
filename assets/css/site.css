@@ -24,9 +24,10 @@
   --slant-ratio:.364;
   /* homepage hero card: shared by the real card and the framing editor's replica of it */
   --hero-card-h:220px;--hero-card-h-compact:146px;--hero-card-gap:14px;
-  /* the homepage photo strip's height on computers (phones set their own below). The framing
-     editor's computer replica is drawn at 900 x this (HERO_REPLICAS in members.js) -- keep in step. */
-  --hero-strip-h:520px;
+  /* the homepage photo strip's height on computers (phones set their own below), and the widest a
+     slide in it gets. The framing editor's computer replica is drawn at exactly this size
+     (HERO_REPLICAS in members.js) -- keep in step. */
+  --hero-strip-h:520px;--hero-slide-w:1100px;
   /* The bevel used by the cards that can't afford a full parallelogram (Club Calendar rows,
      Open Meets). --cut is the horizontal run of the corner cut, --rise its vertical run, and
      --rise = --cut / --slant-ratio, so the cut edge sits at exactly --slant-deg NO MATTER how
@@ -363,7 +364,7 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
      angle still lands exactly on --slant-deg. the slides then overlap by nearly that offset
      so what shows between them is a thin constant seam, not a wide black wedge. */
   --slide-lean:calc(var(--hero-strip-h) * var(--slant-ratio));
-  flex:0 0 clamp(460px,74vw,900px);height:100%;position:relative;display:flex;align-items:flex-end;
+  flex:0 0 clamp(460px,80vw,var(--hero-slide-w));height:100%;position:relative;display:flex;align-items:flex-end;
   filter:blur(3px) brightness(.55);opacity:.92;transition:filter .35s,opacity .35s;pointer-events:none;
   clip-path:polygon(var(--slide-lean) 0,100% 0,calc(100% - var(--slide-lean)) 100%,0 100%);
 }
@@ -503,6 +504,11 @@ section.page#page-home{padding-top:14px}
 /* a second, subordinate heading part-way down a page (e.g. Academy coaches) */
 .page-head h3{font-size:clamp(1.35rem,2.8vw,1.8rem)}
 .page-head p{color:var(--muted);margin-top:12px}
+/* Join Us intro: "what we offer" list under the opening paragraph, flame-coloured markers */
+.join-offer{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:8px}
+.join-offer li{position:relative;padding-left:20px;color:var(--muted);font-size:.95rem}
+.join-offer li::before{content:"";position:absolute;left:0;top:.55em;width:9px;height:9px;background:var(--flame);transform:skewX(-12deg)}
+.join-offer strong{color:var(--text)}
 .news-thumb{height:130px;margin:-22px -22px 14px;border-radius:var(--radius) var(--radius) 0 0;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center}
 /* Tag filter chips: same skewed-::before fill as .pill/.cal-chip rather than a rounded pill, so
    the filter row carries the site's one --slant-deg lean like everything else on the page. */
@@ -1339,6 +1345,22 @@ body.theme-dark .article-body a{color:var(--ember)}
 .gallery-thumb-frame:hover{background:var(--flame-dark)}
 .img-frame-btn{margin-top:8px;justify-self:start}
 .img-picker [hidden]{display:none}
+.img-add-row{display:flex;flex-wrap:wrap;gap:8px}
+button.img-upload-btn{background:none;font-family:inherit}
+
+/* photo library (pickLibraryImages in members.js) */
+.library-body{padding:18px 20px 24px;display:grid;gap:14px}
+.library-body [hidden]{display:none}
+.library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px}
+.library-item{position:relative;display:block;aspect-ratio:1;padding:0;border:2px solid transparent;border-radius:9px;overflow:hidden;background:#101014;cursor:pointer}
+.library-item:hover{border-color:var(--line)}
+.library-item.on{border-color:var(--flame)}
+.library-item img{width:100%;height:100%;object-fit:cover;display:block;margin:0;border-radius:0}
+.library-num{position:absolute;top:5px;right:5px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--flame);color:#fff;font-size:.75rem;font-weight:700;display:none;align-items:center;justify-content:center}
+.library-item.on .library-num{display:flex}
+.library-date{position:absolute;left:0;right:0;bottom:0;padding:3px 0;background:rgba(16,16,20,.72);color:#fff;font-size:.68rem;text-align:center}
+.library-more{justify-self:start}
+@media(max-width:640px){.library-body{padding:16px 16px 24px}.library-grid{grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px}}
 
 /* framing editor (openFramingEditor in members.js) */
 .frame-body{padding:18px 20px 24px;display:grid;gap:16px}
