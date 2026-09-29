@@ -68,6 +68,9 @@ alter table public.feed add column if not exists hero_card text;
 alter table public.feed add column if not exists hero_photos jsonb;
 -- Homepage slideshow: keep this item in front until this date; null = normal order (migration 015).
 alter table public.feed add column if not exists pin_until date;
+-- Meet documents & links, a free list: [{"label","text","url","hl"}] (migration 016). Replaces the
+-- fixed conditions / entry file / results file / current entries columns, which are now unused.
+alter table public.feed add column if not exists doc_links jsonb not null default '[]'::jsonb;
 
 create table if not exists public.coaches (
   id          bigint generated always as identity primary key,

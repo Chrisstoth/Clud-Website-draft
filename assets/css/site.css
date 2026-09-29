@@ -1090,6 +1090,15 @@ details.info[open] summary::after{content:"\2013"}
 details.info .body{padding:4px 24px 22px;color:var(--muted);font-size:.95rem}
 details.info .body .link-line{padding:8px 0;border-top:1px solid var(--line)}
 details.info .body .link-line:first-child{border-top:none}
+/* A meet link line given a highlight colour in the members' area (LINK_HIGHLIGHTS in core.js).
+   Translucent tints, so the same colours sit right on the light and the dark cards. */
+details.info .body .link-line[class*="hl-"]{padding:8px 12px;margin:2px 0;border-top-color:transparent;border-left:4px solid var(--hl-edge);background:var(--hl-bg);color:var(--text)}
+details.info .body .link-line[class*="hl-"]+.link-line{border-top-color:transparent}
+.hl-orange{--hl-bg:rgba(245,132,31,.16);--hl-edge:#f5841f}
+.hl-yellow{--hl-bg:rgba(240,196,25,.24);--hl-edge:#e0b400}
+.hl-green{--hl-bg:rgba(31,138,76,.16);--hl-edge:#1f8a4c}
+.hl-blue{--hl-bg:rgba(26,111,212,.15);--hl-edge:#1a6fd4}
+.hl-red{--hl-bg:rgba(179,38,30,.15);--hl-edge:#d0342a}
 details.info .body a{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--flame-dark);text-decoration:underline;text-underline-offset:3px}
 details.info .body a:hover{color:var(--flame)}
 details.info .body a::after{content:"\2192";text-decoration:none;transition:transform .15s}
@@ -1174,8 +1183,25 @@ footer.site a:hover{color:var(--ember)}
 body.theme-dark .sess-ampm{color:var(--ember)}
 .sess-del{background:none;border:1.5px solid var(--line);color:var(--warn);border-radius:8px;height:38px;cursor:pointer;font-size:1.1rem;line-height:1}
 .sess-del:hover{border-color:var(--warn)}
+/* Meet documents & links editor: name, link text, URL, highlight, move, remove. */
+.doclink-rows{display:grid;gap:8px}
+.doclink-rows:empty{display:none}
+.doclink-row{display:grid;grid-template-columns:1.3fr 1fr 1.6fr .9fr auto 38px;gap:8px;align-items:center;padding:6px;border-radius:10px;border-left:4px solid var(--hl-edge,transparent);background:var(--hl-bg,transparent)}
+.doclink-row input,.doclink-row select{font:inherit;font-size:.9rem;padding:8px 9px;border:1.5px solid var(--line);border-radius:8px;background:var(--field);color:var(--text);min-width:0;width:100%}
+.doclink-row input:focus,.doclink-row select:focus{border-color:var(--flame);outline:none}
+.doclink-move{display:flex;gap:4px}
+.doclink-move button{background:none;border:1.5px solid var(--line);color:var(--muted);border-radius:8px;width:32px;height:38px;cursor:pointer;font-size:1rem;line-height:1}
+.doclink-move button:hover{border-color:var(--flame);color:var(--text)}
+.doclink-row .sess-del{height:38px}
 @media(max-width:700px){
   .sess-head{display:none}
+  .doclink-row{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-areas:"label label label label" "text text text text" "url url url url" "hl hl move del";border:1px solid var(--line);padding:10px}
+  .doclink-row [data-k="label"]{grid-area:label}
+  .doclink-row [data-k="text"]{grid-area:text}
+  .doclink-row [data-k="url"]{grid-area:url}
+  .doclink-row [data-k="hl"]{grid-area:hl}
+  .doclink-row .doclink-move{grid-area:move;justify-self:end}
+  .doclink-row .sess-del{grid-area:del}
   .sess-row{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-areas:"day day day ampm" "start start end end" "loc loc loc loc" "type type type del";border:1px solid var(--line);border-radius:10px;padding:10px}
   .sess-row [data-k="day"]{grid-area:day}
   .sess-row [data-k="start"]{grid-area:start}
@@ -1655,6 +1681,7 @@ main{overflow-x:clip}
    700px; this just takes their type back up to the no-zoom threshold. */
 @media(max-width:760px){
   .sess-row input,.sess-row select,
+  .doclink-row input,.doclink-row select,
   .rte-toolbar button,.rte-img-btn{font-size:16px}
   .rte-toolbar{gap:8px}
   .rte-toolbar button,.rte-img-btn{padding:9px 12px}

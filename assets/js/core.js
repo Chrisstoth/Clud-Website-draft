@@ -17,7 +17,10 @@ const DB={feed:[],coaches:[],squads:[],roles:[],newsDefaults:[],welfare:[],commi
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",conditionsUrl:"conditions_url",conditionsLabel:"conditions_label",entryFileUrl:"entry_file_url",entryFileLabel:"entry_file_label",resultsFileUrl:"results_file_url",resultsFileLabel:"results_file_label",currentEntriesUrl:"current_entries_url",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until"};
+/* Highlight colours a meet's documents & links line can be given, so one that matters (a changed
+   warm-up time, a late programme) stands out. The key is stored on the link; "" is no highlight. */
+const LINK_HIGHLIGHTS=[["","No highlight"],["orange","Orange"],["yellow","Yellow"],["green","Green"],["blue","Blue"],["red","Red"]];
 const FEED_TYPE_TO_ROW={meet:"meet",externalMeet:"external_meet",teamMeet:"team_meet",social:"social",news:"news",training:"training"};
 const FEED_TYPE_FROM_ROW=Object.fromEntries(Object.entries(FEED_TYPE_TO_ROW).map(([k,v])=>[v,k]));
 
@@ -32,11 +35,12 @@ function feedFromRow(row){
 function feedToRow(it){
   const row={type:FEED_TYPE_TO_ROW[it.type]};
   for(const [key,col] of Object.entries(FEED_FIELDS))if(key!=="type")row[col]=it[key]===""||it[key]===undefined?null:it[key];
-  /* "visible" and "photos" are not-null columns; types whose form has no visibility checkbox
-     or gallery (meets, training) never set them, so fill in the column default rather than
+  /* "visible", "photos" and "doc_links" are not-null columns; types whose form has no visibility
+     checkbox, gallery or link list never set them, so fill in the column default rather than
      writing a null the database would reject. */
   if(row.visible===null)row.visible=true;
   if(row.photos===null)row.photos=[];
+  if(row.doc_links===null)row.doc_links=[];
   return row;
 }
 const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads:r.squads||[],photo:r.photo||""});

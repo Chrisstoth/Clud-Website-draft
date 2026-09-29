@@ -55,13 +55,7 @@ const SCHEMAS = {
     {k:"volunteerUrl",label:"Volunteer here link (URL — leave blank to use the Volunteering page)",type:"text"},
     {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
     {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
-    {k:"conditionsUrl",label:"Meet conditions & details link (URL)",type:"text"},
-    {k:"conditionsLabel",label:"Meet conditions link text",type:"text"},
-    {k:"entryFileUrl",label:"Sports Systems entry file link (URL)",type:"text"},
-    {k:"entryFileLabel",label:"Entry file link text",type:"text"},
-    {k:"resultsFileUrl",label:"Sports Systems results file link (URL — the .zip other clubs import)",type:"text"},
-    {k:"resultsFileLabel",label:"Results file link text",type:"text"},
-    {k:"currentEntriesUrl",label:"Current entries link (URL)",type:"text"},
+    {k:"docLinks",label:"Meet documents & links",type:"links"},
     {k:"notes",label:"Notes for parents & swimmers",type:"textarea"},
     {k:"img",label:"Picture",type:"imagepicker"}
   ],
@@ -107,11 +101,7 @@ const SCHEMAS = {
     {k:"volunteerUrl",label:"Volunteer link (URL — button hidden if blank)",type:"text"},
     {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
     {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
-    {k:"conditionsUrl",label:"Meet conditions & details link (URL)",type:"text"},
-    {k:"conditionsLabel",label:"Meet conditions link text",type:"text"},
-    {k:"resultsFileUrl",label:"Sports Systems results file link (URL — the .zip other clubs import)",type:"text"},
-    {k:"resultsFileLabel",label:"Results file link text",type:"text"},
-    {k:"currentEntriesUrl",label:"Current entries link (URL)",type:"text"},
+    {k:"docLinks",label:"Meet documents & links",type:"links"},
     {k:"notes",label:"Notes for parents & swimmers",type:"textarea"},
     {k:"img",label:"Picture",type:"imagepicker"}
   ],
@@ -127,6 +117,7 @@ const SCHEMAS = {
     {k:"leagueUrl",label:"League info link (URL — optional)",type:"text"},
     {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
     {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
+    {k:"docLinks",label:"Meet documents & links",type:"links"},
     {k:"img",label:"Picture",type:"imagepicker"}
   ],
   social:[
@@ -472,6 +463,18 @@ function showSquadForm(id){
   });
 }
 
+/* Meet documents & links editor: one row per link, in the order they show on the card. */
+function docLinkRowHtml(l={}){
+  const hlOpts=LINK_HIGHLIGHTS.map(([k,name])=>`<option value="${k}" ${(l.hl||"")===k?"selected":""}>${name}</option>`).join("");
+  return `<div class="doclink-row${l.hl?" hl-"+esc(l.hl):""}" data-doclink>
+    <input type="text" data-k="label" value="${esc(l.label||"")}" placeholder="Name, e.g. Meet conditions & details" aria-label="Name">
+    <input type="text" data-k="text" value="${esc(l.text||"")}" placeholder="Link text, e.g. View conditions" aria-label="Link text">
+    <input type="text" data-k="url" value="${esc(l.url||"")}" placeholder="Link (https://…)" aria-label="Link (URL)" inputmode="url">
+    <select data-k="hl" aria-label="Highlight colour">${hlOpts}</select>
+    <span class="doclink-move"><button type="button" data-doclink-up aria-label="Move up">↑</button><button type="button" data-doclink-down aria-label="Move down">↓</button></span>
+    <button type="button" class="sess-del" data-doclink-del aria-label="Remove link">×</button>
+  </div>`;
+}
 function showForm(sec,id,forcedType){
   editingId=id;
   if(sec==="squads")return showSquadForm(id);
@@ -531,6 +534,13 @@ function showForm(sec,id,forcedType){
           </div>
           <p class="hint" style="margin-top:2px">Photos are compressed automatically. The first photo doubles as the card thumbnail. Tap <b>Frame</b> to choose what stays in view when a page crops it; × removes one.</p>
         </div>
+      </div>`;
+    }
+    if(f.type==="links"){
+      return `<div class="f">${f.label}
+        <div class="doclink-rows" id="docLinkRows">${(it[f.k]||[]).map(docLinkRowHtml).join("")}</div>
+        <button type="button" class="btn small ghost" id="addDocLink" style="justify-self:start">+ Add link</button>
+        <p class="hint" style="margin:0">Shown in the card's "Meet documents &amp; links" panel, in this order, as <b>Name: link text</b> — e.g. conditions, entry file, results file, warm-up times. Link text is optional. Pick a highlight colour to make a line stand out.</p>
       </div>`;
     }
     if(f.type==="richtext"){
@@ -750,6 +760,24 @@ function showForm(sec,id,forcedType){
       renderHeroSet(k);
     });
   }
+  const docLinkRows=$("#docLinkRows");
+  if(docLinkRows){
+    docLinkRows.addEventListener("change",e=>{
+      if(e.target.dataset.k!=="hl")return;
+      const row=e.target.closest("[data-doclink]");
+      row.className="doclink-row"+(e.target.value?" hl-"+e.target.value:"");
+    });
+    docLinkRows.addEventListener("click",e=>{
+      const row=e.target.closest("[data-doclink]");if(!row)return;
+      if(e.target.closest("[data-doclink-del]"))row.remove();
+      else if(e.target.closest("[data-doclink-up]")&&row.previousElementSibling)row.after(row.previousElementSibling);
+      else if(e.target.closest("[data-doclink-down]")&&row.nextElementSibling)row.before(row.nextElementSibling);
+    });
+    $("#addDocLink").addEventListener("click",()=>{
+      docLinkRows.insertAdjacentHTML("beforeend",docLinkRowHtml());
+      docLinkRows.lastElementChild.querySelector('[data-k="label"]').focus();
+    });
+  }
   const rteEditor=$("#rteEditor");
   if(rteEditor){
     $("#rteToolbar").addEventListener("click",e=>{
@@ -801,6 +829,15 @@ function showForm(sec,id,forcedType){
     }
     if(isFeed)data.type=type;
     if(galleryField)data.photos=galleryPhotos;
+    if(docLinkRows){
+      /* The row inputs carry data-k rather than name, so FormData skips them; gather them here.
+         A row with no name, text or link is just dropped; one with words but no link is a mistake. */
+      const rowEls=[...docLinkRows.querySelectorAll("[data-doclink]")];
+      const links=rowEls.map(r=>{const o={};r.querySelectorAll("[data-k]").forEach(i=>o[i.dataset.k]=i.value.trim());return o;});
+      const bad=links.findIndex(l=>!l.url&&(l.label||l.text));
+      if(bad>-1){toast("Each document or link needs its link (URL) — or remove that line");rowEls[bad].querySelector('[data-k="url"]').focus();return;}
+      data.docLinks=links.filter(l=>l.url);
+    }
     if(heroSetsField){
       const own=Object.fromEntries(["hd","hp"].filter(heroUsed).map(k=>[k,heroSets[k]]));
       data.heroPhotos=Object.keys(own).length?own:null;

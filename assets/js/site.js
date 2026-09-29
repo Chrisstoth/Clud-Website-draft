@@ -46,12 +46,12 @@ function renderMeets(){
     /* A gala in progress leads with its live-results button, whatever else the card offers. */
     if(meetLive(m))actions=liveLink(m.liveUrl)+actions;
     const dates=m.end?`${fmtDate(m.start)} – ${fmtDate(m.end)}`:fmtDate(m.start);
-    const extraLinks=[
-      m.conditionsUrl?`Meet conditions &amp; details: <a href="${esc(m.conditionsUrl)}">${esc(m.conditionsLabel||"View conditions")}</a>`:"",
-      m.entryFileUrl?`Sports Systems entry file: <a href="${esc(m.entryFileUrl)}">${esc(m.entryFileLabel||"Download entry file")}</a>`:"",
-      m.resultsFileUrl?`Sports Systems results file: <a href="${esc(m.resultsFileUrl)}">${esc(m.resultsFileLabel||"Download results file")}</a>`:"",
-      m.currentEntriesUrl?`Current entries: <a href="${esc(m.currentEntriesUrl)}">View entries</a>`:""
-    ].filter(Boolean).map(line=>`<div class="link-line">${line}</div>`).join("");
+    /* Each line reads "Name: link text", or just the link when it has no name. */
+    const extraLinks=(m.docLinks||[]).filter(l=>l&&l.url).map(l=>{
+      const a=`<a href="${esc(l.url)}">${esc(l.text||(l.label?"Open":l.url))}</a>`;
+      const hl=LINK_HIGHLIGHTS.some(([k])=>k&&k===l.hl)?` hl-${l.hl}`:"";
+      return `<div class="link-line${hl}">${l.label?`${esc(l.label)}: `:""}${a}</div>`;
+    }).join("");
     const r=resolveNewsImage(m.img);
     const thumb=r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
     return `<article class="card meet${meetLive(m)?" live":""}${done?" done":""}${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
