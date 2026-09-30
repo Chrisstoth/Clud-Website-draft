@@ -71,6 +71,7 @@ function renderMeets(){
         ${m.license?`<div style="font-size:.82rem;color:var(--muted);margin-top:2px">Licence ${esc(m.license)}</div>`:""}
         ${m.notes&&!done?`<p style="margin-top:10px;font-size:.94rem;color:var(--body2)">${esc(m.notes)}</p>`:""}
         ${m.closing&&m.status==="open"&&!done?`<div class="closing">Entries close <strong>${fmtDate(m.closing)}</strong></div>`:""}
+        ${ours&&!done?`<div class="visit-line">Visiting club? <a href="venue#getting-here">Getting here &amp; parking</a>${m.end?` · <a href="venue#staying">Places to stay</a>`:""}</div>`:""}
         ${extraLinks?`<details class="info" style="margin-top:12px"><summary>Meet documents &amp; links</summary><div class="body">${extraLinks}</div></details>`:""}
       </div>
       ${actions?`<div class="meet-actions">${actions}</div>`:""}</article>`;

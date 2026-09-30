@@ -839,6 +839,7 @@ body.theme-dark .meet.ours .datebox .m{color:#3a1c00}
 .meet .links{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
 .meet .closing{font-size:.88rem;color:var(--muted);margin-top:10px}
 .meet .closing strong{color:var(--text)}
+.meet .visit-line{font-size:.85rem;color:var(--muted);margin-top:6px}
 @media(max-width:520px){.meet{grid-template-columns:58px minmax(0,1fr);gap:14px}.meet .datebox{padding:9px 4px}.meet .datebox .d{font-size:1.4rem}.meet h3{font-size:1.15rem}}
 @media(max-width:640px){
   .meet{position:relative;clip-path:none;border-radius:var(--radius);padding:22px}
