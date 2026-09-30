@@ -302,6 +302,12 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
     background:var(--flame);border-color:transparent;
   }
   nav.main a.cta{margin:4px 0 0;justify-content:center;clip-path:none;filter:none}
+  /* Club Organiser login: the brand's own black banner, set in the same skewed panel as the
+     other rows so it reads as part of the drawer rather than a pasted-in ad */
+  nav.main a.nav-co{justify-content:center;margin:10px 0 0;padding:12px 22px}
+  nav.main a.nav-co::before,body.theme-dark nav.main a.nav-co::before{background:#000;border-color:#000}
+  nav.main a.nav-co:active::before,body.theme-dark nav.main a.nav-co:active::before{background:#000;border-color:var(--flame)}
+  nav.main a.nav-co img{display:block;height:30px;width:auto;max-width:100%}
   .nav-dropdown{width:100%}
   .nav-dropdown-toggle{width:100%;justify-content:space-between}
   .nav-dropdown .caret{font-size:1.2em;opacity:1;color:var(--flame)}
@@ -1767,7 +1773,7 @@ main{overflow-x:clip}
    gets them as plain icons sitting just left of the day/night toggle, so the whole cluster at
    the right-hand end reads as one group of controls. Each is its own breakpoint's version of
    the same thing, so only one is ever on. */
-@media(min-width:1024px){.nav-social,.nav-social-label{display:none}}
+@media(min-width:1024px){.nav-social,.nav-social-label,nav.main a.nav-co{display:none}}
 /* below the bar breakpoint the drawer version takes over */
 .nav-social-desk{display:none}
 /* 1120px, not the 1024px the bar itself starts at. .nav-wrap is capped at max-width:1120px,
