@@ -426,6 +426,108 @@ let heroIndex=0;
 const HERO_AUTO_MS=10000;
 let heroAutoTimer=null,heroHeld=false;
 let newsTagFilter=null;
+/* The "My squads" chip's filter value -- can't clash with a real category, which is free text
+   but never starts with a space. */
+const NEWS_MINE=" mine";
+
+/* ================= FOLLOWING SQUADS =================
+   No accounts: a visitor ticks the squads they care about on the News page and it's remembered
+   in this browser only (localStorage), never sent anywhere. Stories an admin tagged for one of
+   those squads (feed.squads) are marked as theirs, and the ones they haven't opened yet put a
+   count on the Club News link on every page. It lasts until the browser's site data is cleared
+   (Safari on an iPhone also clears it after about a week without a visit, unless the site is
+   installed to the home screen); a different device or browser starts afresh.
+   "Unread" only counts stories posted since they started following -- less a week, so following
+   a squad shows its latest news straight away rather than an empty count. */
+const FOLLOW_KEY="bpsc_follow_v1",FOLLOW_LOOKBACK_MS=7*86400000;
+function loadFollow(){
+  try{
+    const f=JSON.parse(localStorage.getItem(FOLLOW_KEY)||"null");
+    if(f&&Array.isArray(f.squads))return {squads:f.squads,since:f.since||null,seen:Array.isArray(f.seen)?f.seen:[]};
+  }catch(e){}
+  return {squads:[],since:null,seen:[]};
+}
+let follow=loadFollow();
+function saveFollow(){try{localStorage.setItem(FOLLOW_KEY,JSON.stringify(follow));}catch(e){}}
+const followedStory=n=>n.type==="news"&&(n.squads||[]).some(s=>follow.squads.includes(s));
+const unreadStory=n=>followedStory(n)&&!follow.seen.includes(n.id)
+  &&!!follow.since&&Date.parse(n.createdAt||0)>Date.parse(follow.since);
+const followUnread=()=>DB.feed.filter(unreadStory);
+function toggleFollow(name){
+  const on=!follow.squads.includes(name);
+  follow.squads=on?follow.squads.concat(name):follow.squads.filter(s=>s!==name);
+  if(on&&!follow.since)follow.since=new Date(Date.now()-FOLLOW_LOOKBACK_MS).toISOString();
+  if(!follow.squads.length)follow={squads:[],since:null,seen:[]};
+  saveFollow();
+}
+function markStoriesSeen(list){
+  const ids=list.map(n=>n.id).filter(id=>!follow.seen.includes(id));
+  if(!ids.length)return;
+  follow.seen=follow.seen.concat(ids);
+  saveFollow();
+}
+/* Once the feed is loaded: forget "seen" ids of stories that have since been deleted (so the list
+   can't grow for ever), then put the unread count on every Club News link and a dot on the phone
+   menu button, since on a phone the link itself is hidden in the menu. */
+function renderFollowBadge(){
+  if(follow.seen.length){
+    const kept=follow.seen.filter(id=>DB.feed.some(n=>n.id===id));
+    if(kept.length!==follow.seen.length){follow.seen=kept;saveFollow();}
+  }
+  const n=followUnread().length;
+  const label=`${n} new ${n===1?"story":"stories"} for your squads`;
+  document.querySelectorAll('nav.main a[href="news"]').forEach(a=>{
+    let b=a.querySelector(".nav-badge");
+    if(!n){if(b)b.remove();return;}
+    if(!b){b=document.createElement("span");b.className="nav-badge";a.appendChild(b);}
+    b.textContent=n>9?"9+":n;
+    b.setAttribute("aria-label",label);
+  });
+  const burger=$("#burger");
+  if(burger){
+    burger.classList.toggle("has-unread",n>0);
+    burger.setAttribute("aria-label",n?`Open menu (${label})`:"Open menu");
+  }
+}
+/* The News page's follow panel: folded away to one line so it doesn't push the news down on a
+   phone. Squads come from Squad Timetables; one someone follows that has since been renamed or
+   removed stays listed so it can be unfollowed. */
+let followPanelOpen=false;
+function renderFollowPanel(){
+  const el=$("#followPanel");
+  if(!el)return;
+  const names=[...new Set(DB.squads.map(s=>s.name).concat(follow.squads))];
+  el.hidden=!names.length;
+  if(!names.length)return;
+  const unread=followUnread().length;
+  const summary=follow.squads.length
+    ?`<span class="follow-sum-label">Following</span> <span class="follow-sum-names">${esc(follow.squads.join(", "))}</span>`
+    :`<span class="follow-sum-label">Follow your squads</span> <span class="follow-sum-names">Get your swimmer's news marked for you</span>`;
+  el.innerHTML=`<details class="follow-panel"${followPanelOpen?" open":""}>
+    <summary><span class="follow-bell" aria-hidden="true">🔔</span><span class="follow-sum">${summary}</span>${unread?`<span class="follow-new">${unread} new</span>`:""}</summary>
+    <div class="follow-body">
+      <p class="follow-note">Tap the squads you want to follow. Their stories get a <b>Your squad</b> label, and new ones show a count on Club News. It's saved on this device only &mdash; no sign-up, nothing sent to us.</p>
+      <div class="follow-chips">${names.map(n=>{const on=follow.squads.includes(n);
+        return `<button type="button" class="news-tag-chip follow-chip${on?" active":""}" data-follow="${esc(n)}" aria-pressed="${on}">${on?"✓ ":""}${esc(n)}</button>`;}).join("")}</div>
+      ${unread?`<button type="button" class="btn small ghost follow-read" id="followMarkRead">Mark ${unread} as read</button>`:""}
+    </div>
+  </details>`;
+  el.querySelector("details").addEventListener("toggle",e=>{followPanelOpen=e.target.open;});
+}
+document.addEventListener("click",e=>{
+  const chip=e.target.closest("[data-follow]");
+  if(chip){
+    toggleFollow(chip.dataset.follow);
+    if(newsTagFilter===NEWS_MINE&&!follow.squads.length)newsTagFilter=null;
+    renderFollowPanel();renderNews();renderFollowBadge();
+    return;
+  }
+  if(e.target.closest("#followMarkRead")){
+    markStoriesSeen(followUnread());
+    renderFollowPanel();renderNews();renderFollowBadge();
+    toast("All caught up");
+  }
+});
 
 /* ================= NEWS TIMELINE =================
    Club News reads as one scroller running backwards through time: whatever landed in the last
@@ -454,9 +556,12 @@ function newsEraFor(iso,today){
 function newsCard(n,featured){
   const r=resolveNewsImage(n.img);
   const thumb=r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
-  return `<article class="card news-card tap-card${featured?" is-latest":""}">${thumb}<p class="eyebrow">${esc(n.tag)}</p>
+  const squads=n.squads||[];
+  const marks=followedStory(n)
+    ?`<p class="news-marks"><span class="news-mark mine">Your squad</span>${unreadStory(n)?`<span class="news-mark new">New</span>`:""}</p>`:"";
+  return `<article class="card news-card tap-card${featured?" is-latest":""}${followedStory(n)?" is-mine":""}">${thumb}${marks}<p class="eyebrow">${esc(n.tag)}</p>
     <h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3>
-    <p class="news-date"><time datetime="${esc(n.start)}">${fmtDate(n.start)}</time></p>
+    <p class="news-date"><time datetime="${esc(n.start)}">${fmtDate(n.start)}</time>${squads.length?` · For ${esc(squads.join(", "))}`:""}</p>
     <p style="color:var(--muted);font-size:.9rem;margin-top:8px">${esc(n.blurb)}</p>
     <div style="margin-top:14px">${cardLink(`href="article?id=${n.id}"`,'<span class="btn small ghost">Read more →</span>')}</div></article>`;
 }
@@ -464,14 +569,17 @@ function renderNews(){
   if(!$("#newsList"))return;
   const all=DB.feed.filter(it=>it.type==="news").sort((a,b)=>a.start<b.start?1:-1);
   const tags=[...new Set(all.map(n=>n.tag).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  if(newsTagFilter&&!tags.includes(newsTagFilter))newsTagFilter=null;
+  const mine=follow.squads.length>0;
+  if(newsTagFilter===NEWS_MINE?!mine:newsTagFilter&&!tags.includes(newsTagFilter))newsTagFilter=null;
   if($("#newsTagChips")){
     $("#newsTagChips").innerHTML=[`<button type="button" class="news-tag-chip${newsTagFilter?"":" active"}" data-tag="">All</button>`]
+      .concat(mine?[`<button type="button" class="news-tag-chip chip-mine${newsTagFilter===NEWS_MINE?" active":""}" data-tag="${NEWS_MINE}">My squads</button>`]:[])
       .concat(tags.map(t=>`<button type="button" class="news-tag-chip${t===newsTagFilter?" active":""}" data-tag="${esc(t)}">${esc(t)}</button>`)).join("");
   }
-  const list=newsTagFilter?all.filter(n=>n.tag===newsTagFilter):all;
+  const list=newsTagFilter===NEWS_MINE?all.filter(followedStory):newsTagFilter?all.filter(n=>n.tag===newsTagFilter):all;
   if(!list.length){
-    $("#newsList").innerHTML=`<p style="color:var(--muted)">${newsTagFilter?`No news articles tagged "${esc(newsTagFilter)}" yet.`:"No news articles yet."}</p>`;
+    $("#newsList").innerHTML=`<p style="color:var(--muted)">${newsTagFilter===NEWS_MINE?"No stories for your squads yet — they'll show here when there are."
+      :newsTagFilter?`No news articles tagged "${esc(newsTagFilter)}" yet.`:"No news articles yet."}</p>`;
     renderNewsJump([]);
     return;
   }
@@ -718,13 +826,14 @@ function renderArticle(){
     return;
   }
   document.title=`${it.title} — Basildon & Phoenix Swimming Club`;
+  if(followedStory(it))markStoriesSeen([it]);
   const back=it.type==="social"?{href:"club-calendar",label:"← Back to Club Calendar"}:{href:"news",label:"← Back to Club News"};
   view.innerHTML=articleContentHtml(it)
     +(it.link?`<div style="margin-top:18px"><a class="btn small" href="${esc(it.link)}" target="_blank" rel="noopener">Details / tickets →</a></div>`:"")
     +`<div style="margin-top:28px"><a class="btn small ghost" href="${back.href}">${back.label}</a></div>`;
   wireArticleGallery((it.photos||[]).length);
 }
-function renderAllPublic(){renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();renderCommittee();}
+function renderAllPublic(){renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();renderCommittee();renderFollowPanel();renderFollowBadge();}
 
 /* ================= NAV ================= */
 const infoDropdown=$("#infoDropdown"), infoToggle=$("#infoToggle");

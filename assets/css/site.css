@@ -535,6 +535,38 @@ section.page#page-home{padding-top:14px}
 .news-tag-chip.active::before{background:var(--flame);border-color:var(--flame)}
 .meet .news-thumb{grid-column:1/-1}
 
+/* ---- Following squads (see FOLLOWING SQUADS in site.js) ---- */
+.follow-panel{margin:0 0 22px;background:var(--card);border:1.5px solid var(--line);border-left:4px solid var(--flame)}
+.follow-panel summary{display:flex;align-items:center;gap:10px;padding:12px 16px;cursor:pointer;list-style:none;min-width:0}
+.follow-panel summary::-webkit-details-marker{display:none}
+.follow-panel summary::after{content:"▾";margin-left:auto;color:var(--muted);transition:transform .15s}
+.follow-panel[open] summary::after{transform:rotate(180deg)}
+.follow-bell{flex:0 0 auto}
+.follow-sum{min-width:0;display:flex;flex-wrap:wrap;column-gap:8px;align-items:baseline}
+.follow-sum-label{font-weight:800;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text)}
+.follow-sum-names{color:var(--muted);font-size:.9rem;overflow-wrap:anywhere}
+.follow-new{flex:0 0 auto;background:var(--flame);color:#101014;font-weight:800;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;padding:3px 9px;border-radius:999px}
+.follow-body{padding:0 16px 16px}
+.follow-note{color:var(--muted);font-size:.9rem;margin:0 0 14px;max-width:62ch}
+.follow-chips{display:flex;flex-wrap:wrap;gap:10px}
+.follow-read{margin-top:16px}
+.news-tag-chip.chip-mine:not(.active){color:var(--flame-dark)}
+.news-tag-chip.chip-mine:not(.active)::before{border-color:var(--flame)}
+.news-marks{display:flex;gap:6px;margin:0 0 8px}
+.news-mark{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:3px 8px;border-radius:999px}
+.news-mark.mine{background:rgba(245,132,31,.16);color:var(--flame-dark);border:1px solid var(--flame)}
+.news-mark.new{background:var(--flame);color:#101014}
+.news-card.is-mine{border-left:3px solid var(--flame)}
+/* the unread count on every Club News link, and a dot on the phone menu button */
+.nav-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;
+  border-radius:999px;background:var(--flame);color:#101014;font-size:.68rem;font-weight:800;line-height:1;text-shadow:none}
+nav.main a.active .nav-badge{background:#101014;color:var(--flame)}
+.burger{position:relative}
+.burger.has-unread::after{content:"";position:absolute;top:-4px;right:-4px;width:11px;height:11px;border-radius:50%;
+  background:var(--flame);border:2px solid #fff}
+body.theme-dark .burger.has-unread::after{border-color:#111116}
+body.theme-dark .news-mark.mine,body.theme-dark .news-tag-chip.chip-mine:not(.active){color:var(--flame)}
+
 /* ---- Club News timeline (see renderNews in site.js) ----
    One scroller running backwards through time. Each period is a block with its own heading;
    the sticky bar above them is the way forward and back. --hdr-h is set by site.js from the
@@ -1071,6 +1103,10 @@ label.f input:focus,label.f select:focus,label.f textarea:focus{border-color:var
 .hint{font-size:.85rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:normal}
 label.f.checkbox-f{display:flex;align-items:center;gap:10px}
 label.f.checkbox-f input{all:revert;width:18px;height:18px;accent-color:var(--flame)}
+/* News form: "Which squads is this for?" */
+.squad-picks{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:4px}
+.squad-pick{display:flex;align-items:center;gap:8px;color:var(--text);font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer}
+.squad-pick input{width:18px;height:18px;accent-color:var(--flame)}
 
 /* info accordions */
 /* Bevelled like the cards (--cut-sm/--rise-sm), not skewed: an accordion is 52px shut and can

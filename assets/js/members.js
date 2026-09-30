@@ -137,6 +137,7 @@ const SCHEMAS = {
   ],
   news:[
     {k:"tag",label:"Category tag (e.g. Racing, Club, Trips)",type:"text",req:1},
+    {k:"squads",label:"Which squads is this for?",type:"squadpicks"},
     {k:"title",label:"Headline",type:"text",req:1},
     {k:"start",label:"Date",type:"date",req:1},
     {k:"blurb",label:"Summary (shown in the news list and homepage)",type:"textarea",req:1},
@@ -247,7 +248,7 @@ function itemSummary(sec,it){
       return {t:it.title,s:`${typeLabel}${who} · ${fmtDate(it.start)} · ${it.venue||"Venue TBC"} · ${state}`};
     }
     if(it.type==="social")return {t:it.title,s:`${typeLabel} · ${fmtDate(it.start)}`};
-    if(it.type==="news")return {t:it.title,s:`${typeLabel} · ${it.tag}${it.start?" · "+fmtDate(it.start):""}`};
+    if(it.type==="news")return {t:it.title,s:`${typeLabel} · ${it.tag}${(it.squads||[]).length?" · for "+it.squads.join(", "):""}${it.start?" · "+fmtDate(it.start):""}`};
     if(it.type==="training")return {t:it.title,s:`${typeLabel} · ${fmtDate(it.start)}${it.end?" – "+fmtDate(it.end):""}`};
   }
   switch(sec){
@@ -544,6 +545,17 @@ function showForm(sec,id,forcedType){
     const val=esc(it[f.k]??"");
     if(f.type==="textarea")return `<label class="f">${f.label}<textarea name="${f.k}" rows="3" ${f.req?"required":""}>${val}</textarea></label>`;
     if(f.type==="checkbox")return `<label class="f checkbox-f"><input type="checkbox" name="${f.k}" ${it[f.k]===false?"":"checked"}> ${f.label}</label>`;
+    if(f.type==="squadpicks"){
+      /* Squads come from Squad Timetables. A name the story already carries but that list no
+         longer has (renamed or removed) is still offered, ticked, so saving can't drop it silently. */
+      const picked=it[f.k]||[];
+      const names=[...new Set(DB.squads.map(s=>s.name).concat(picked))];
+      return `<div class="f">${f.label}
+        <p class="hint" style="margin:0">People following a ticked squad see this story marked as theirs, and a count of new stories on the Club News link. Leave them all unticked for news that's for the whole club.</p>
+        ${names.length?`<div class="squad-picks">${names.map(n=>`<label class="checkbox-f squad-pick"><input type="checkbox" data-squadpick value="${esc(n)}" ${picked.includes(n)?"checked":""}> ${esc(n)}</label>`).join("")}</div>`
+          :`<p class="hint" style="margin:0">No squads set up yet — they come from Squad Timetables.</p>`}
+      </div>`;
+    }
     if(f.type==="select"){
       const opts=f.opts.map(o=>{const [v,l]=Array.isArray(o)?o:[o,o];return `<option value="${esc(v)}" ${it[f.k]===v?"selected":""}>${esc(l)}</option>`;}).join("");
       return `<label class="f">${f.label}<select name="${f.k}">${opts}</select></label>`;
@@ -875,6 +887,8 @@ function showForm(sec,id,forcedType){
     const data=Object.fromEntries(new FormData(e.target).entries());
     /* FormData omits an unchecked checkbox entirely, so read those straight off the inputs. */
     SCHEMAS[schemaKey].filter(f=>f.type==="checkbox").forEach(f=>{data[f.k]=formTarget.querySelector(`[name="${f.k}"]`).checked;});
+    if(SCHEMAS[schemaKey].some(f=>f.type==="squadpicks"))
+      data.squads=[...formTarget.querySelectorAll("[data-squadpick]:checked")].map(i=>i.value);
     if(sec==="coaches"){data.squads=(data.squadsRaw||"").split(",").map(s=>s.trim()).filter(Boolean);delete data.squadsRaw;}
     if(sec==="committee"){
       data.skills=(data.skillsRaw||"").split("\n").map(s=>s.trim()).filter(Boolean);delete data.skillsRaw;

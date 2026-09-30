@@ -17,7 +17,7 @@ const DB={feed:[],coaches:[],squads:[],roles:[],newsDefaults:[],welfare:[],commi
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",squads:"squads"};
 /* Highlight colours a meet's documents & links line can be given, so one that matters (a changed
    warm-up time, a late programme) stands out. The key is stored on the link; "" is no highlight. */
 const LINK_HIGHLIGHTS=[["","No highlight"],["orange","Orange"],["yellow","Yellow"],["green","Green"],["blue","Blue"],["red","Red"]];
@@ -29,18 +29,19 @@ function feedFromRow(row){
   for(const [key,col] of Object.entries(FEED_FIELDS))if(key!=="type"&&row[col]!==null)it[key]=row[col];
   /* The day it was first saved (read-only, never written back): tells the homepage whether a news
      story was written ahead of its date -- i.e. it's about something coming up (renderHeroFeed). */
-  if(row.created_at)it.created=isoDay(new Date(row.created_at));
+  if(row.created_at){it.created=isoDay(new Date(row.created_at));it.createdAt=row.created_at;}
   return it;
 }
 function feedToRow(it){
   const row={type:FEED_TYPE_TO_ROW[it.type]};
   for(const [key,col] of Object.entries(FEED_FIELDS))if(key!=="type")row[col]=it[key]===""||it[key]===undefined?null:it[key];
-  /* "visible", "photos" and "doc_links" are not-null columns; types whose form has no visibility
-     checkbox, gallery or link list never set them, so fill in the column default rather than
-     writing a null the database would reject. */
+  /* "visible", "photos", "doc_links" and "squads" are not-null columns; types whose form has no
+     visibility checkbox, gallery, link list or squad picker never set them, so fill in the column
+     default rather than writing a null the database would reject. */
   if(row.visible===null)row.visible=true;
   if(row.photos===null)row.photos=[];
   if(row.doc_links===null)row.doc_links=[];
+  if(row.squads===null)row.squads=[];
   return row;
 }
 const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads:r.squads||[],photo:r.photo||""});
@@ -426,6 +427,8 @@ const SUN_ICON='<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stro
 function syncThemeToggles(){
   const on=document.body.classList.contains("theme-dark");
   document.querySelectorAll(".theme-toggle").forEach(t=>{t.setAttribute("aria-pressed",on);t.innerHTML=on?MOON_ICON:SUN_ICON;});
+  // the phone's status bar / installed app's title bar matches the header
+  const tc=document.querySelector('meta[name="theme-color"]');if(tc)tc.content=on?"#111116":"#ffffff";
   return on;
 }
 function toggleTheme(e){e&&e.preventDefault();document.body.classList.toggle("theme-dark");
@@ -439,3 +442,25 @@ if(window.matchMedia){const mq=matchMedia("(prefers-color-scheme: light)");
   const follow=()=>{let saved=null;try{saved=localStorage.getItem("bpsc_theme");}catch(err){}
     if(!saved){document.body.classList.toggle("theme-dark",!mq.matches);syncThemeToggles();}};
   mq.addEventListener?mq.addEventListener("change",follow):mq.addListener&&mq.addListener(follow);}
+
+/* ================= INSTALL AS AN APP =================
+   sw.js is what makes the site installable. Chrome, Edge and Android offer the install
+   themselves; the "Install the app" footer link appears only when the browser says it can
+   install (or on an iPhone/iPad, where Safari has no prompt and it has to be done through
+   the Share menu). Hidden once running as the installed app. */
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+(function(){
+  const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone;
+  const col=document.querySelector("footer.site .foot-grid > div:last-child");
+  if(standalone||!col)return;
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  const link=document.createElement("a");link.href="#";link.textContent="Install the app";
+  const show=on=>link.style.display=on?"":"none";show(ios);
+  col.appendChild(link);
+  let deferred=null;
+  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;show(true);});
+  window.addEventListener("appinstalled",()=>{show(false);deferred=null;toast("Installed — find B&P Swim on your home screen");});
+  link.addEventListener("click",e=>{e.preventDefault();
+    if(deferred){deferred.prompt();deferred.userChoice.finally(()=>{deferred=null;show(false);});}
+    else if(ios)toast("Tap the Share button, then “Add to Home Screen”");});
+})();

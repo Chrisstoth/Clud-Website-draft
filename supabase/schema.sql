@@ -71,6 +71,8 @@ alter table public.feed add column if not exists pin_until date;
 -- Meet documents & links, a free list: [{"label","text","url","hl"}] (migration 016). Replaces the
 -- fixed conditions / entry file / results file / current entries columns, which are now unused.
 alter table public.feed add column if not exists doc_links jsonb not null default '[]'::jsonb;
+-- News: the squads a story is for, by name (empty = whole club); visitors follow squads (migration 017).
+alter table public.feed add column if not exists squads jsonb not null default '[]'::jsonb;
 
 create table if not exists public.coaches (
   id          bigint generated always as identity primary key,
