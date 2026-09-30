@@ -4,17 +4,18 @@ const ROLES = {
   coaching:   {label:"Coaching Lead",        desc:"Edit coach profiles & squad timetables", sections:["coaches","squads"]},
   volunteers: {label:"Volunteer Coordinator",desc:"Edit volunteer role explainers",   sections:["roles"]},
   socials:    {label:"Socials Team",         desc:"Add events, links & graphics",     sections:["feed","instagram"], feedTypes:["social"]},
-  comms:      {label:"Comms / Club News",    desc:"Post club news & announcements",   sections:["feed","instagram"], feedTypes:["news"]},
+  comms:      {label:"Comms / Club News",    desc:"Post club news & announcements",   sections:["feed","topics","instagram"], feedTypes:["news"]},
   training:   {label:"Coaching / Training Changes", desc:"Post key training schedule changes", sections:["feed"], feedTypes:["training"]},
   membership: {label:"Membership Team",      desc:"View trial & squad enquiries",     sections:["enquiries"]},
   welfare:    {label:"Welfare Officer",      desc:"Edit the Welfare & Safeguarding page", sections:["welfare"]},
   secretary:  {label:"Club Secretary",       desc:"Edit the Club Committee page",     sections:["committee"]},
-  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","instagram","images"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
+  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","topics","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","instagram","images"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
 };
 const SECTION_META = {
   feed:{name:"Club Feed", empty:"Nothing published yet — add the first item."},
   coaches:{name:"Coaches & Squads", empty:"No coaches listed yet."},
   squads:{name:"Squad Timetables", empty:"No squads yet — add the first one."},
+  topics:{name:"News Tags", empty:"The club hasn't added any tags of its own yet. Squads are tags already — add others (Trips, Open Water, Officials…) here."},
   roles:{name:"Volunteer Roles", empty:"No roles yet."},
   enquiries:{name:"Trial Enquiries (inbox)", empty:"No enquiries yet — the public Join Us form feeds this inbox."},
   newsDefaults:{name:"Default News Pictures", empty:"No default picture categories yet."},
@@ -64,7 +65,8 @@ const SCHEMAS = {
     {k:"name",label:"Name",type:"text",req:1},
     {k:"role",label:"Coaching role",type:"text",req:1},
     {k:"quals",label:"Qualifications & checks",type:"text"},
-    {k:"squadsRaw",label:"Squads (comma-separated)",type:"text"}
+    {k:"squadsRaw",label:"Squads (comma-separated)",type:"text"},
+    {k:"bio",label:"Bio (shown next to their card on the Coaches page)",type:"textarea"}
   ],
   roles:[
     {k:"title",label:"Role title",type:"text",req:1},
@@ -136,8 +138,7 @@ const SCHEMAS = {
     {k:"body",label:"Full write-up (shown on the article page)",type:"richtext"}
   ],
   news:[
-    {k:"tag",label:"Category tag (e.g. Racing, Club, Trips)",type:"text",req:1},
-    {k:"squads",label:"Which squads is this for?",type:"squadpicks"},
+    {k:"topics",label:"Tags",type:"tagpicks"},
     {k:"title",label:"Headline",type:"text",req:1},
     {k:"start",label:"Date",type:"date",req:1},
     {k:"blurb",label:"Summary (shown in the news list and homepage)",type:"textarea",req:1},
@@ -153,6 +154,9 @@ const SCHEMAS = {
     {k:"end",label:"End date (optional, for a range)",type:"date"},
     {k:"note",label:"Details for parents & swimmers",type:"textarea"},
     {k:"img",label:"Picture",type:"imagepicker"}
+  ],
+  topics:[
+    {k:"name",label:"Tag name (e.g. Trips, Open Water, Officials)",type:"text",req:1}
   ],
   newsDefaults:[
     {k:"label",label:"Category name",type:"text",req:1},
@@ -248,11 +252,14 @@ function itemSummary(sec,it){
       return {t:it.title,s:`${typeLabel}${who} · ${fmtDate(it.start)} · ${it.venue||"Venue TBC"} · ${state}`};
     }
     if(it.type==="social")return {t:it.title,s:`${typeLabel} · ${fmtDate(it.start)}`};
-    if(it.type==="news")return {t:it.title,s:`${typeLabel} · ${it.tag}${(it.squads||[]).length?" · for "+it.squads.join(", "):""}${it.start?" · "+fmtDate(it.start):""}`};
+    if(it.type==="news"){const tags=storyTags(it).map(t=>t.name).join(", ");
+      return {t:it.title,s:`${typeLabel}${tags?" · "+tags:" · whole club"}${it.start?" · "+fmtDate(it.start):""}`};}
     if(it.type==="training")return {t:it.title,s:`${typeLabel} · ${fmtDate(it.start)}${it.end?" – "+fmtDate(it.end):""}`};
   }
   switch(sec){
     case "coaches":return {t:it.name,s:it.role};
+    case "topics":{const n=DB.feed.filter(x=>x.type==="news"&&(x.topics||[]).includes("t:"+it.id)).length;
+      return {t:it.name,s:`${n} news ${n===1?"story":"stories"}`};}
     case "squads":{const n=(it.sessions||[]).length;return {t:it.name,s:`Lead squad coach: ${it.lead||"TBC"} · ${n} session${n===1?"":"s"} a week`};}
     case "roles":{const catLabel={officiating:"Officiating",team_manager:"Team Manager",volunteering:"Volunteering"}[it.category]||"Volunteering";
       return {t:it.title,s:`${catLabel}${it.commitment?" · "+it.commitment:""}`};}
@@ -323,17 +330,24 @@ function renderAdminSection(){
     return;
   }
   const items=sec==="feed"?feedItemsForRole(role):DB[sec];
-  const note=sec==="feed"&&role.feedTypes.length>1
+  const note=sec==="topics"
+    ?"These are the club's own tags for news stories. Every squad in Squad Timetables is a tag automatically, so there's no need to add squads here. Visitors can follow any tag on the News page and get a count of new stories for it. Renaming a tag updates every story that has it; deleting one just takes it off those stories."
+    :sec==="feed"&&role.feedTypes.length>1
     ?"Changes here publish straight to the public page — no webmaster needed. This feed is shared across several types of item; pick the type when you add something new."
     :"Changes here publish straight to the public page — no webmaster needed.";
   const slides=sec==="feed"?homepageSlides():[];
-  const rowHtml=it=>{const s=itemSummary(sec,it);
+  const REORDERABLE=["coaches"];
+  const rowHtml=(it,i,arr)=>{const s=itemSummary(sec,it);
     const h=sec==="feed"?homeStatus(it,slides):null;
     const cls=h?(h.pinned&&h.slot>=0?" is-pinned":h.slot>=0?" on-home":""):"";
+    const move=REORDERABLE.includes(sec)?`<span class="doclink-move">
+      <button type="button" data-move-up="${it.id}" ${i===0?"disabled":""} title="Move up">↑</button>
+      <button type="button" data-move-down="${it.id}" ${i===arr.length-1?"disabled":""} title="Move down">↓</button>
+      </span>`:"";
     return `
       <div class="item-block" data-item-block="${it.id}">
       <div class="item-row${cls}"><div><div class="t">${esc(s.t)}</div><div class="s">${esc(s.s)}</div>${sec==="feed"?homeBadges(it,slides):""}</div>
-      <div class="acts"><button class="btn small ghost" data-edit="${it.id}">Edit</button>
+      <div class="acts">${move}<button class="btn small ghost" data-edit="${it.id}">Edit</button>
       <button class="btn small dangerous" data-del="${it.id}">Delete</button></div></div>
       <div class="edit-slot" id="editSlot-${it.id}"></div>
       </div>`;};
@@ -343,18 +357,19 @@ function renderAdminSection(){
     const galasOnly=role.feedTypes.every(t=>MEET_TYPES.includes(t));
     if(feedFilter.type&&!role.feedTypes.includes(feedFilter.type))feedFilter={type:"",tag:""};
     const newsShown=role.feedTypes.includes("news")&&(feedFilter.type==="news"||role.feedTypes.length===1);
-    const tags=newsShown?[...new Set(items.filter(it=>it.type==="news"&&it.tag).map(it=>it.tag))].sort((a,b)=>a.localeCompare(b)):[];
-    if(!tags.includes(feedFilter.tag))feedFilter.tag="";
+    const hasTag=(it,ref)=>it.type==="news"&&(it.topics||[]).includes(ref);
+    const tags=newsShown?newsTagList().filter(t=>items.some(it=>hasTag(it,t.ref))):[];
+    if(!tags.some(t=>t.ref===feedFilter.tag))feedFilter.tag="";
     const chip=(attr,val,label,n,on)=>`<button type="button" class="news-tag-chip${on?" active":""}" ${attr}="${esc(val)}">${esc(label)} <span class="chip-n">${n}</span></button>`;
     const typeChips=role.feedTypes.length>1?`<div class="news-tag-chips admin-filter" id="feedTypeChips">
         ${chip("data-ftype","","All",items.length,!feedFilter.type)}
         ${role.feedTypes.map(t=>[t,items.filter(it=>it.type===t).length]).filter(([t,n])=>n||feedFilter.type===t)
           .map(([t,n])=>chip("data-ftype",t,FEED_TYPE_META[t].short,n,feedFilter.type===t)).join("")}</div>`:"";
     const newsItems=items.filter(it=>it.type==="news");
-    const tagChips=tags.length>1?`<div class="news-tag-chips admin-filter" id="feedTagChips"><span class="admin-filter-label">Category</span>
+    const tagChips=tags.length>1?`<div class="news-tag-chips admin-filter" id="feedTagChips"><span class="admin-filter-label">Tag</span>
         ${chip("data-ftag","","All",newsItems.length,!feedFilter.tag)}
-        ${tags.map(t=>chip("data-ftag",t,t,newsItems.filter(it=>it.tag===t).length,feedFilter.tag===t)).join("")}</div>`:"";
-    const shown=items.filter(it=>(!feedFilter.type||it.type===feedFilter.type)&&(!feedFilter.tag||it.tag===feedFilter.tag));
+        ${tags.map(t=>chip("data-ftag",t.ref,t.name,newsItems.filter(it=>hasTag(it,t.ref)).length,feedFilter.tag===t.ref)).join("")}</div>`:"";
+    const shown=items.filter(it=>(!feedFilter.type||it.type===feedFilter.type)&&(!feedFilter.tag||hasTag(it,feedFilter.tag)));
     const byDate=[...shown].sort((a,b)=>(a.start||"").localeCompare(b.start||""));
     const upcoming=byDate.filter(it=>!it.start||!meetDone(it)),past=byDate.filter(it=>it.start&&meetDone(it)).reverse();
     return `${typeChips}${tagChips}
@@ -403,6 +418,9 @@ function renderAdminSection(){
       }
       return;
     }
+    const up=e.target.closest("[data-move-up]"),down=e.target.closest("[data-move-down]");
+    if(up&&!up.disabled){moveItem(sec,+up.dataset.moveUp,-1);return;}
+    if(down&&!down.disabled){moveItem(sec,+down.dataset.moveDown,1);return;}
     const ed=e.target.closest("[data-edit]"),del=e.target.closest("[data-del]");
     if(ed){
       const clickedId=+ed.dataset.edit,wasOpen=editingId===clickedId;
@@ -426,6 +444,20 @@ async function publishItem(sec,id,data){
   renderAdminShell();
   toast(id?"Saved — live on the public site":"Published to the public site");
   return true;
+}
+/* Swaps an item with its neighbour and renumbers the whole list 0..n-1 in the new order, so
+   a stray duplicate sort_order (e.g. two items both left at the column default) can't stick an
+   item in place -- every move self-heals the full ordering, not just the two rows touched. */
+async function moveItem(sec,id,dir){
+  const items=[...DB[sec]];
+  const idx=items.findIndex(it=>it.id===id),j=idx+dir;
+  if(idx<0||j<0||j>=items.length)return;
+  [items[idx],items[j]]=[items[j],items[idx]];
+  const results=await Promise.all(items.map((it,i)=>sb.from(SECTIONS[sec].table).update({sort_order:i}).eq("id",it.id)));
+  const failed=results.find(r=>r.error);
+  if(failed)return toast(saveErrorMessage(failed.error));
+  await loadContent();
+  renderAdminShell();
 }
 async function deleteItem(sec,id){
   const {error}=await sb.from(SECTIONS[sec].table).delete().eq("id",id);
@@ -529,6 +561,7 @@ function docLinkRowHtml(l={}){
     <button type="button" class="sess-del" data-doclink-del aria-label="Remove link">×</button>
   </div>`;
 }
+const tagPickHtml=(t,on)=>`<label class="checkbox-f squad-pick"><input type="checkbox" data-tagpick value="${esc(t.ref)}" ${on?"checked":""}> ${esc(t.name)}</label>`;
 function showForm(sec,id,forcedType){
   editingId=id;
   if(sec==="squads")return showSquadForm(id);
@@ -545,15 +578,20 @@ function showForm(sec,id,forcedType){
     const val=esc(it[f.k]??"");
     if(f.type==="textarea")return `<label class="f">${f.label}<textarea name="${f.k}" rows="3" ${f.req?"required":""}>${val}</textarea></label>`;
     if(f.type==="checkbox")return `<label class="f checkbox-f"><input type="checkbox" name="${f.k}" ${it[f.k]===false?"":"checked"}> ${f.label}</label>`;
-    if(f.type==="squadpicks"){
-      /* Squads come from Squad Timetables. A name the story already carries but that list no
-         longer has (renamed or removed) is still offered, ticked, so saving can't drop it silently. */
+    if(f.type==="tagpicks"){
+      /* Squads (from Squad Timetables) and the club's own tags (News Tags). Stored as references,
+         so a tag or squad deleted since is simply no longer offered. */
       const picked=it[f.k]||[];
-      const names=[...new Set(DB.squads.map(s=>s.name).concat(picked))];
+      const all=newsTagList();
+      const canAdd=session.role.sections.includes("topics");
       return `<div class="f">${f.label}
-        <p class="hint" style="margin:0">People following a ticked squad see this story marked as theirs, and a count of new stories on the Club News link. Leave them all unticked for news that's for the whole club.</p>
-        ${names.length?`<div class="squad-picks">${names.map(n=>`<label class="checkbox-f squad-pick"><input type="checkbox" data-squadpick value="${esc(n)}" ${picked.includes(n)?"checked":""}> ${esc(n)}</label>`).join("")}</div>`
-          :`<p class="hint" style="margin:0">No squads set up yet — they come from Squad Timetables.</p>`}
+        <p class="hint" style="margin:0">Tick whatever this story is about or who it's for. The club's tags show on the card; squads show as "For Gold 1". People following a ticked tag get the story marked for them and a count of new stories on the Club News link. Leave everything unticked for whole-club news.</p>
+        <p class="tag-group-label">Topics</p>
+        <div class="squad-picks" id="topicPicks">${all.filter(t=>!t.squad).map(t=>tagPickHtml(t,picked.includes(t.ref))).join("")||`<span class="hint">None yet.</span>`}</div>
+        ${canAdd?`<div class="tag-add"><input type="text" id="newTagName" placeholder="New tag, e.g. Trips" maxlength="40" aria-label="New tag name">
+          <button type="button" class="btn small ghost" id="addTagBtn">+ Add tag</button></div>`:""}
+        <p class="tag-group-label">Squads</p>
+        <div class="squad-picks">${all.filter(t=>t.squad).map(t=>tagPickHtml(t,picked.includes(t.ref))).join("")||`<span class="hint">No squads set up yet — they come from Squad Timetables.</span>`}</div>
       </div>`;
     }
     if(f.type==="select"){
@@ -638,6 +676,34 @@ function showForm(sec,id,forcedType){
     <div style="display:flex;gap:10px"><button class="btn" type="submit">${id?"Save & publish":"Publish"}</button>
     <button class="btn ghost" type="button" id="cancelForm">Cancel</button></div></form>`;
   formTarget.scrollIntoView({behavior:"smooth",block:"nearest"});
+  const pickedTags=()=>[...formTarget.querySelectorAll("[data-tagpick]:checked")].map(i=>i.value);
+  /* "+ Add tag" makes a new club tag on the spot and ticks it, so nobody has to leave a half-written
+     story to go to News Tags first. It goes live straight away (it's only a name). */
+  const addTag=async()=>{
+    const input=$("#newTagName"),name=input.value.trim();
+    if(!name)return input.focus();
+    const clash=newsTagList().find(t=>t.name.toLowerCase()===name.toLowerCase());
+    if(clash){
+      const box=formTarget.querySelector(`[data-tagpick][value="${clash.ref}"]`);
+      if(box)box.checked=true;
+      input.value="";
+      return toast(`"${clash.name}" is already a ${clash.squad?"squad":"tag"} — ticked it`);
+    }
+    $("#addTagBtn").disabled=true;
+    const {data:row,error}=await sb.from("news_topics").insert({name}).select().single();
+    $("#addTagBtn").disabled=false;
+    if(error)return toast(saveErrorMessage(error));
+    const t=topicFromRow(row);
+    DB.topics.push(t);
+    DB.topics.sort((a,b)=>a.name.localeCompare(b.name));
+    const holder=$("#topicPicks");
+    holder.querySelector(".hint")?.remove();
+    holder.insertAdjacentHTML("beforeend",tagPickHtml({ref:"t:"+t.id,name:t.name},true));
+    input.value="";
+    toast(`Tag "${t.name}" added`);
+  };
+  $("#addTagBtn")?.addEventListener("click",addTag);
+  $("#newTagName")?.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addTag();}});
   /* Opens the framing editor on a set of photos (the gallery, one screen's own homepage pictures,
      or the one picture), starting at photo i, showing only the views those photos appear in. On
      a feed item it also carries the story's homepage card (its live text from this form, and
@@ -648,7 +714,7 @@ function showForm(sec,id,forcedType){
     let card=null;
     if(cardInput){
       const live=Object.fromEntries(new FormData(formTarget.querySelector("#adminForm")).entries());
-      card={...heroFeedContent({...live,type}),layout:cardInput.value};
+      card={...heroFeedContent({...live,type,topics:pickedTags()}),layout:cardInput.value};
     }
     const res=await openFramingEditor(urls,i,card,views);
     if(!res)return null;
@@ -877,6 +943,7 @@ function showForm(sec,id,forcedType){
     const liveData=Object.fromEntries(new FormData(formTarget.querySelector("#adminForm")).entries());
     liveData.type=type;
     liveData.id=it.id;
+    liveData.topics=pickedTags();
     if(galleryField)liveData.photos=galleryPhotos;
     if(rteEditor)liveData.body=sanitizeArticleHtml(rteEditor.innerHTML);
     showArticlePreview(liveData);
@@ -887,8 +954,12 @@ function showForm(sec,id,forcedType){
     const data=Object.fromEntries(new FormData(e.target).entries());
     /* FormData omits an unchecked checkbox entirely, so read those straight off the inputs. */
     SCHEMAS[schemaKey].filter(f=>f.type==="checkbox").forEach(f=>{data[f.k]=formTarget.querySelector(`[name="${f.k}"]`).checked;});
-    if(SCHEMAS[schemaKey].some(f=>f.type==="squadpicks"))
-      data.squads=[...formTarget.querySelectorAll("[data-squadpick]:checked")].map(i=>i.value);
+    if(SCHEMAS[schemaKey].some(f=>f.type==="tagpicks"))data.topics=pickedTags();
+    if(sec==="topics"){
+      data.name=(data.name||"").trim();
+      const clash=newsTagList().find(t=>t.name.toLowerCase()===data.name.toLowerCase()&&t.ref!=="t:"+id);
+      if(clash){toast(clash.squad?`"${clash.name}" is already a squad, so it's a tag already`:`There's already a tag called "${clash.name}"`);return;}
+    }
     if(sec==="coaches"){data.squads=(data.squadsRaw||"").split(",").map(s=>s.trim()).filter(Boolean);delete data.squadsRaw;}
     if(sec==="committee"){
       data.skills=(data.skillsRaw||"").split("\n").map(s=>s.trim()).filter(Boolean);delete data.skillsRaw;

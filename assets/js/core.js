@@ -13,11 +13,11 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const TT_LOC={lc:"BSV Long Course",deep:"BSV Short Course – Deep End",shallow:"BSV Short Course – Shallow End",bill:"Billericay Pool",land:"BSV Meeting Room"};
 
 /* In-memory copy of what is published, filled by loadContent() on every page load. */
-const DB={feed:[],coaches:[],squads:[],roles:[],newsDefaults:[],welfare:[],committee:[],enquiries:[]};
+const DB={feed:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfare:[],committee:[],enquiries:[]};
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",tag:"tag",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",squads:"squads"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",topics:"topics"};
 /* Highlight colours a meet's documents & links line can be given, so one that matters (a changed
    warm-up time, a late programme) stands out. The key is stored on the link; "" is no highlight. */
 const LINK_HIGHLIGHTS=[["","No highlight"],["orange","Orange"],["yellow","Yellow"],["green","Green"],["blue","Blue"],["red","Red"]];
@@ -35,19 +35,21 @@ function feedFromRow(row){
 function feedToRow(it){
   const row={type:FEED_TYPE_TO_ROW[it.type]};
   for(const [key,col] of Object.entries(FEED_FIELDS))if(key!=="type")row[col]=it[key]===""||it[key]===undefined?null:it[key];
-  /* "visible", "photos", "doc_links" and "squads" are not-null columns; types whose form has no
-     visibility checkbox, gallery, link list or squad picker never set them, so fill in the column
+  /* "visible", "photos", "doc_links" and "topics" are not-null columns; types whose form has no
+     visibility checkbox, gallery, link list or tag picker never set them, so fill in the column
      default rather than writing a null the database would reject. */
   if(row.visible===null)row.visible=true;
   if(row.photos===null)row.photos=[];
   if(row.doc_links===null)row.doc_links=[];
-  if(row.squads===null)row.squads=[];
+  if(row.topics===null)row.topics=[];
   return row;
 }
-const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads:r.squads||[],photo:r.photo||""});
-const coachToRow=c=>({name:c.name,role:c.role,quals:c.quals||null,squads:c.squads||[],photo:c.photo||null});
+const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads:r.squads||[],photo:r.photo||"",bio:r.bio||"",sortOrder:r.sort_order??0});
+const coachToRow=c=>({name:c.name,role:c.role,quals:c.quals||null,squads:c.squads||[],photo:c.photo||null,bio:c.bio||null});
 const squadFromRow=r=>({id:r.id,name:r.name,lead:r.lead||"",sessions:r.sessions||[]});
 const squadToRow=s=>({name:s.name,lead:s.lead||null,sessions:s.sessions||[]});
+const topicFromRow=r=>({id:r.id,name:r.name});
+const topicToRow=t=>({name:t.name});
 const roleFromRow=r=>({id:r.id,title:r.title,category:r.category||"volunteering",commitment:r.commitment||"",training:r.training||"",blurb:r.blurb});
 const roleToRow=r=>({title:r.title,category:r.category||"volunteering",commitment:r.commitment||null,training:r.training||null,blurb:r.blurb});
 const pictureFromRow=r=>({id:r.id,key:r.key,label:r.label,icon:r.icon||"",bg:r.bg||"",img:r.img||""});
@@ -62,6 +64,7 @@ const SECTIONS={
   feed:{table:"feed",from:feedFromRow,to:feedToRow,order:"start_date"},
   coaches:{table:"coaches",from:coachFromRow,to:coachToRow,order:"sort_order"},
   squads:{table:"squads",from:squadFromRow,to:squadToRow,order:"sort_order"},
+  topics:{table:"news_topics",from:topicFromRow,to:topicToRow,order:"name"},
   roles:{table:"volunteer_roles",from:roleFromRow,to:roleToRow,order:"sort_order"},
   newsDefaults:{table:"news_defaults",from:pictureFromRow,to:pictureToRow,order:"id"},
   welfare:{table:"welfare_page",from:welfareFromRow,to:welfareToRow,order:"id"},
@@ -197,6 +200,25 @@ function photoImgStyle(url){
   return `object-position:${pos}`+(f.zoom>1?`;transform:scale(${f.zoom});transform-origin:${pos}`:"");
 }
 
+/* ================= NEWS TAGS =================
+   One list the club manages, which both labels a story and is what visitors follow: every squad
+   in Squad Timetables (automatically) plus the club's own tags (DB.topics -- Trips, Open Water…).
+   A story holds references, not names ("s:<squad id>", "t:<tag id>"), so a rename carries through
+   and a deleted tag or squad just drops out. Squads read as who a story is for ("For Gold 1"); the
+   club's tags read as what it's about, in the card's eyebrow. */
+function newsTagList(){
+  return DB.topics.map(t=>({ref:"t:"+t.id,name:t.name,squad:false}))
+    .concat(DB.squads.map(s=>({ref:"s:"+s.id,name:s.name,squad:true})));
+}
+function storyTags(it){
+  const refs=it.topics||[];
+  return newsTagList().filter(t=>refs.includes(t.ref));
+}
+/* What a story is about, for eyebrows: its club tags, or plain "Club News" with none. */
+const storyTopicLabel=it=>storyTags(it).filter(t=>!t.squad).map(t=>t.name).join(" · ")||"Club News";
+/* Who it's for: its squads, e.g. "Gold 1, Silver 2" -- empty when it's for the whole club. */
+const storySquadLabel=it=>storyTags(it).filter(t=>t.squad).map(t=>t.name).join(", ");
+
 /* Hero carousel: pulls across the whole feed (meets, socials, news) so it reads as one connected
    "what's happening" strip rather than club news alone. Two kinds of item, two rules:
    - events (meets, socials, training changes -- and a news story written ahead of its date,
@@ -228,7 +250,8 @@ function heroFeedContent(it){
   if(isMeet(it))return {tag:it.type==="teamMeet"?"Team Meet":"Open Meet",title:it.title,blurb:`${it.venue||"Venue TBC"} · ${fmtDate(it.start)}`,linkAttrs:'href="open-meets"',img:it.img||null};
   if(it.type==="social")return {tag:"Club Calendar",title:it.title,blurb:it.blurb||fmtDate(it.start),linkAttrs:`href="article?id=${it.id}"`,img:it.img||null};
   if(it.type==="training")return {tag:"Training change",title:it.title,blurb:it.note||fmtDate(it.start),linkAttrs:'href="club-calendar"',img:it.img||null};
-  return {tag:`${it.tag} · Club News`,title:it.title,blurb:it.blurb,linkAttrs:`href="article?id=${it.id}"`,img:it.img||null};
+  const about=storyTopicLabel(it);
+  return {tag:about==="Club News"?about:`${about} · Club News`,title:it.title,blurb:it.blurb,linkAttrs:`href="article?id=${it.id}"`,img:it.img||null};
 }
 /* An item's hero_card setting as the classes the card takes: space-separated words, each for one
    screen -- computer: "right", "compact"; phone: "p-top", "p-compact"; empty is the default
@@ -342,8 +365,9 @@ function wireArticleGallery(n){
 function articleContentHtml(it){
   const photos=it.photos||[];
   const cover=!photos.length?resolveNewsImage(it.img,"article"):null;
-  const dateLabel=it.start?fmtDate(it.start):"";
-  const eyebrow=it.type==="news"?(it.tag||"Club News"):"Club Calendar · Social";
+  const forWho=it.type==="news"?storySquadLabel(it):"";
+  const dateLabel=[it.start?fmtDate(it.start):"",forWho?`For ${forWho}`:""].filter(Boolean).join(" · ");
+  const eyebrow=it.type==="news"?storyTopicLabel(it):"Club Calendar · Social";
   const media=photos.length?articleGalleryHtml(photos)
     :(cover?`<div class="article-cover ${cover.cls}" style="${cover.style}">${cover.icon?`<span class="news-thumb-icon">${cover.icon}</span>`:""}</div>`:"");
   const bodyHtml=sanitizeArticleHtml(it.body||"")||`<p>${esc(it.blurb||"")}</p>`;

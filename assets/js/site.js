@@ -108,11 +108,15 @@ function coachCard(c){
   const ini=c.name.split(" ").map(w=>w[0]).slice(0,2).join("");
   const squads=(c.squads||[]).map(s=>`<span class="tag">${esc(s)}</span>`).join("");
   const photoStyle=c.photo?`background-image:url('${esc(c.photo)}')`:"";
-  return `<article class="card coach">
-    <div class="coach-photo" style="${photoStyle}">${c.photo?"":`<span class="avatar">${esc(ini)}</span>`}</div>
-    <h3>${esc(c.name)}</h3><div class="role">${esc(c.role)}</div>
-    ${c.quals?`<div class="quals">${esc(c.quals)}</div>`:""}
-    <div class="squads">${squads}</div></article>`;
+  const bio=(c.bio||"").trim();
+  return `<article class="card coach${bio?" has-bio":""}">
+    <div class="coach-main">
+      <div class="coach-photo" style="${photoStyle}">${c.photo?"":`<span class="avatar">${esc(ini)}</span>`}</div>
+      <h3>${esc(c.name)}</h3><div class="role">${esc(c.role)}</div>
+      ${c.quals?`<div class="quals">${esc(c.quals)}</div>`:""}
+      <div class="squads">${squads}</div>
+    </div>
+    ${bio?`<div class="coach-bio"><p>${esc(bio)}</p></div>`:""}</article>`;
 }
 function renderCoaches(){
   if(!$("#coachesList"))return;
@@ -425,39 +429,40 @@ const HERO_SLIDE_BG=[
 let heroIndex=0;
 const HERO_AUTO_MS=10000;
 let heroAutoTimer=null,heroHeld=false;
+/* The News page's filter: null (everything), NEWS_MINE, or one tag's reference ("t:3" / "s:5"). */
 let newsTagFilter=null;
-/* The "My squads" chip's filter value -- can't clash with a real category, which is free text
-   but never starts with a space. */
-const NEWS_MINE=" mine";
+const NEWS_MINE="mine";
 
-/* ================= FOLLOWING SQUADS =================
-   No accounts: a visitor ticks the squads they care about on the News page and it's remembered
-   in this browser only (localStorage), never sent anywhere. Stories an admin tagged for one of
-   those squads (feed.squads) are marked as theirs, and the ones they haven't opened yet put a
-   count on the Club News link on every page. It lasts until the browser's site data is cleared
-   (Safari on an iPhone also clears it after about a week without a visit, unless the site is
-   installed to the home screen); a different device or browser starts afresh.
+/* ================= FOLLOWING TAGS =================
+   No accounts: a visitor ticks the tags they care about on the News page -- squads, and the club's
+   own tags like Trips (see NEWS TAGS in core.js) -- and it's remembered in this browser only
+   (localStorage), never sent anywhere. Stories with one of those tags get a "For you" label, and
+   the ones they haven't opened yet put a count on the Club News link on every page. It lasts
+   until the browser's site data is cleared (Safari on an iPhone also clears it after about a week
+   without a visit, unless the site is installed to the home screen); a different device or
+   browser starts afresh.
    "Unread" only counts stories posted since they started following -- less a week, so following
-   a squad shows its latest news straight away rather than an empty count. */
-const FOLLOW_KEY="bpsc_follow_v1",FOLLOW_LOOKBACK_MS=7*86400000;
+   a tag shows its latest news straight away rather than an empty count. */
+const FOLLOW_KEY="bpsc_follow_v2",FOLLOW_LOOKBACK_MS=7*86400000;
+const FOLLOW_EMPTY=()=>({tags:[],since:null,seen:[]});
 function loadFollow(){
   try{
     const f=JSON.parse(localStorage.getItem(FOLLOW_KEY)||"null");
-    if(f&&Array.isArray(f.squads))return {squads:f.squads,since:f.since||null,seen:Array.isArray(f.seen)?f.seen:[]};
+    if(f&&Array.isArray(f.tags))return {tags:f.tags,since:f.since||null,seen:Array.isArray(f.seen)?f.seen:[]};
   }catch(e){}
-  return {squads:[],since:null,seen:[]};
+  return FOLLOW_EMPTY();
 }
 let follow=loadFollow();
 function saveFollow(){try{localStorage.setItem(FOLLOW_KEY,JSON.stringify(follow));}catch(e){}}
-const followedStory=n=>n.type==="news"&&(n.squads||[]).some(s=>follow.squads.includes(s));
+const followedStory=n=>n.type==="news"&&(n.topics||[]).some(r=>follow.tags.includes(r));
 const unreadStory=n=>followedStory(n)&&!follow.seen.includes(n.id)
   &&!!follow.since&&Date.parse(n.createdAt||0)>Date.parse(follow.since);
 const followUnread=()=>DB.feed.filter(unreadStory);
-function toggleFollow(name){
-  const on=!follow.squads.includes(name);
-  follow.squads=on?follow.squads.concat(name):follow.squads.filter(s=>s!==name);
+function toggleFollow(ref){
+  const on=!follow.tags.includes(ref);
+  follow.tags=on?follow.tags.concat(ref):follow.tags.filter(r=>r!==ref);
   if(on&&!follow.since)follow.since=new Date(Date.now()-FOLLOW_LOOKBACK_MS).toISOString();
-  if(!follow.squads.length)follow={squads:[],since:null,seen:[]};
+  if(!follow.tags.length)follow=FOLLOW_EMPTY();
   saveFollow();
 }
 function markStoriesSeen(list){
@@ -466,16 +471,20 @@ function markStoriesSeen(list){
   follow.seen=follow.seen.concat(ids);
   saveFollow();
 }
-/* Once the feed is loaded: forget "seen" ids of stories that have since been deleted (so the list
-   can't grow for ever), then put the unread count on every Club News link and a dot on the phone
-   menu button, since on a phone the link itself is hidden in the menu. */
+/* Once content is loaded: drop follows of tags the club has since deleted, and "seen" ids of
+   stories since deleted (so neither list grows for ever), then put the unread count on every
+   Club News link and a dot on the phone menu button, since on a phone the link itself is hidden
+   in the menu. */
 function renderFollowBadge(){
-  if(follow.seen.length){
-    const kept=follow.seen.filter(id=>DB.feed.some(n=>n.id===id));
-    if(kept.length!==follow.seen.length){follow.seen=kept;saveFollow();}
+  const refs=newsTagList().map(t=>t.ref);
+  const tags=follow.tags.filter(r=>refs.includes(r));
+  const seen=follow.seen.filter(id=>DB.feed.some(n=>n.id===id));
+  if(tags.length!==follow.tags.length||seen.length!==follow.seen.length){
+    follow=tags.length?{...follow,tags,seen}:FOLLOW_EMPTY();
+    saveFollow();
   }
   const n=followUnread().length;
-  const label=`${n} new ${n===1?"story":"stories"} for your squads`;
+  const label=`${n} new ${n===1?"story":"stories"} for you`;
   document.querySelectorAll('nav.main a[href="news"]').forEach(a=>{
     let b=a.querySelector(".nav-badge");
     if(!n){if(b)b.remove();return;}
@@ -490,26 +499,41 @@ function renderFollowBadge(){
   }
 }
 /* The News page's follow panel: folded away to one line so it doesn't push the news down on a
-   phone. Squads come from Squad Timetables; one someone follows that has since been renamed or
-   removed stays listed so it can be unfollowed. */
+   phone. Squads and the club's own tags are listed as two groups. */
 let followPanelOpen=false;
+/* The iPhone warning only matters in Safari itself -- the Home Screen app keeps its data. */
+const FOLLOW_IOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+const FOLLOW_INSTALLED=matchMedia("(display-mode: standalone)").matches||!!navigator.standalone;
 function renderFollowPanel(){
   const el=$("#followPanel");
   if(!el)return;
-  const names=[...new Set(DB.squads.map(s=>s.name).concat(follow.squads))];
-  el.hidden=!names.length;
-  if(!names.length)return;
+  const all=newsTagList();
+  el.hidden=!all.length;
+  if(!all.length)return;
   const unread=followUnread().length;
-  const summary=follow.squads.length
-    ?`<span class="follow-sum-label">Following</span> <span class="follow-sum-names">${esc(follow.squads.join(", "))}</span>`
-    :`<span class="follow-sum-label">Follow your squads</span> <span class="follow-sum-names">Get your swimmer's news marked for you</span>`;
+  const followed=all.filter(t=>follow.tags.includes(t.ref));
+  const summary=followed.length
+    ?`<span class="follow-sum-label">Following</span> <span class="follow-sum-names">${esc(followed.map(t=>t.name).join(", "))}</span>`
+    :`<span class="follow-sum-label">Follow what matters to you</span> <span class="follow-sum-names">Your squads, trips and more</span>`;
+  const group=(label,list)=>list.length?`<p class="follow-group">${label}</p><div class="follow-chips">${list.map(t=>{const on=follow.tags.includes(t.ref);
+    return `<button type="button" class="news-tag-chip follow-chip${on?" active":""}" data-follow="${esc(t.ref)}" aria-pressed="${on}">${on?"✓ ":""}${esc(t.name)}</button>`;}).join("")}</div>`:"";
   el.innerHTML=`<details class="follow-panel"${followPanelOpen?" open":""}>
     <summary><span class="follow-bell" aria-hidden="true">🔔</span><span class="follow-sum">${summary}</span>${unread?`<span class="follow-new">${unread} new</span>`:""}</summary>
     <div class="follow-body">
-      <p class="follow-note">Tap the squads you want to follow. Their stories get a <b>Your squad</b> label, and new ones show a count on Club News. It's saved on this device only &mdash; no sign-up, nothing sent to us.</p>
-      <div class="follow-chips">${names.map(n=>{const on=follow.squads.includes(n);
-        return `<button type="button" class="news-tag-chip follow-chip${on?" active":""}" data-follow="${esc(n)}" aria-pressed="${on}">${on?"✓ ":""}${esc(n)}</button>`;}).join("")}</div>
+      <p class="follow-note">Tap anything you want to follow. Those stories get a <b>For you</b> label, and new ones show a count on Club News. No sign-up, and nothing is sent to us.</p>
+      ${group("Squads",all.filter(t=>t.squad))}
+      ${group("Topics",all.filter(t=>!t.squad))}
       ${unread?`<button type="button" class="btn small ghost follow-read" id="followMarkRead">Mark ${unread} as read</button>`:""}
+      <div class="follow-warn">
+        <p class="follow-warn-head">⚠️ Saved on this device only</p>
+        <ul>
+          <li><b>Other phones, tablets or computers</b> won't know what you follow &mdash; set it up on each one.</li>
+          <li><b>Clearing your browsing data</b> (history, cookies or site data) wipes it, and so does a <b>private / incognito</b> window.</li>
+          <li><b>A different browser</b> on this device (say Chrome instead of Safari) starts from scratch too.</li>
+          ${FOLLOW_IOS&&!FOLLOW_INSTALLED?`<li><b>On iPhone and iPad</b>, Safari forgets it if you don't visit for about a week. Add this site to your Home Screen (Share → <i>Add to Home Screen</i>) and open it from there to keep it.</li>`:""}
+        </ul>
+        <p class="follow-warn-foot">If your tags ever disappear, just tick them again here.</p>
+      </div>
     </div>
   </details>`;
   el.querySelector("details").addEventListener("toggle",e=>{followPanelOpen=e.target.open;});
@@ -518,7 +542,6 @@ document.addEventListener("click",e=>{
   const chip=e.target.closest("[data-follow]");
   if(chip){
     toggleFollow(chip.dataset.follow);
-    if(newsTagFilter===NEWS_MINE&&!follow.squads.length)newsTagFilter=null;
     renderFollowPanel();renderNews();renderFollowBadge();
     return;
   }
@@ -556,30 +579,32 @@ function newsEraFor(iso,today){
 function newsCard(n,featured){
   const r=resolveNewsImage(n.img);
   const thumb=r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
-  const squads=n.squads||[];
+  const forWho=storySquadLabel(n);
   const marks=followedStory(n)
-    ?`<p class="news-marks"><span class="news-mark mine">Your squad</span>${unreadStory(n)?`<span class="news-mark new">New</span>`:""}</p>`:"";
-  return `<article class="card news-card tap-card${featured?" is-latest":""}${followedStory(n)?" is-mine":""}">${thumb}${marks}<p class="eyebrow">${esc(n.tag)}</p>
+    ?`<p class="news-marks"><span class="news-mark mine">For you</span>${unreadStory(n)?`<span class="news-mark new">New</span>`:""}</p>`:"";
+  return `<article class="card news-card tap-card${featured?" is-latest":""}${followedStory(n)?" is-mine":""}">${thumb}${marks}<p class="eyebrow">${esc(storyTopicLabel(n))}</p>
     <h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3>
-    <p class="news-date"><time datetime="${esc(n.start)}">${fmtDate(n.start)}</time>${squads.length?` · For ${esc(squads.join(", "))}`:""}</p>
+    <p class="news-date"><time datetime="${esc(n.start)}">${fmtDate(n.start)}</time>${forWho?` · For ${esc(forWho)}`:""}</p>
     <p style="color:var(--muted);font-size:.9rem;margin-top:8px">${esc(n.blurb)}</p>
     <div style="margin-top:14px">${cardLink(`href="article?id=${n.id}"`,'<span class="btn small ghost">Read more →</span>')}</div></article>`;
 }
 function renderNews(){
   if(!$("#newsList"))return;
   const all=DB.feed.filter(it=>it.type==="news").sort((a,b)=>a.start<b.start?1:-1);
-  const tags=[...new Set(all.map(n=>n.tag).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  const mine=follow.squads.length>0;
-  if(newsTagFilter===NEWS_MINE?!mine:newsTagFilter&&!tags.includes(newsTagFilter))newsTagFilter=null;
+  /* A chip for every tag at least one story has -- the club's topics first, then squads. */
+  const tags=newsTagList().filter(t=>all.some(n=>(n.topics||[]).includes(t.ref)));
+  const mine=follow.tags.length>0;
+  if(newsTagFilter===NEWS_MINE?!mine:newsTagFilter&&!tags.some(t=>t.ref===newsTagFilter))newsTagFilter=null;
   if($("#newsTagChips")){
     $("#newsTagChips").innerHTML=[`<button type="button" class="news-tag-chip${newsTagFilter?"":" active"}" data-tag="">All</button>`]
-      .concat(mine?[`<button type="button" class="news-tag-chip chip-mine${newsTagFilter===NEWS_MINE?" active":""}" data-tag="${NEWS_MINE}">My squads</button>`]:[])
-      .concat(tags.map(t=>`<button type="button" class="news-tag-chip${t===newsTagFilter?" active":""}" data-tag="${esc(t)}">${esc(t)}</button>`)).join("");
+      .concat(mine?[`<button type="button" class="news-tag-chip chip-mine${newsTagFilter===NEWS_MINE?" active":""}" data-tag="${NEWS_MINE}">Following</button>`]:[])
+      .concat(tags.map(t=>`<button type="button" class="news-tag-chip${t.ref===newsTagFilter?" active":""}" data-tag="${esc(t.ref)}">${esc(t.name)}</button>`)).join("");
   }
-  const list=newsTagFilter===NEWS_MINE?all.filter(followedStory):newsTagFilter?all.filter(n=>n.tag===newsTagFilter):all;
+  const list=newsTagFilter===NEWS_MINE?all.filter(followedStory):newsTagFilter?all.filter(n=>(n.topics||[]).includes(newsTagFilter)):all;
   if(!list.length){
-    $("#newsList").innerHTML=`<p style="color:var(--muted)">${newsTagFilter===NEWS_MINE?"No stories for your squads yet — they'll show here when there are."
-      :newsTagFilter?`No news articles tagged "${esc(newsTagFilter)}" yet.`:"No news articles yet."}</p>`;
+    const tagName=newsTagFilter&&(tags.find(t=>t.ref===newsTagFilter)||{}).name;
+    $("#newsList").innerHTML=`<p style="color:var(--muted)">${newsTagFilter===NEWS_MINE?"No stories for what you follow yet — they'll show here when there are."
+      :newsTagFilter?`No news articles tagged "${esc(tagName)}" yet.`:"No news articles yet."}</p>`;
     renderNewsJump([]);
     return;
   }

@@ -71,8 +71,9 @@ alter table public.feed add column if not exists pin_until date;
 -- Meet documents & links, a free list: [{"label","text","url","hl"}] (migration 016). Replaces the
 -- fixed conditions / entry file / results file / current entries columns, which are now unused.
 alter table public.feed add column if not exists doc_links jsonb not null default '[]'::jsonb;
--- News: the squads a story is for, by name (empty = whole club); visitors follow squads (migration 017).
-alter table public.feed add column if not exists squads jsonb not null default '[]'::jsonb;
+-- News tags on a story, as references: "s:<squads.id>" / "t:<news_topics.id>"; empty = whole club.
+-- Visitors follow tags on the News page (migration 017). Replaces the free-text "tag" (category).
+alter table public.feed add column if not exists topics jsonb not null default '[]'::jsonb;
 
 create table if not exists public.coaches (
   id          bigint generated always as identity primary key,
@@ -81,10 +82,13 @@ create table if not exists public.coaches (
   quals       text,
   squads      jsonb not null default '[]'::jsonb,
   photo       text,
+  bio         text,
   sort_order  int not null default 0,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+-- Short bio shown alongside a coach's card on the Coaches page (migration 018).
+alter table public.coaches add column if not exists bio text;
 
 -- Weekly sessions stay as jsonb: they are always edited and displayed as one whole
 -- week per squad, never queried individually, and "end" is awkward as a column name.
@@ -94,6 +98,15 @@ create table if not exists public.squads (
   name        text not null,
   lead        text,
   sessions    jsonb not null default '[]'::jsonb,
+  sort_order  int not null default 0,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+-- The club's own news tags (Trips, Open Water…); every squad is a tag too, automatically (migration 017).
+create table if not exists public.news_topics (
+  id          bigint generated always as identity primary key,
+  name        text not null,
   sort_order  int not null default 0,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
@@ -194,6 +207,7 @@ language sql stable security definer set search_path = public as $$
         or (section = 'welfare'   and m.role = 'welfare')
         or (section = 'committee' and m.role = 'secretary')
         or (section = 'instagram' and m.role in ('comms', 'socials'))
+        or (section = 'topics'    and m.role = 'comms')
       )
   );
 $$;
@@ -206,6 +220,7 @@ alter table public.news_defaults   enable row level security;
 alter table public.welfare_page    enable row level security;
 alter table public.committee_roles enable row level security;
 alter table public.instagram_settings enable row level security;
+alter table public.news_topics     enable row level security;
 alter table public.members         enable row level security;
 
 -- Anyone may read published content; the public site uses the publishable key.
@@ -217,6 +232,7 @@ create policy "public read pictures"  on public.news_defaults   for select using
 create policy "public read welfare"   on public.welfare_page    for select using (true);
 create policy "public read committee" on public.committee_roles for select using (true);
 create policy "public read instagram" on public.instagram_settings for select using (true);
+create policy "public read topics"    on public.news_topics     for select using (true);
 
 -- Signed-in club accounts may see their own membership row (drives the members' area menu).
 create policy "read own membership" on public.members for select
@@ -244,6 +260,8 @@ create policy "committee write" on public.committee_roles for all to authenticat
   using (public.can_edit('committee')) with check (public.can_edit('committee'));
 create policy "instagram write" on public.instagram_settings for all to authenticated
   using (public.can_edit('instagram')) with check (public.can_edit('instagram'));
+create policy "topics write" on public.news_topics for all to authenticated
+  using (public.can_edit('topics')) with check (public.can_edit('topics'));
 
 create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $$
@@ -252,7 +270,7 @@ begin new.updated_at = now(); return new; end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['feed','coaches','squads','volunteer_roles','news_defaults','welfare_page','committee_roles','instagram_settings'] loop
+  foreach t in array array['feed','coaches','squads','volunteer_roles','news_defaults','welfare_page','committee_roles','instagram_settings','news_topics'] loop
     execute format('drop trigger if exists touch_%1$s on public.%1$I', t);
     execute format('create trigger touch_%1$s before update on public.%1$I
                     for each row execute function public.touch_updated_at()', t);

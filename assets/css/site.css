@@ -304,10 +304,13 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
   nav.main a.cta{margin:4px 0 0;justify-content:center;clip-path:none;filter:none}
   /* Club Organiser login: the brand's own black banner, set in the same skewed panel as the
      other rows so it reads as part of the drawer rather than a pasted-in ad */
-  nav.main a.nav-co{justify-content:center;margin:10px 0 0;padding:12px 22px}
+  nav.main a.nav-co{flex-direction:column;justify-content:center;gap:7px;margin:10px 0 0;padding:12px 22px 10px}
   nav.main a.nav-co::before,body.theme-dark nav.main a.nav-co::before{background:#000;border-color:#000}
   nav.main a.nav-co:active::before,body.theme-dark nav.main a.nav-co:active::before{background:#000;border-color:var(--flame)}
   nav.main a.nav-co img{display:block;height:30px;width:auto;max-width:100%}
+  /* the caption under the logo; white in both themes since the tile is always black */
+  .nav-co-note{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#fff;line-height:1.2}
+  body.theme-dark nav.main a.nav-co{color:#fff}
   .nav-dropdown{width:100%}
   .nav-dropdown-toggle{width:100%;justify-content:space-between}
   .nav-dropdown .caret{font-size:1.2em;opacity:1;color:var(--flame)}
@@ -549,6 +552,13 @@ section.page#page-home{padding-top:14px}
 .follow-body{padding:0 16px 16px}
 .follow-note{color:var(--muted);font-size:.9rem;margin:0 0 14px;max-width:62ch}
 .follow-chips{display:flex;flex-wrap:wrap;gap:10px}
+.follow-group{margin:14px 0 8px;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.follow-note+.follow-group{margin-top:0}
+.follow-warn{margin-top:18px;padding:12px 14px;border:1.5px dashed var(--line);border-radius:10px;font-size:.85rem;color:var(--muted)}
+.follow-warn-head{margin:0 0 6px;font-weight:800;color:var(--text)}
+.follow-warn ul{margin:0;padding-left:18px;display:grid;gap:5px}
+.follow-warn b{color:var(--text)}
+.follow-warn-foot{margin:8px 0 0}
 .follow-read{margin-top:16px}
 .news-tag-chip.chip-mine:not(.active){color:var(--flame-dark)}
 .news-tag-chip.chip-mine:not(.active)::before{border-color:var(--flame)}
@@ -639,6 +649,9 @@ body.theme-dark .news-break-label{background:var(--flame);color:var(--ink)}
 .grid.cols-3{grid-template-columns:repeat(3,1fr)}
 .grid.cols-2{grid-template-columns:repeat(2,1fr)}
 @media(max-width:900px){.grid.cols-3{grid-template-columns:repeat(2,1fr)}}
+/* Coach cards with a bio need more elbow room per card than a plain 2-up grid assumes, so they
+   drop to one column sooner than .cols-2's usual 640px. */
+@media(max-width:860px){#coachesList,#academyCoachesList{grid-template-columns:1fr}}
 @media(max-width:640px){.grid.cols-3,.grid.cols-2{grid-template-columns:1fr}}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px}
 
@@ -814,6 +827,14 @@ body.theme-dark .meet.ours .datebox .m{color:#3a1c00}
 .coach .role{color:var(--flame-dark);font-weight:600;font-size:.92rem;margin:2px 0 10px}
 .coach .quals{font-size:.86rem;color:var(--muted)}
 .coach .squads{margin-top:12px;display:flex;gap:6px;flex-wrap:wrap}
+/* A coach with a bio splits the card into the existing photo/name/role column plus a bio
+   column alongside it, rather than stacking the bio underneath -- keeps the card's height in
+   line with ones that have no bio, so a 2-up grid of mixed cards still lines up row to row. */
+.card.coach.has-bio{display:flex;align-items:stretch;gap:0}
+.card.coach.has-bio .coach-main{flex:0 0 200px;min-width:0}
+.card.coach.has-bio .coach-bio{flex:1;min-width:0;padding-left:26px;margin-left:26px;
+  border-left:1px solid var(--line);display:flex;align-items:center}
+.card.coach.has-bio .coach-bio p{margin:0;color:var(--body2);font-size:.9rem;line-height:1.55}
 /* skewed ::before fill rather than a rounded pill, same call as .pill and .cal-chip -- at this
    size the full --slant-deg costs a couple of px and keeps the lean consistent */
 .tag{position:relative;z-index:0;font-size:.76rem;font-weight:600;padding:3px 12px;color:var(--muted)}
@@ -991,6 +1012,9 @@ body.theme-dark .committee-item.active .t{color:var(--ember)}
   clip-path:polygon(var(--cut) 0,100% 0,100% calc(100% - var(--rise)),calc(100% - var(--cut)) 100%,0 100%,0 var(--rise))}
 /* bleeds to the bevelled edges, same as .news-card .news-thumb */
 .card.coach .coach-photo{margin:-22px -38px 14px -34px;border-radius:0}
+/* With a bio column alongside, the photo still bleeds to the card's top/left bevel edges but
+   stops at the bio divider rather than bleeding into it. */
+.card.coach.has-bio .coach-photo{margin-right:0}
 /* The route cards marked hover with a flame border and selection with a 2px flame border plus a
    box-shadow ring. Both are drawn on the card's RECTANGLE and only then clipped, so on a
    bevelled card they ran along the straight edges and stopped dead at the cuts -- it read as a
@@ -1029,6 +1053,12 @@ body.theme-dark .comp-card.ours.entries-open{background:linear-gradient(150deg,r
   .social-card .art,.news-card .news-thumb{margin:-18px -20px 14px -20px;border-radius:var(--radius) var(--radius) 0 0}
   .card.slanted,.card.coach,.card.role-card,.card.path-card{position:relative;padding:22px;min-height:0;clip-path:none;border-radius:var(--radius)}
   .card.coach .coach-photo{margin:-22px -22px 14px;border-radius:var(--radius) var(--radius) 0 0}
+  /* Below the bevel breakpoint there's no room for the bio beside the card -- stack it under
+     the existing content instead, same as a mobile meet/social card losing its side-by-side layout. */
+  .card.coach.has-bio{flex-direction:column}
+  .card.coach.has-bio .coach-main{flex:0 0 auto}
+  .card.coach.has-bio .coach-bio{padding-left:0;margin-left:0;margin-top:14px;padding-top:14px;
+    border-left:none;border-top:1px solid var(--line)}
   #roleCatTabs.role-cat-tabs{grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
   #roleCatTabs .path-card{padding:12px 10px;text-align:center}
   #roleCatTabs .path-card .eyebrow,#roleCatTabs .path-card .path-desc,#roleCatTabs .path-card .role-cat-count{display:none}
@@ -1107,6 +1137,10 @@ label.f.checkbox-f input{all:revert;width:18px;height:18px;accent-color:var(--fl
 .squad-picks{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:4px}
 .squad-pick{display:flex;align-items:center;gap:8px;color:var(--text);font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer}
 .squad-pick input{width:18px;height:18px;accent-color:var(--flame)}
+.tag-group-label{margin:10px 0 0;font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.tag-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px}
+.tag-add input{font:inherit;font-size:.95rem;color:var(--text);padding:8px 11px;border:1.5px solid var(--line);border-radius:10px;background:var(--field);min-width:0;flex:1 1 180px;max-width:280px}
+.tag-add input:focus{border-color:var(--flame);outline:none}
 
 /* info accordions */
 /* Bevelled like the cards (--cut-sm/--rise-sm), not skewed: an accordion is 52px shut and can
