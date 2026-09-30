@@ -244,8 +244,7 @@ function itemSummary(sec,it){
       /* Flag a gala that is running today so the Open Meets Secretary can see at a glance whether the live link is set. */
       const state=meetRunning(it)?(it.liveUrl?"● LIVE NOW — results linked":"● running today — add live results link"):meetDone(it)?(it.resultsUrl?"completed · results linked":"completed · add results link"):it.type==="teamMeet"?(it.league||"team meet"):"entries "+it.status;
       const who=it.type==="externalMeet"?` · host: ${it.host||"?"}`:"";
-      const hidden=it.visible===false?" · HIDDEN FROM SITE":"";
-      return {t:it.title,s:`${typeLabel}${who} · ${fmtDate(it.start)} · ${it.venue||"Venue TBC"} · ${state}${hidden}`};
+      return {t:it.title,s:`${typeLabel}${who} · ${fmtDate(it.start)} · ${it.venue||"Venue TBC"} · ${state}`};
     }
     if(it.type==="social")return {t:it.title,s:`${typeLabel} · ${fmtDate(it.start)}`};
     if(it.type==="news")return {t:it.title,s:`${typeLabel} · ${it.tag}${it.start?" · "+fmtDate(it.start):""}`};
@@ -261,6 +260,43 @@ function itemSummary(sec,it){
   }
 }
 function feedItemsForRole(role){return DB.feed.filter(it=>role.feedTypes.includes(it.type));}
+
+/* Where a Club Feed item stands on the homepage slideshow today. Worked out with the same
+   heroFeedItems() the homepage runs (core.js), so these badges can't drift from what visitors
+   actually see. Pinned items count down to their pin date; other events drop off once their
+   last day has passed; ordinary news has no end date -- newer stories push it off. */
+const homepageSlides=()=>heroFeedItems(DB.feed.filter(it=>it.visible!==false));
+const daysUntil=iso=>Math.round((new Date(iso+"T12:00:00")-new Date(isoToday()+"T12:00:00"))/86400000);
+const daysLeftLabel=n=>n<=0?"last day today":n===1?"1 day left":`${n} days left`;
+function homeStatus(it,slides){
+  const slot=slides.indexOf(it),pinned=heroPinned(it);
+  let until="";
+  if(pinned)until=`pinned until ${fmtDate(it.pinUntil)} · ${daysLeftLabel(daysUntil(it.pinUntil))}`;
+  else if(slot>=0&&heroIsEvent(it))until=`until ${fmtDate(it.end||it.start)} · ${daysLeftLabel(daysUntil(it.end||it.start))}`;
+  else if(slot>=0)until="until newer stories push it off";
+  return {slot,pinned,until};
+}
+function homeBadges(it,slides){
+  if(it.visible===false)return `<span class="feed-badge off">Hidden from site</span>`;
+  const h=homeStatus(it,slides),b=[];
+  if(h.slot>=0)b.push(`<span class="feed-badge home">On homepage · slide ${h.slot+1} of ${slides.length}</span>`);
+  if(h.pinned)b.push(`<span class="feed-badge pin">📌 Pinned to the front · ${esc(daysLeftLabel(daysUntil(it.pinUntil)))}</span>`);
+  if(h.pinned&&h.slot<0)b.push(`<span class="feed-badge off">Not showing — the slideshow is full of other pinned items</span>`);
+  if(!h.pinned&&h.slot>=0)b.push(`<span class="feed-badge note">${esc(h.until)}</span>`);
+  if(!h.pinned&&it.pinUntil&&daysUntil(it.pinUntil)>=-14)b.push(`<span class="feed-badge note">Pin ended ${esc(fmtDate(it.pinUntil))}</span>`);
+  return b.length?`<div class="feed-badges">${b.join("")}</div>`:"";
+}
+/* The slideshow as it stands today, in order, at the top of the Club Feed. Items this role can
+   edit link down to their row; the rest (another team's) are listed for context only. */
+function homepagePanelHtml(slides,role){
+  if(!slides.length)return `<div class="home-panel"><h3 class="admin-sub">On the homepage now</h3><p style="color:var(--muted)">Nothing on the homepage slideshow at the moment.</p></div>`;
+  return `<div class="home-panel"><h3 class="admin-sub">On the homepage now</h3><ol class="home-slides">${slides.map(it=>{
+    const h=homeStatus(it,slides),mine=role.feedTypes.includes(it.type);
+    const title=mine?`<button type="button" class="home-slide-link" data-jump="${it.id}">${esc(it.title)}</button>`:`<span>${esc(it.title)}</span>`;
+    return `<li class="${h.pinned?"is-pinned":""}">${title}
+      <span class="home-slide-meta">${esc(heroFeedContent(it).tag)} · ${h.pinned?"📌 ":""}${esc(h.until)}</span></li>`;
+  }).join("")}</ol></div>`;
+}
 function renderAdminSection(){
   const main=$("#adminMain"),sec=adminSection,role=session.role;
   if(sec==="enquiries"){
@@ -289,9 +325,13 @@ function renderAdminSection(){
   const note=sec==="feed"&&role.feedTypes.length>1
     ?"Changes here publish straight to the public page — no webmaster needed. This feed is shared across several types of item; pick the type when you add something new."
     :"Changes here publish straight to the public page — no webmaster needed.";
-  const rowHtml=it=>{const s=itemSummary(sec,it);return `
+  const slides=sec==="feed"?homepageSlides():[];
+  const rowHtml=it=>{const s=itemSummary(sec,it);
+    const h=sec==="feed"?homeStatus(it,slides):null;
+    const cls=h?(h.pinned&&h.slot>=0?" is-pinned":h.slot>=0?" on-home":""):"";
+    return `
       <div class="item-block" data-item-block="${it.id}">
-      <div class="item-row"><div><div class="t">${esc(s.t)}</div><div class="s">${esc(s.s)}</div></div>
+      <div class="item-row${cls}"><div><div class="t">${esc(s.t)}</div><div class="s">${esc(s.s)}</div>${sec==="feed"?homeBadges(it,slides):""}</div>
       <div class="acts"><button class="btn small ghost" data-edit="${it.id}">Edit</button>
       <button class="btn small dangerous" data-del="${it.id}">Delete</button></div></div>
       <div class="edit-slot" id="editSlot-${it.id}"></div>
@@ -327,6 +367,7 @@ function renderAdminSection(){
   else listHtml=items.map(rowHtml).join("");
   main.innerHTML=`<h2>${SECTION_META[sec].name}</h2>
     <div class="admin-note">${note}</div>
+    ${sec==="feed"?homepagePanelHtml(slides,role):""}
     <div style="margin-bottom:18px"><button class="btn small" id="addNew">+ Add new</button></div>
     <div id="itemList">${listHtml}</div>
     <div id="formSlot"></div>`;
@@ -347,6 +388,18 @@ function renderAdminSection(){
       else feedFilter.tag=fchip.dataset.ftag;
       editingId=null;
       $("#itemList").innerHTML=feedListHtml();
+      return;
+    }
+    /* "On the homepage now" titles jump to that item's row, clearing a filter that hides it */
+    const jump=e.target.closest("[data-jump]");
+    if(jump){
+      const find=()=>document.querySelector(`[data-item-block="${jump.dataset.jump}"]`);
+      if(!find()){feedFilter={type:"",tag:""};editingId=null;$("#itemList").innerHTML=feedListHtml();}
+      const block=find();
+      if(block){
+        block.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
+        block.classList.remove("flash");void block.offsetWidth;block.classList.add("flash");
+      }
       return;
     }
     const ed=e.target.closest("[data-edit]"),del=e.target.closest("[data-del]");

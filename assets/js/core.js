@@ -196,6 +196,31 @@ function photoImgStyle(url){
   return `object-position:${pos}`+(f.zoom>1?`;transform:scale(${f.zoom});transform-origin:${pos}`:"");
 }
 
+/* Hero carousel: pulls across the whole feed (meets, socials, news) so it reads as one connected
+   "what's happening" strip rather than club news alone. Two kinds of item, two rules:
+   - events (meets, socials, training changes -- and a news story written ahead of its date,
+     e.g. a preview of a gala) are about a day: soonest first, gone once that day (or the end
+     date) has passed;
+   - announcements (any other news story) are about when they went up: newest first, until
+     newer ones push them out.
+   Order: anything pinned (feed.pin_until, still in date), then the next HERO_UPCOMING events,
+   then the latest news -- with more events filling in if there isn't enough news, and vice versa.
+   Lives here rather than in site.js so the members' area can show which items are on the
+   homepage right now; pass it only the items the public can see. */
+const HERO_SLOTS=6,HERO_UPCOMING=3;
+const heroIsEvent=it=>it.type!=="news"||it.start>(it.created||isoToday());
+const heroPinned=it=>!!(it.start&&it.pinUntil&&it.pinUntil>=isoToday());
+function heroFeedItems(feed){
+  const today=isoToday();
+  const pinned=feed.filter(heroPinned).sort((a,b)=>a.start<b.start?1:-1);
+  const rest=feed.filter(it=>it.start&&!pinned.includes(it));
+  const isEvent=heroIsEvent;
+  const upcoming=rest.filter(it=>isEvent(it)&&(it.end||it.start)>=today).sort((a,b)=>a.start<b.start?-1:1);
+  const news=rest.filter(it=>!isEvent(it)).sort((a,b)=>a.start<b.start?1:-1);
+  const room=HERO_SLOTS-pinned.length;
+  const nUp=Math.min(upcoming.length,Math.max(HERO_UPCOMING,room-news.length));
+  return pinned.concat(upcoming.slice(0,nUp),news).slice(0,HERO_SLOTS);
+}
 /* Homepage hero card text for any feed item. Lives here rather than in site.js so the framing
    editor in the members' area can put the real card over its homepage previews. */
 function heroFeedContent(it){
@@ -409,3 +434,8 @@ function toggleTheme(e){e&&e.preventDefault();document.body.classList.toggle("th
   toast(on?"Black & orange theme":"Light theme");}
 document.querySelectorAll(".theme-toggle").forEach(t=>t.addEventListener("click",toggleTheme));
 syncThemeToggles();
+// No saved choice → follow the device's light/dark setting as it changes
+if(window.matchMedia){const mq=matchMedia("(prefers-color-scheme: light)");
+  const follow=()=>{let saved=null;try{saved=localStorage.getItem("bpsc_theme");}catch(err){}
+    if(!saved){document.body.classList.toggle("theme-dark",!mq.matches);syncThemeToggles();}};
+  mq.addEventListener?mq.addEventListener("change",follow):mq.addListener&&mq.addListener(follow);}

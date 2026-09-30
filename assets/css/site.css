@@ -1142,6 +1142,30 @@ footer.site a:hover{color:var(--ember)}
 .item-row .t{font-weight:700;color:var(--text)}
 .item-row .s{font-size:.85rem;color:var(--muted);margin-top:2px}
 .item-row .acts{display:flex;gap:8px}
+/* Club Feed: where each item stands on the homepage slideshow (members.js homeBadges). A row
+   on the homepage gets a flame edge; a pinned one a solid flame edge plus a warm tint, so both
+   read from across the list before any badge text is. */
+.item-row.on-home{border-left:4px solid var(--ember)}
+.item-row.is-pinned{border-left:4px solid var(--flame);background:linear-gradient(90deg,#fdeee2 0%,var(--card) 60%)}
+.feed-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.feed-badge{font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:999px;line-height:1.4}
+.feed-badge.home{background:#e6f4ec;color:var(--ok)}
+.feed-badge.pin{background:var(--flame);color:#fff}
+.feed-badge.note{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:600}
+.feed-badge.off{background:#f2f2f0;color:var(--muted)}
+.item-block.flash .item-row{animation:row-flash 1.6s ease-out}
+@keyframes row-flash{0%,30%{box-shadow:0 0 0 3px var(--flame)}100%{box-shadow:0 0 0 3px transparent}}
+@media(prefers-reduced-motion:reduce){.item-block.flash .item-row{animation:none;box-shadow:0 0 0 3px var(--flame)}}
+.home-panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px 12px;margin:0 0 20px}
+.home-panel .admin-sub{margin:0 0 8px}
+.home-slides{margin:0;padding-left:22px;display:grid;gap:6px}
+.home-slides li{font-size:.9rem;color:var(--text)}
+.home-slides li::marker{font-weight:700;color:var(--muted)}
+.home-slides li.is-pinned::marker{color:var(--flame)}
+.home-slide-link{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--text);cursor:pointer;text-align:left;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.home-slide-link:hover,.home-slide-link:focus-visible{text-decoration-color:var(--flame)}
+.home-slide-meta{display:block;font-size:.8rem;color:var(--muted)}
+@media(min-width:640px){.home-slide-meta{display:inline;margin-left:8px}}
 /* Instagram section: the one-off setup guide folds away once a feed is connected, and each
    post row is a thumbnail + caption with its "Show on website" tick. An unticked post fades
    so hidden ones stand out when scanning the list. */
@@ -1276,6 +1300,9 @@ body.theme-dark .eyebrow{color:var(--ember)}
 body.theme-dark .lane-rope{background:repeating-linear-gradient(90deg,var(--flame) 0 16px,transparent 16px 22px,#fff 22px 38px,transparent 38px 44px)}
 body.theme-dark .pill.open{color:#5fce93}
 body.theme-dark .pill.open::before{background:rgba(31,138,76,.2)}
+body.theme-dark .feed-badge.home{background:rgba(31,138,76,.2);color:#5fce93}
+body.theme-dark .feed-badge.off{background:#26262e;color:#a5a3a0}
+body.theme-dark .item-row.is-pinned{background:linear-gradient(90deg,rgba(245,132,31,.14) 0%,var(--card) 60%)}
 body.theme-dark .pill.closed{color:#a5a3a0}
 body.theme-dark .pill.closed::before{background:#26262e}
 body.theme-dark .pill.results{color:var(--ember)}
@@ -1766,4 +1793,42 @@ main{overflow-x:clip}
   .nav-social-desk a:hover{color:var(--flame-dark);transform:translateY(-1px)}
   body.theme-dark .nav-social-desk a{color:#fff}
   body.theme-dark .nav-social-desk a:hover{color:var(--ember)}
+}
+
+/* ---------- tappable cards ----------
+   A card with a single destination (news, socials, calendar competitions, the hero story, the
+   next-meet card) is one big link: .card-link's ::after is stretched over the card, which is
+   already position:relative with its own stacking context. The anchor itself must stay
+   unpositioned for that to work -- which is why the leaning .btn look (position:relative for
+   its skewed fill) lives on a span inside it rather than on the anchor. Anything else in the
+   card that goes somewhere different (.card-extra) is lifted above the overlay. */
+.card-link{text-decoration:none}
+/* a ghost button takes the card's text colour, as it did when the anchor was the button (the
+   dark theme's link colour would otherwise win) */
+.card-link:has(>.btn),body.theme-dark .card-link:has(>.btn){color:inherit}
+.card-link::after{content:"";position:absolute;inset:0;z-index:1}
+.card-link:focus-visible{outline:none}
+.card-link:focus-visible::after{box-shadow:inset 0 0 0 3px rgba(245,132,31,.6)}
+.tap-card .card-extra{position:relative;z-index:2}
+.tap-card{transition:transform .15s ease}
+.tap-card:hover .card-link .btn.ghost::before{background:rgba(242,107,33,.1)}
+.tap-card:hover .card-link .btn:not(.ghost)::before{background:var(--flame-dark)}
+.comp-card.tap-card:hover .card-link,.hero-news-card.tap-card:hover .card-link{text-decoration:underline}
+/* a story sliding out (or peeking in beside the current one) is invisible, so it mustn't catch taps */
+.hero-slide:not(.active) .hero-news-card{pointer-events:none}
+/* Phones: no "Read more" / "Details" labels -- the whole card is the button, marked by a round
+   flame arrow and a small press-in when touched. The label stays for screen readers. */
+@media(max-width:640px){
+  .card-link>.cl-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .card-link::before{content:"→";display:inline-flex;align-items:center;justify-content:center;
+    width:32px;height:32px;border-radius:50%;background:var(--flame);color:#fff;
+    font-size:1.05rem;font-weight:800;line-height:1;box-shadow:0 2px 8px rgba(245,132,31,.35)}
+  .tap-card:active{transform:scale(.98)}
+  .tap-card .card-extra{display:none}
+  /* the badge sits bottom-right of the card */
+  .news-card .card-link,.social-card .card-link{float:right}
+  .news-card>div:has(>.card-link),.social-card .body>div:has(>.card-link){margin-top:4px!important;display:flow-root}
+  .comp-foot{align-items:center}
+  .hero-news-card .card-link{align-self:flex-end;margin-top:4px}
+  .next-meet .card-link::before{width:36px;height:36px}
 }

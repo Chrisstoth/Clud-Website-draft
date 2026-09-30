@@ -1,4 +1,8 @@
 /* Orange edge only when entries can actually be made: an open meet, upcoming, status open, and an entry pack link set. */
+/* A card with one destination is a link as a whole: this anchor's ::after is stretched over the
+   nearest positioned ancestor (the card), so a tap anywhere on it follows the link. On phones the
+   label gives way to an arrow badge (see .tap-card in site.css). */
+const cardLink=(attrs,label)=>`<a class="card-link" ${attrs}><span class="cl-label">${label}</span></a>`;
 const meetHasEntry=m=>m.type!=="teamMeet"&&!meetDone(m)&&m.status==="open"&&!!m.entryUrl;
 /* The results archive runs back to 2024 and only grows, so showing every completed gala as a
    card leaves a wall of them between the reader and the one they came for. The most recent
@@ -87,11 +91,12 @@ function renderMeets(){
   const isHome=m=>/basildon/i.test(m.venue||"");
   const clubUpcoming=upcoming.filter(m=>m.type==="meet");
   const next=clubUpcoming.find(isHome)||clubUpcoming[0]||upcomingOpen[0];
+  $("#nextMeetCard").classList.toggle("tap-card",!!next);
   $("#nextMeetCard").innerHTML=next?`
     <p class="eyebrow">Next ${isHome(next)?"Basildon ":""}meet</p>
     <h3>${esc(next.title)}</h3>
     <div class="meta"><div class="nm-venue">${esc(next.venue)}</div><div>${fmtDate(next.start)}${next.closing?`<span class="nm-closing"> · entries close ${fmtDate(next.closing)}</span>`:""}</div></div>
-    <div class="nm-cta"><a class="btn small" href="open-meets">Details<span class="nm-long"> &amp; entry pack</span></a></div>`
+    <div class="nm-cta">${cardLink('href="open-meets"','<span class="btn small">Details<span class="nm-long"> &amp; entry pack</span></span>')}</div>`
     :`<p class="eyebrow">Next Basildon meet</p><h3>Dates coming soon</h3>
     <div class="meta"><div>The next season's meets will be published here once confirmed.</div></div>`;
 }
@@ -318,7 +323,7 @@ function renderCalendarGrid(){
 /* Compact calendar card: date + title share the top line; open entries get a pulsing orange edge instead of a pill. */
 function meetRowCard(m){
   const dp=dateParts(m.start),open=m.status==="open",ours=m.type==="meet";
-  return `<article class="card comp-card${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
+  return `<article class="card comp-card tap-card${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
     <div class="comp-top">
       <div class="comp-date"><span class="d">${dp.d}</span><span class="m">${dp.m}</span></div>
       <h3>${esc(m.title)}</h3>
@@ -327,7 +332,7 @@ function meetRowCard(m){
     <div class="comp-meta">${esc(m.venue||"Venue TBC")}${m.poolType?` · ${esc(m.poolType)}`:""}</div>
     <div class="comp-foot">
       <span class="comp-status">${m.type==="teamMeet"?esc(m.league||"Team meet"):meetHasEntry(m)?"":open?"Entry pack soon":"Entries closed"}</span>
-      <a href="open-meets">Full details →</a>
+      ${cardLink('href="open-meets"',"Full details →")}
     </div></article>`;
 }
 function renderSocials(){
@@ -341,11 +346,11 @@ function renderSocials(){
     const shade="linear-gradient(160deg,rgba(16,16,20,.15),rgba(16,16,20,.65))";
     const artStyle=!r?`background:${it.color}`:r.bg?`background:${shade},${r.bg}`:`${r.style};--shade:${shade}`;
     return `
-    <article class="card social-card">
+    <article class="card social-card tap-card">
       <div class="art ${r?r.cls:""}" style="${artStyle}">${esc(it.title)}</div>
       <div class="body"><div class="when">${esc(fmtDate(it.start))}</div><p>${esc(it.blurb)}</p>
-      ${it.link?`<div><a class="btn small" href="${esc(it.link)}">Details / tickets</a></div>`:""}
-      <div><a class="btn small ghost" href="article?id=${it.id}">Read more →</a></div></div>
+      ${it.link?`<div class="card-extra"><a class="btn small" href="${esc(it.link)}">Details / tickets</a></div>`:""}
+      <div>${cardLink(`href="article?id=${it.id}"`,'<span class="btn small ghost">Read more →</span>')}</div></div>
     </article>`;
   }).join(""):`<p style="color:var(--muted)">No socials scheduled yet.</p>`;
 
@@ -447,11 +452,11 @@ function newsEraFor(iso,today){
 function newsCard(n,featured){
   const r=resolveNewsImage(n.img);
   const thumb=r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
-  return `<article class="card news-card${featured?" is-latest":""}">${thumb}<p class="eyebrow">${esc(n.tag)}</p>
+  return `<article class="card news-card tap-card${featured?" is-latest":""}">${thumb}<p class="eyebrow">${esc(n.tag)}</p>
     <h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3>
     <p class="news-date"><time datetime="${esc(n.start)}">${fmtDate(n.start)}</time></p>
     <p style="color:var(--muted);font-size:.9rem;margin-top:8px">${esc(n.blurb)}</p>
-    <div style="margin-top:14px"><a class="btn small ghost" href="article?id=${n.id}">Read more →</a></div></article>`;
+    <div style="margin-top:14px">${cardLink(`href="article?id=${n.id}"`,'<span class="btn small ghost">Read more →</span>')}</div></article>`;
 }
 function renderNews(){
   if(!$("#newsList"))return;
@@ -568,30 +573,9 @@ document.addEventListener("click",e=>{
   if(next>=0&&next<newsEraKeys.length)newsScrollToEra(newsEraKeys[next]);
 });
 
-/* Hero carousel: pulls across the whole feed (meets, socials, news) so it reads as one connected
-   "what's happening" strip rather than club news alone. Two kinds of item, two rules:
-   - events (meets, socials, training changes -- and a news story written ahead of its date,
-     e.g. a preview of a gala) are about a day: soonest first, gone once that day (or the end
-     date) has passed;
-   - announcements (any other news story) are about when they went up: newest first, until
-     newer ones push them out.
-   Order: anything pinned (feed.pin_until, still in date), then the next HERO_UPCOMING events,
-   then the latest news -- with more events filling in if there isn't enough news, and vice versa. */
-const HERO_SLOTS=6,HERO_UPCOMING=3;
-function heroFeedItems(){
-  const today=isoToday();
-  const pinned=DB.feed.filter(it=>it.start&&it.pinUntil&&it.pinUntil>=today).sort((a,b)=>a.start<b.start?1:-1);
-  const rest=DB.feed.filter(it=>it.start&&!pinned.includes(it));
-  const isEvent=it=>it.type!=="news"||it.start>(it.created||today);
-  const upcoming=rest.filter(it=>isEvent(it)&&(it.end||it.start)>=today).sort((a,b)=>a.start<b.start?-1:1);
-  const news=rest.filter(it=>!isEvent(it)).sort((a,b)=>a.start<b.start?1:-1);
-  const room=HERO_SLOTS-pinned.length;
-  const nUp=Math.min(upcoming.length,Math.max(HERO_UPCOMING,room-news.length));
-  return pinned.concat(upcoming.slice(0,nUp),news).slice(0,HERO_SLOTS);
-}
 function renderHeroFeed(){
   if(!$("#heroSlides"))return;
-  const items=heroFeedItems();
+  const items=heroFeedItems(DB.feed);
   $("#heroSlides").innerHTML=items.map((it,i)=>{
     const c=heroFeedContent(it);
     /* An article with a gallery shows all of it here, cross-fading (see cycleHeroPhotos);
@@ -608,11 +592,11 @@ function renderHeroFeed(){
     return `
     <div class="hero-slide" style="background:${wide.length||narrow.length?"#101014":HERO_SLIDE_BG[i%HERO_SLIDE_BG.length]}">
       ${media}
-      <div class="hero-news-card${heroCardClasses(it.heroCard)}">
+      <div class="hero-news-card tap-card${heroCardClasses(it.heroCard)}">
         <p class="eyebrow">${esc(c.tag)}</p>
         <h3>${esc(c.title)}</h3>
         <p>${esc(c.blurb)}</p>
-        <a ${c.linkAttrs}>Read more →</a>
+        ${cardLink(c.linkAttrs,"Read more →")}
       </div>
     </div>`;
   }).join("");
