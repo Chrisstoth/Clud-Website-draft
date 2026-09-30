@@ -1816,19 +1816,28 @@ main{overflow-x:clip}
 .comp-card.tap-card:hover .card-link,.hero-news-card.tap-card:hover .card-link{text-decoration:underline}
 /* a story sliding out (or peeking in beside the current one) is invisible, so it mustn't catch taps */
 .hero-slide:not(.active) .hero-news-card{pointer-events:none}
-/* Phones: no "Read more" / "Details" labels -- the whole card is the button, marked by a round
-   flame arrow and a small press-in when touched. The label stays for screen readers. */
+/* Phones: no "Read more" / "Details" labels -- the whole card is the button, marked by a small
+   leaning tab with a flame arrow, which fills flame when the card is pressed. The tab is cut
+   with clip-path rather than skewed so the arrow stays upright (same lean as .btn). Its fill
+   contrasts with the surface under it: white on dark cards and the hero's dark glass, ink on
+   white cards (light theme, and the next-meet card in both themes). The label stays for
+   screen readers. */
 @media(max-width:640px){
   .card-link>.cl-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+  .tap-card{--tap-bg:#101014;--tap-h:30px}
+  body.theme-dark .tap-card,body .hero-news-card.tap-card{--tap-bg:#fff}
+  body .next-meet.tap-card,body.theme-dark .next-meet.tap-card{--tap-bg:#101014;--tap-h:34px}
   .card-link::before{content:"→";display:inline-flex;align-items:center;justify-content:center;
-    width:32px;height:32px;border-radius:50%;background:var(--flame);color:#fff;
-    font-size:1.05rem;font-weight:800;line-height:1;box-shadow:0 2px 8px rgba(245,132,31,.35)}
+    width:calc(var(--tap-h) * 1.5);height:var(--tap-h);background:var(--tap-bg);color:var(--flame);
+    font-family:'Montserrat',sans-serif;font-size:1.1rem;font-weight:800;line-height:1;
+    clip-path:polygon(calc(var(--tap-h) * var(--slant-ratio)) 0,100% 0,calc(100% - var(--tap-h) * var(--slant-ratio)) 100%,0 100%);
+    transition:background .12s,color .12s}
   .tap-card:active{transform:scale(.98)}
+  .tap-card:active .card-link::before{background:var(--flame);color:#fff}
   .tap-card .card-extra{display:none}
   /* the badge sits bottom-right of the card */
   .news-card .card-link,.social-card .card-link{float:right}
   .news-card>div:has(>.card-link),.social-card .body>div:has(>.card-link){margin-top:4px!important;display:flow-root}
   .comp-foot{align-items:center}
   .hero-news-card .card-link{align-self:flex-end;margin-top:4px}
-  .next-meet .card-link::before{width:36px;height:36px}
 }

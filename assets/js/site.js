@@ -2,6 +2,8 @@
 /* A card with one destination is a link as a whole: this anchor's ::after is stretched over the
    nearest positioned ancestor (the card), so a tap anywhere on it follows the link. On phones the
    label gives way to an arrow badge (see .tap-card in site.css). */
+/* iOS Safari only applies :active (the tap-card press state) once the page listens for touches */
+document.addEventListener("touchstart",()=>{},{passive:true});
 const cardLink=(attrs,label)=>`<a class="card-link" ${attrs}><span class="cl-label">${label}</span></a>`;
 const meetHasEntry=m=>m.type!=="teamMeet"&&!meetDone(m)&&m.status==="open"&&!!m.entryUrl;
 /* The results archive runs back to 2024 and only grows, so showing every completed gala as a
