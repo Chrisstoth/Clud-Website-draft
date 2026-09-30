@@ -193,6 +193,32 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 .theme-toggle{display:flex;align-items:center;justify-content:center;width:42px;height:42px;background:none;border:1.5px solid rgba(16,16,20,.25);color:var(--ink);border-radius:50%;cursor:pointer;padding:0}
 .theme-toggle:hover{border-color:var(--flame);color:var(--flame-dark)}
 .burger{display:none;background:none;border:1.5px solid rgba(16,16,20,.25);color:var(--ink);border-radius:8px;padding:8px 10px;font-size:1.05rem;cursor:pointer}
+
+/* ---------- quick links menu (desktop) ----------
+   Facebook, Instagram and the day/night toggle used to sit as three separate buttons at the
+   right of the bar; on a wide screen they're joined by the club's other off-site links (results,
+   leagues, governing bodies), so they're collapsed into one menu button instead of growing the
+   button row further. Below the 1120px bar-content breakpoint the standalone theme toggle takes
+   over again and these links live in the drawer/footer instead. */
+.quick-links{display:none;position:relative}
+.quick-links-toggle{display:flex;align-items:center;justify-content:center;width:42px;height:42px;background:none;border:1.5px solid rgba(16,16,20,.25);color:var(--ink);border-radius:50%;cursor:pointer;padding:0}
+.quick-links-toggle:hover{border-color:var(--flame);color:var(--flame-dark)}
+.quick-links-menu{display:none;position:absolute;top:calc(100% + 10px);right:0;min-width:230px;background:#fff;border:1.5px solid var(--line);border-radius:12px;box-shadow:0 16px 32px rgba(16,16,20,.16);padding:8px;flex-direction:column;gap:2px;z-index:60}
+.quick-links.open .quick-links-menu{display:flex}
+.quick-links-menu a,.quick-links-menu button.theme-toggle{display:flex;align-items:center;justify-content:flex-start;gap:10px;color:var(--ink);text-decoration:none;font-size:.85rem;font-weight:600;white-space:nowrap;border-radius:8px;padding:9px 10px;background:none;border:none;width:100%;height:auto;text-align:left;cursor:pointer;font:inherit;font-weight:600}
+.quick-links-menu a:hover,.quick-links-menu button.theme-toggle:hover{background:rgba(16,16,20,.06)}
+.quick-links-menu button.theme-toggle{color:var(--ink)}
+.quick-links-menu .icon{display:flex;flex:0 0 auto;width:18px;height:18px}
+.quick-links-divider{height:1px;background:var(--line);margin:4px 2px}
+@media(min-width:1120px){
+  .theme-toggle-standalone{display:none}
+  .quick-links{display:block}
+}
+body.theme-dark .quick-links-toggle{color:#fff;border-color:rgba(255,255,255,.3)}
+body.theme-dark .quick-links-menu{background:#1c1c22;border-color:#31313a}
+body.theme-dark .quick-links-menu a,body.theme-dark .quick-links-menu button.theme-toggle{color:#e4e2de}
+body.theme-dark .quick-links-menu a:hover,body.theme-dark .quick-links-menu button.theme-toggle:hover{background:rgba(255,255,255,.08)}
+body.theme-dark .quick-links-divider{background:#31313a}
 /* Buttons lean with everything else. Same ::before-fill technique as .pill and the skewed nav
    highlight: the FILL is skewed, the label stays upright, and because a skew transform (not a
    px offset) holds the shape, the edge sits at exactly --slant-deg whether the button is one
@@ -1839,37 +1865,10 @@ main{overflow-x:clip}
 }
 
 /* ---------- the two social links in the header ----------
-   Phones get them as rows at the foot of the drawer (.nav-social, above); the desktop bar
-   gets them as plain icons sitting just left of the day/night toggle, so the whole cluster at
-   the right-hand end reads as one group of controls. Each is its own breakpoint's version of
-   the same thing, so only one is ever on. */
+   Phones get them as rows at the foot of the drawer (.nav-social, above); from 1120px up
+   they're inside the .quick-links menu instead (see above). Each is its own breakpoint's
+   version of the same thing, so only one is ever on. */
 @media(min-width:1024px){.nav-social,.nav-social-label,nav.main a.nav-co{display:none}}
-/* below the bar breakpoint the drawer version takes over */
-.nav-social-desk{display:none}
-/* 1120px, not the 1024px the bar itself starts at. .nav-wrap is capped at max-width:1120px,
-   so 1120 is the first width where the bar gets its full 1080px content box -- and the icon
-   cluster needs about 1079px of it. Below that the window is narrower than the cap and the
-   row would spill past its gutter, so that band keeps the bar it already has and the footer
-   carries the links there. Measured, not guessed: at 1100px the same row spills 21px. */
-@media(min-width:1120px){
-  .nav-social-desk{display:flex;align-items:center;gap:0;position:relative;padding-right:8px}
-  /* the same skewed tick that divides the nav links and the partner logos, so the icons are
-     separated from the toggle the way everything else on this bar is separated */
-  .nav-social-desk::after{
-    content:"";position:absolute;top:6px;bottom:6px;right:0;width:2px;
-    background:var(--flame);opacity:.7;transform:skewX(calc(-1 * var(--slant-deg)));pointer-events:none;
-  }
-  /* colours track .theme-toggle rather than the global link colour -- these sit in the header
-     cluster, not in running text */
-  .nav-social-desk a{
-    display:flex;align-items:center;justify-content:center;width:27px;height:27px;
-    color:var(--ink);text-decoration:none;transition:color .15s,transform .15s;
-  }
-  .nav-social-desk a svg{width:18px;height:18px}
-  .nav-social-desk a:hover{color:var(--flame-dark);transform:translateY(-1px)}
-  body.theme-dark .nav-social-desk a{color:#fff}
-  body.theme-dark .nav-social-desk a:hover{color:var(--ember)}
-}
 
 /* ---------- tappable cards ----------
    A card with a single destination (news, socials, calendar competitions, the hero story, the

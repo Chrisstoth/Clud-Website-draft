@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=62">
+<link rel="stylesheet" href="assets/css/site.css?v=63">
 </head>
 <body class="theme-dark">
 <script>(function(){var t=null;try{t=localStorage.getItem("bpsc_theme")}catch(e){}if(t?t==="light":window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches)document.body.classList.remove("theme-dark")})()</script>
@@ -54,15 +54,32 @@
       </div>
     </nav>
     <div class="nav-cta">
-      <div class="nav-social-desk">
-        <a href="https://www.facebook.com/BasildonandPhoenixSC" target="_blank" rel="noopener" aria-label="Basildon &amp; Phoenix SC on Facebook">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.9h2.54V9.85c0-2.52 1.5-3.9 3.78-3.9 1.09 0 2.23.19 2.23.19v2.47h-1.26c-1.24 0-1.63.77-1.63 1.57v1.88h2.78l-.45 2.9h-2.33V22c4.78-.76 8.44-4.92 8.44-9.94z"/></svg></a>
-        <a href="https://www.instagram.com/basildonphoenix_swim/" target="_blank" rel="noopener" aria-label="Basildon &amp; Phoenix SC on Instagram">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.7 3.7 0 0 1-1.38-.9 3.7 3.7 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23C2.17 15.58 2.16 15.2 2.16 12s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41C8.42 2.17 8.8 2.16 12 2.16m0 1.8c-3.15 0-3.52.01-4.77.07-1.08.05-1.66.23-2.05.38-.52.2-.88.44-1.27.83-.39.39-.63.75-.83 1.27-.15.39-.33.97-.38 2.05-.06 1.25-.07 1.62-.07 4.77s.01 3.52.07 4.77c.05 1.08.23 1.66.38 2.05.2.52.44.88.83 1.27.39.39.75.63 1.27.83.39.15.97.33 2.05.38 1.25.06 1.62.07 4.77.07s3.52-.01 4.77-.07c1.08-.05 1.66-.23 2.05-.38.52-.2.88-.44 1.27-.83.39-.39.63-.75.83-1.27.15-.39.33-.97.38-2.05.06-1.25.07-1.62.07-4.77s-.01-3.52-.07-4.77c-.05-1.08-.23-1.66-.38-2.05-.2-.52-.44-.88-.83-1.27a3.4 3.4 0 0 0-1.27-.83c-.39-.15-.97-.33-2.05-.38-1.25-.06-1.62-.07-4.77-.07zm0 3.06a5.14 5.14 0 1 1 0 10.28 5.14 5.14 0 0 1 0-10.28zm0 8.48a3.34 3.34 0 1 0 0-6.68 3.34 3.34 0 0 0 0 6.68zm5.35-9.88a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 0 1 2.4 0z"/></svg></a>
-      </div>
-      <button class="theme-toggle" id="themeToggle" title="Switch theme" aria-label="Switch between light and dark theme" aria-pressed="true">
+      <button class="theme-toggle theme-toggle-standalone" id="themeToggle" title="Switch theme" aria-label="Switch between light and dark theme" aria-pressed="true">
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
       </button>
+      <div class="quick-links" id="quickLinks">
+        <button type="button" class="quick-links-toggle" id="quickLinksToggle" aria-haspopup="true" aria-expanded="false" aria-label="Quick links menu">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+        </button>
+        <div class="quick-links-menu" id="quickLinksMenu">
+          <button type="button" class="theme-toggle" id="themeToggleQuick" aria-pressed="true">
+            <span class="icon" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg></span>
+            <span class="label">Dark mode</span>
+          </button>
+          <div class="quick-links-divider"></div>
+          <a href="https://www.facebook.com/BasildonandPhoenixSC" target="_blank" rel="noopener"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.9h2.54V9.85c0-2.52 1.5-3.9 3.78-3.9 1.09 0 2.23.19 2.23.19v2.47h-1.26c-1.24 0-1.63.77-1.63 1.57v1.88h2.78l-.45 2.9h-2.33V22c4.78-.76 8.44-4.92 8.44-9.94z"/></svg><span class="label">Facebook</span></a>
+          <a href="https://www.instagram.com/basildonphoenix_swim/" target="_blank" rel="noopener"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.7 3.7 0 0 1-1.38-.9 3.7 3.7 0 0 1-.9-1.38c-.16-.42-.36-1.06-.41-2.23C2.17 15.58 2.16 15.2 2.16 12s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41C8.42 2.17 8.8 2.16 12 2.16m0 1.8c-3.15 0-3.52.01-4.77.07-1.08.05-1.66.23-2.05.38-.52.2-.88.44-1.27.83-.39.39-.63.75-.83 1.27-.15.39-.33.97-.38 2.05-.06 1.25-.07 1.62-.07 4.77s.01 3.52.07 4.77c.05 1.08.23 1.66.38 2.05.2.52.44.88.83 1.27.39.39.75.63 1.27.83.39.15.97.33 2.05.38 1.25.06 1.62.07 4.77.07s3.52-.01 4.77-.07c1.08-.05 1.66-.23 2.05-.38.52-.2.88-.44 1.27-.83.39-.39.63-.75.83-1.27.15-.39.33-.97.38-2.05.06-1.25.07-1.62.07-4.77s-.01-3.52-.07-4.77c-.05-1.08-.23-1.66-.38-2.05-.2-.52-.44-.88-.83-1.27a3.4 3.4 0 0 0-1.27-.83c-.39-.15-.97-.33-2.05-.38-1.25-.06-1.62-.07-4.77-.07zm0 3.06a5.14 5.14 0 1 1 0 10.28 5.14 5.14 0 0 1 0-10.28zm0 8.48a3.34 3.34 0 1 0 0-6.68 3.34 3.34 0 0 0 0 6.68zm5.35-9.88a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 0 1 2.4 0z"/></svg><span class="label">Instagram</span></a>
+          <a href="https://www.cluborganiser.co.uk/login.php" target="_blank" rel="noopener">Club members login</a>
+          <div class="quick-links-divider"></div>
+          <a href="https://www.swimmingresults.org/" target="_blank" rel="noopener">Swimming Results</a>
+          <a href="http://www.essexswimming.org/wp/" target="_blank" rel="noopener">Essex Swimming</a>
+          <a href="http://www.eastswimming.org/" target="_blank" rel="noopener">Swim England East Region</a>
+          <a href="http://www.swimming.org/swimengland/" target="_blank" rel="noopener">Swim England</a>
+          <a href="https://www.britishswimming.org/" target="_blank" rel="noopener">British Swimming</a>
+          <a href="http://www.nationalswimmingleague.org.uk/london" target="_blank" rel="noopener">National Arena League London</a>
+          <a href="http://www.essexswimleague.org.uk/" target="_blank" rel="noopener">Essex League</a>
+        </div>
+      </div>
       <button class="burger" id="burger" aria-label="Open menu" aria-expanded="false">☰</button>
     </div>
   </div>
@@ -207,7 +224,7 @@
 
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
-<script src="assets/js/core.js?v=25"></script>
-<script src="assets/js/site.js?v=31"></script>
+<script src="assets/js/core.js?v=26"></script>
+<script src="assets/js/site.js?v=32"></script>
 </body>
 </html>

@@ -450,7 +450,13 @@ const MOON_ICON='<svg width="19" height="19" viewBox="0 0 24 24" fill="none" str
 const SUN_ICON='<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.2M12 19.8V22M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2 12h2.2M19.8 12H22M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg>';
 function syncThemeToggles(){
   const on=document.body.classList.contains("theme-dark");
-  document.querySelectorAll(".theme-toggle").forEach(t=>{t.setAttribute("aria-pressed",on);t.innerHTML=on?MOON_ICON:SUN_ICON;});
+  document.querySelectorAll(".theme-toggle").forEach(t=>{
+    t.setAttribute("aria-pressed",on);
+    const icon=t.querySelector(".icon");
+    if(icon)icon.innerHTML=on?MOON_ICON:SUN_ICON;else t.innerHTML=on?MOON_ICON:SUN_ICON;
+    const label=t.querySelector(".label");
+    if(label)label.textContent=on?"Dark mode":"Light mode";
+  });
   // the phone's status bar / installed app's title bar matches the header
   const tc=document.querySelector('meta[name="theme-color"]');if(tc)tc.content=on?"#111116":"#ffffff";
   return on;

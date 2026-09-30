@@ -871,6 +871,19 @@ infoToggle.addEventListener("click",e=>{
 document.addEventListener("click",e=>{
   if(infoDropdown.classList.contains("open") && !infoDropdown.contains(e.target)) closeInfoMenu();
 });
+const quickLinks=$("#quickLinks"), quickLinksToggle=$("#quickLinksToggle");
+if(quickLinks&&quickLinksToggle){
+  const closeQuickLinks=()=>{quickLinks.classList.remove("open");quickLinksToggle.setAttribute("aria-expanded","false");};
+  quickLinksToggle.addEventListener("click",e=>{
+    e.stopPropagation();
+    const open=quickLinks.classList.toggle("open");
+    quickLinksToggle.setAttribute("aria-expanded",String(open));
+  });
+  quickLinks.querySelectorAll("#quickLinksMenu a, #quickLinksMenu button").forEach(el=>el.addEventListener("click",closeQuickLinks));
+  document.addEventListener("click",e=>{
+    if(quickLinks.classList.contains("open") && !quickLinks.contains(e.target)) closeQuickLinks();
+  });
+}
 /* The drawer hangs off a sticky header that may sit below the prototype banner, so how much
    room it actually has is only knowable at open time -- a pure-CSS cap has to assume the header
    is already pinned to the top, which on a short phone pushes "Join Us" off the bottom. */
