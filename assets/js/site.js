@@ -90,8 +90,8 @@ function renderMeets(){
   $("#nextMeetCard").innerHTML=next?`
     <p class="eyebrow">Next ${isHome(next)?"Basildon ":""}meet</p>
     <h3>${esc(next.title)}</h3>
-    <div class="meta"><div>${esc(next.venue)}</div><div>${fmtDate(next.start)}${next.closing?` · entries close ${fmtDate(next.closing)}`:""}</div></div>
-    <div style="margin-top:12px"><a class="btn small" href="open-meets">Details &amp; entry pack</a></div>`
+    <div class="meta"><div class="nm-venue">${esc(next.venue)}</div><div>${fmtDate(next.start)}${next.closing?`<span class="nm-closing"> · entries close ${fmtDate(next.closing)}</span>`:""}</div></div>
+    <div class="nm-cta"><a class="btn small" href="open-meets">Details<span class="nm-long"> &amp; entry pack</span></a></div>`
     :`<p class="eyebrow">Next Basildon meet</p><h3>Dates coming soon</h3>
     <div class="meta"><div>The next season's meets will be published here once confirmed.</div></div>`;
 }

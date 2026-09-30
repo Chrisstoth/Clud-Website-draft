@@ -499,6 +499,7 @@ nav.main a{position:relative;color:var(--ink);text-decoration:none;font-weight:6
 .next-meet h3{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.3rem;margin-top:6px;line-height:1.15;letter-spacing:-.01em}
 .next-meet .meta{color:#5c5c63;font-size:.92rem;margin-top:6px}
 .next-meet .meta div{margin-top:3px}
+.next-meet .nm-cta{margin-top:12px}
 @media(max-width:820px){.hero-grid{grid-template-columns:1fr}.hero{padding:42px 0 50px}}
 @media(max-width:640px){.next-meet{padding:22px}.next-meet::before{transform:none;border-radius:4px}}
 
@@ -1325,6 +1326,27 @@ body.theme-dark label.f input:focus,body.theme-dark label.f select:focus,body.th
   /* the feature card is already flame, so its tab inverts to stay legible on it */
   .pointed-card.feature .eyebrow,body.theme-dark .pointed-card.feature .eyebrow{color:#fff}
   .pointed-card.feature .eyebrow::before{background:linear-gradient(100deg,#101014 0%,#2a2a32 100%)}
+
+  /* Homepage banner: on a computer the next-meet card sits beside the headline, but stacked
+     on a phone the two filled most of the first screen and pushed the news photos out of
+     sight. Here the banner tightens and the card becomes one short row -- title and date on
+     the left, a "Details" button on the right -- with the venue and closing date left to the
+     Open Meets page the button goes to. */
+  .hero{padding:16px 0 18px}
+  .hero-grid{gap:12px}
+  .hero-grid>div>.eyebrow{display:none}
+  .hero h1{font-size:1.4rem;margin-top:0}
+  .next-meet{
+    display:grid;grid-template-columns:1fr auto;column-gap:12px;align-items:center;
+    padding:10px 12px;
+  }
+  .next-meet>.eyebrow{grid-column:1;justify-self:start;padding:3px 12px;font-size:.7rem;margin-bottom:3px}
+  .next-meet h3{grid-column:1;font-size:1rem;margin-top:0;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .next-meet .meta{grid-column:1;font-size:.82rem;margin-top:2px}
+  .next-meet .meta div{margin-top:0}
+  .next-meet .nm-venue,.next-meet .nm-closing,.next-meet .nm-long{display:none}
+  .next-meet .nm-cta{grid-column:2;grid-row:1 / span 3;margin-top:0}
 }
 /* The partners row used to WRAP on phones, and a leading tick was added here because a
    trailing separator could dangle at the end of a wrapped line. That layout is gone -- at
