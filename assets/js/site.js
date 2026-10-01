@@ -128,6 +128,28 @@ function renderCoaches(){
     $("#academyCoachesHead").hidden=!academy.length;
   }
 }
+/* Coaches & Squads has two tabs; "coaches#squads" opens straight on the squad map. */
+const coachTabs=$("#coachTabs");
+function showCoachTab(tab){
+  coachTabs.querySelectorAll("[data-ctab]").forEach(b=>{
+    const on=b.dataset.ctab===tab;
+    b.classList.toggle("active",on);b.setAttribute("aria-selected",String(on));
+  });
+  document.querySelectorAll("[data-ctab-panel]").forEach(p=>{p.hidden=p.dataset.ctabPanel!==tab;});
+  /* The map can only size itself once it's on screen. */
+  if(tab==="squads"&&typeof pwShown==="function")pwShown();
+}
+if(coachTabs){
+  const fromHash=()=>location.hash==="#squads"?"squads":"coaches";
+  coachTabs.addEventListener("click",e=>{
+    const b=e.target.closest("[data-ctab]");
+    if(!b)return;
+    history.replaceState(null,"",b.dataset.ctab==="squads"?"#squads":location.pathname+location.search);
+    showCoachTab(b.dataset.ctab);
+  });
+  addEventListener("hashchange",()=>showCoachTab(fromHash()));
+  showCoachTab(fromHash());
+}
 function roleCard(r){
   return `<article class="card role-card" data-cat="${esc(r.category)}"><h3>${esc(r.title)}</h3>
       <div class="meta">

@@ -169,7 +169,7 @@ function pwDetailHtml(p){
 }
 
 /* ---------- pan & zoom ---------- */
-const pw={x:0,y:0,k:1,sel:null,pts:new Map(),drag:null,moved:false,anim:0};
+const pw={x:0,y:0,k:1,homed:false,sel:null,pts:new Map(),drag:null,moved:false,anim:0};
 const pwEls=()=>({vp:$("#pwViewport"),world:$("#pwWorld"),panel:$("#pwPanel")});
 function pwBounds(){
   const {vp}=pwEls();
@@ -186,7 +186,8 @@ function pwClamp(){
   pw.x=cl(pw.x,PW_W*pw.k,vw);pw.y=cl(pw.y,PW_H*pw.k,vh);
 }
 function pwApply(animate){
-  const {world}=pwEls();
+  const {world,vp}=pwEls();
+  if(!vp.clientWidth)return;
   pwClamp();
   world.classList.toggle("animating",!!animate);
   world.style.transform=`translate(${pw.x}px,${pw.y}px) scale(${pw.k})`;
@@ -203,8 +204,14 @@ function pwCentre(x,y,k){
   pw.x=b.w/2-x*pw.k;pw.y=b.h/2-y*pw.k;
   pwApply(true);
 }
+/* Lay the map out the first time it's actually visible (it starts on a hidden tab). */
+function pwShown(){
+  const {vp}=pwEls();
+  if(vp&&!pw.homed&&vp.clientWidth)pwHome();
+}
 function pwHome(){
   const {vp}=pwEls();
+  pw.homed=true;
   /* Phones start zoomed in on Junior Pathway and the hats, ready to be dragged; computers see it all. */
   if(vp.clientWidth<760){const jp=pwPos(PATHWAY.find(p=>p.branch==="jp"));pwCentre(jp.x,jp.y+20,Math.max(pwFitK(),.55));}
   else{pw.k=pwFitK();pw.x=(vp.clientWidth-PW_W*pw.k)/2;pw.y=(vp.clientHeight-PW_H*pw.k)/2;pwApply(true);}
@@ -286,7 +293,7 @@ function renderPathway(){
       </div>
       <p class="pw-note"><strong>There's no set route — and no guarantees.</strong> Swimmers move up, across and sometimes back as they grow and develop, and the coaches place every swimmer where they'll progress best.</p>`;
     pwWire();
-    requestAnimationFrame(()=>pwHome());
+    requestAnimationFrame(pwShown);
   }
   if(pw.sel)pwSelect(pw.sel,{centre:false});
 }

@@ -116,22 +116,30 @@
       <div class="lane-rope"></div>
       <p>Our coaching team is Swim England qualified, DBS-checked and safeguarding trained. Squads run from Academy hat groups through to Gold.</p>
     </div>
-    <div class="grid cols-2" id="coachesList"></div>
-
-    <div class="page-head" id="academyCoachesHead" style="margin-top:56px" hidden>
-      <h3 class="display">Academy Coaches</h3>
-      <div class="lane-rope"></div>
-      <p>Our Academy team takes swimmers from their first hat group through to the competitive squads.</p>
+    <div class="tt-views" id="coachTabs" role="tablist" aria-label="Coaches or squads">
+      <button type="button" role="tab" data-ctab="coaches">Coaches</button>
+      <button type="button" role="tab" data-ctab="squads">Squads</button>
     </div>
-    <div class="grid cols-2" id="academyCoachesList"></div>
 
-    <div class="page-head" id="squads" style="margin-top:56px">
-      <p class="eyebrow">Our squads</p>
-      <h3 class="display">The slanted approach</h3>
-      <div class="lane-rope"></div>
-      <p>From the Academy hat groups, Junior Pathway finds where each swimmer fits best: Bronze, Silver or Gold. Each lane climbs at a slant, and the further up a lane you go, the more is expected. Swimmers move between lanes as they develop, so explore the map and tap a squad to see who it's for, its coaches and its weekly training.</p>
+    <div data-ctab-panel="coaches" role="tabpanel">
+      <div class="grid cols-2" id="coachesList"></div>
+
+      <div class="page-head" id="academyCoachesHead" style="margin-top:56px" hidden>
+        <h3 class="display">Academy Coaches</h3>
+        <div class="lane-rope"></div>
+        <p>Our Academy team takes swimmers from their first hat group through to the competitive squads.</p>
+      </div>
+      <div class="grid cols-2" id="academyCoachesList"></div>
     </div>
-    <div id="pathwayMap"></div>
+
+    <div data-ctab-panel="squads" role="tabpanel" hidden>
+      <div class="page-head" style="margin-top:12px">
+        <h3 class="display">The slanted approach</h3>
+        <div class="lane-rope"></div>
+        <p>From the Academy hat groups, Junior Pathway finds where each swimmer fits best: Bronze, Silver or Gold. Each lane climbs at a slant, and the further up a lane you go, the more is expected. Swimmers move between lanes as they develop, so explore the map and tap a squad to see who it's for, its coaches and its weekly training.</p>
+      </div>
+      <div id="pathwayMap"></div>
+    </div>
   </div>
 </section>
 </main>
@@ -172,6 +180,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <script src="assets/js/core.js?v=27"></script>
 <script src="assets/js/site.js?v=37"></script>
-<script src="assets/js/pathway.js?v=2"></script>
+<script src="assets/js/pathway.js?v=3"></script>
 </body>
 </html>
