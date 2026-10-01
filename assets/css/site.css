@@ -839,7 +839,13 @@ body.theme-dark .meet.ours .datebox .m{color:#3a1c00}
 .meet .links{margin-top:14px;display:flex;gap:10px;flex-wrap:wrap}
 .meet .closing{font-size:.88rem;color:var(--muted);margin-top:10px}
 .meet .closing strong{color:var(--text)}
-.meet .visit-line{font-size:.85rem;color:var(--muted);margin-top:6px}
+/* Open Meets: intro on the left, visiting-club shortcuts on the right; stacks on narrow screens */
+.meets-top{display:flex;gap:28px;align-items:flex-start;justify-content:space-between}
+.meets-top .page-head{flex:1 1 auto}
+.visit-box{flex:0 0 240px;display:flex;flex-direction:column;gap:10px;padding:18px 20px;border:1px solid var(--line);border-radius:var(--radius);background:var(--card)}
+.visit-box .visit-q{font-weight:700;font-size:.95rem;margin:0 0 4px}
+.visit-box .btn{text-align:center}
+@media(max-width:760px){.meets-top{flex-direction:column;gap:0}.visit-box{flex:none;width:100%;margin-bottom:28px}}
 @media(max-width:520px){.meet{grid-template-columns:58px minmax(0,1fr);gap:14px}.meet .datebox{padding:9px 4px}.meet .datebox .d{font-size:1.4rem}.meet h3{font-size:1.15rem}}
 @media(max-width:640px){
   .meet{position:relative;clip-path:none;border-radius:var(--radius);padding:22px}

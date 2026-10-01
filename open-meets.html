@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=64">
+<link rel="stylesheet" href="assets/css/site.css?v=65">
 </head>
 <body class="theme-dark">
 <script>(function(){var t=null;try{t=localStorage.getItem("bpsc_theme")}catch(e){}if(t?t==="light":window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches)document.body.classList.remove("theme-dark")})()</script>
@@ -110,6 +110,7 @@
 <main>
 <section class="page" id="page-meets">
   <div class="container">
+    <div class="meets-top">
     <div class="page-head">
       <p class="eyebrow">Racing calendar</p>
       <h2 class="display">Open Meets &amp; Galas</h2>
@@ -117,8 +118,14 @@
       <p>Everything you need for upcoming competitions: entry packs, closing dates and results. Questions about entries? Contact the Open Meets Secretary via the club email.</p>
       <p style="margin-top:8px"><em>Advance notice: 2027 BPSC meet dates will be published here once confirmed.</em></p>
     </div>
+    <aside class="visit-box" aria-label="Visiting clubs">
+      <p class="visit-q">Planning a club trip to one of our meets?</p>
+      <a class="btn small" href="venue#galas">Getting here</a>
+      <a class="btn small ghost" href="venue#staying">Places to stay</a>
+    </aside>
+    </div>
     <h3 class="display meets-heading">Our galas</h3>
-    <p class="meets-sub">Meets we host ourselves at Basildon Sporting Village. Visiting club? See <a href="venue#galas">getting here, parking &amp; places to stay</a>.</p>
+    <p class="meets-sub">Meets we host ourselves at Basildon Sporting Village.</p>
     <div class="grid" id="meetsList"></div>
     <h3 class="display meets-heading">Open meets you can enter</h3>
     <p class="meets-sub">Licensed meets hosted by other clubs and counties — great extra racing opportunities.</p>
@@ -168,6 +175,6 @@
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <script src="assets/js/core.js?v=26"></script>
-<script src="assets/js/site.js?v=33"></script>
+<script src="assets/js/site.js?v=35"></script>
 </body>
 </html>
