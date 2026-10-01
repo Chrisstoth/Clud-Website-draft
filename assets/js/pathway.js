@@ -1,73 +1,80 @@
 /* ================= SQUAD PATHWAY MAP =================
    The "slanted approach" on the Coaches & Squads page: a map you drag around (pinch or the
-   +/- buttons to zoom), with age along the bottom and performance expectation up the side.
-   Bronze, Silver and Gold are slanted ribbons -- the higher the branch, the steeper it climbs --
-   and tapping a squad opens who it's for, its coaches and its training hours.
+   +/- buttons to zoom). Bronze, Silver and Gold are three equal lanes side by side, each leaning
+   at the site's slant: the higher up a lane, the more is expected. There's deliberately no scale
+   across lanes -- a Silver swimmer isn't "below" Gold 3 -- and the dotted links show swimmers move
+   between them. Tapping a squad opens who it's for, its coaches and its training hours.
    Who-it's-for text lives here in PATHWAY; the sessions, lead coach and coaches come live from
    Squad Timetables and the coaching team, matched by squad name, so hours can never go stale.
    A squad here with no timetable of its own yet can borrow one through `alias`. */
 
-/* World size in map pixels; X() places an age along the bottom axis. */
-const PW_W=1520,PW_H=860;
-const PW_X=age=>110+(age-5)*92;
+/* The map's drawing area, in the SVG's own coordinates (y runs down). */
+const PW_MINX=0,PW_MINY=160,PW_W=1300,PW_H=850;
+/* Lanes lean right as they climb, at the site's --slant-ratio. A lane is placed by where its
+   centre meets PW_BASE, the top of the Junior Pathway bar. */
+const PW_LEAN=.364,PW_BASE=640,PW_TOP=232;
+const pwLaneX=(bx,y)=>bx+(PW_BASE-y)*PW_LEAN;
 
-/* Each branch is a ribbon from one [age, y] point to another; squads sit on it at their `at` age. */
 const PW_BRANCHES={
-  academy:{label:"Academy",color:"#4f9bd9",from:[5.1,745],to:[11.4,718]},
+  academy:{label:"Academy"},
   jp:{label:"Junior Pathway",color:"#f5841f"},
-  bronze:{label:"Bronze · Club Swim",color:"#b8733a",from:[12.3,650],to:[19.4,592]},
-  silver:{label:"Silver pathway",color:"#8f99a6",from:[11.8,478],to:[19.4,372]},
-  gold:{label:"Gold pathway",color:"#d9a521",from:[9.4,318],to:[19.4,118]},
-  masters:{label:"Masters",color:"#24756b",from:[14.4,768],to:[19.6,768]}
+  masters:{label:"Masters",color:"#24756b",bx:110,w:190,from:560,to:300},
+  bronze:{label:"Bronze · Club Swim",color:"#b8733a",bx:440,w:200},
+  silver:{label:"Silver",color:"#8f99a6",bx:690,w:200},
+  gold:{label:"Gold",color:"#d9a521",bx:940,w:200}
 };
 
 const PATHWAY=[
-  {name:"Green Hats",branch:"academy",at:5.9,fill:"#23803f",light:true,ages:[5,12],ageLabel:"Up to 12",
+  {name:"Green Hats",branch:"academy",x:390,y:930,fill:"#23803f",light:true,ageLabel:"Up to 12",
     level:"Academy · first hat group",
     blurb:"The first Academy hat group, for swimmers coming out of lessons. Swimmers work up through Green, Yellow, Blue and Red hats."},
-  {name:"Yellow Hats",branch:"academy",at:7.4,fill:"#f2c230",ages:[5,12],ageLabel:"Up to 12",
+  {name:"Yellow Hats",branch:"academy",x:530,y:875,fill:"#f2c230",ageLabel:"Up to 12",
     level:"Academy · second hat group",
     blurb:"The second Academy hat group, building on the skills from Green Hats."},
-  {name:"Blue Hats",branch:"academy",at:8.9,fill:"#2f6fd6",light:true,ages:[5,12],ageLabel:"Up to 12",
+  {name:"Blue Hats",branch:"academy",x:670,y:820,fill:"#2f6fd6",light:true,ageLabel:"Up to 12",
     level:"Academy · third hat group",
     blurb:"The third Academy hat group, getting swimmers ready for Red Hats."},
-  {name:"Red Hats",branch:"academy",at:10.4,fill:"#d23a3a",light:true,ages:[5,12],ageLabel:"Up to 12",
+  {name:"Red Hats",branch:"academy",x:810,y:765,fill:"#d23a3a",light:true,ageLabel:"Up to 12",
     level:"Academy · final hat group",
     blurb:"The final Academy hat group, before Junior Pathway. There's no age limit in the Academy other than 12: swimmers who haven't moved on by then join the Bronze pathway."},
-  {name:"Junior Pathway",branch:"jp",x:10.9,y:560,ages:[8,12],ageLabel:"Aim to move on by 12",competitive:true,
+  {name:"Junior Pathway",branch:"jp",x:672,y:690,width:740,ageLabel:"9–12",competitive:true,
     level:"The \"sorting hat\"",
     blurb:"Junior Pathway works out where each swimmer fits best — Bronze, Silver or Gold — and we aim for swimmers to have moved on by 12. A highly competitive squad with minimum attendance."},
-  {name:"Bronze 2",branch:"bronze",at:13.6,alias:"Bronze",ages:[11,15],ageLabel:"Younger swimmers",
+  {name:"Bronze 2",branch:"bronze",y:495,alias:"Bronze",ageLabel:"11–14",
     level:"Club Swim",
     blurb:"The Club Swim programme for younger swimmers: fitness, working towards county times, late bloomers and swimmers who are here for the social side as much as the racing."},
-  {name:"Bronze 1",branch:"bronze",at:16.6,alias:"Bronze",ages:[14,19],ageLabel:"Older swimmers",
+  {name:"Bronze 1",branch:"bronze",y:365,alias:"Bronze",ageLabel:"14+",
     level:"Club Swim",
     blurb:"The Club Swim programme for older swimmers: fitness, gaining county times, late bloomers and more social swimmers."},
-  {name:"Silver 3",branch:"silver",at:13,ages:[12,14],ageLabel:"12–14",competitive:true,
+  {name:"Silver 3",branch:"silver",y:560,ageLabel:"12–14",competitive:true,
     level:"Working towards county times",
     blurb:"Generally for younger swimmers working towards county times, broadening their swimming skills and improving fitness and speed."},
-  {name:"Silver 2",branch:"silver",at:15,ages:[13,16],ageLabel:"13–16",competitive:true,
+  {name:"Silver 2",branch:"silver",y:430,ageLabel:"13–16",competitive:true,
     level:"County times, or very close",
     blurb:"Generally for swimmers with county times, or very close to them."},
-  {name:"Silver 1",branch:"silver",at:17.4,ages:[15,19],ageLabel:"15+",competitive:true,
+  {name:"Silver 1",branch:"silver",y:300,ageLabel:"15+",competitive:true,
     level:"County & regional · some national qualifiers",
     blurb:"For county and regional level swimmers, some with national qualifying times."},
-  {name:"Gold 3",branch:"gold",at:11.8,ages:[10,14],ageLabel:"10–14",competitive:true,
+  {name:"Gold 3",branch:"gold",y:560,ageLabel:"10–14",competitive:true,
     level:"County & regional · national potential",
     blurb:"For swimmers with county and regional qualifying times, and national potential."},
-  {name:"Gold 2",branch:"gold",at:14.4,ages:[12,16],ageLabel:"12–16",competitive:true,
+  {name:"Gold 2",branch:"gold",y:430,ageLabel:"12–16",competitive:true,
     level:"Regional & national qualifiers",
     blurb:"For swimmers with regional and national qualifying times."},
-  {name:"Gold 1",branch:"gold",at:17.2,ages:[14,19],ageLabel:"14+",competitive:true,
+  {name:"Gold 1",branch:"gold",y:300,ageLabel:"14+",competitive:true,
     level:"Regional finals · national qualifying",
     blurb:"For swimmers aiming for regional finals and national qualification."},
-  {name:"Junior Masters",branch:"masters",at:15.6,ageLabel:"Younger swimmers",
+  {name:"Junior Masters",branch:"masters",y:495,ageLabel:"14–18",
     level:"Masters offering",
     blurb:"Our Masters offering for younger swimmers. Get in touch to find out more."},
-  {name:"Masters",branch:"masters",at:18.4,ageLabel:"Adults",
+  {name:"Masters",branch:"masters",y:365,ageLabel:"18+",
     level:"Fitness or competitive",
     blurb:"For adult swimmers — whether you're swimming for fitness or to compete."}
 ];
+
+/* Squads swimmers often move between, drawn as dotted links -- in either direction. */
+const PW_LINKS=[["Bronze 2","Silver 3"],["Bronze 2","Silver 2"],["Bronze 1","Silver 2"],["Bronze 1","Silver 1"],
+  ["Silver 3","Gold 3"],["Silver 2","Gold 2"],["Silver 1","Gold 1"],["Silver 3","Gold 2"],["Silver 2","Gold 1"]];
 
 /* Real routes swimmers have taken -- proof there's no set path, in either direction. */
 const PW_JOURNEYS=[
@@ -75,12 +82,12 @@ const PW_JOURNEYS=[
   {label:"Up, and across",route:["Junior Pathway","Silver 2","Gold 2","Silver 1"]}
 ];
 
-/* Where a squad's card sits on the map. */
-function pwPos(p){
-  if(p.x!=null)return {x:PW_X(p.x),y:p.y};
-  const b=PW_BRANCHES[p.branch],[a1,y1]=b.from,[a2,y2]=b.to;
-  return {x:PW_X(p.at),y:y1+(p.at-a1)/(a2-a1)*(y2-y1)};
+/* Where a squad's card sits: in the SVG's coordinates (pwRaw), and on the map itself (pwPos). */
+function pwRaw(p){
+  if(p.x!=null)return {x:p.x,y:p.y};
+  return {x:pwLaneX(PW_BRANCHES[p.branch].bx,p.y),y:p.y};
 }
+function pwPos(p){const r=pwRaw(p);return {x:r.x-PW_MINX,y:r.y-PW_MINY};}
 const pwSlug=n=>n.toLowerCase().replace(/[^a-z0-9]+/g,"-");
 const pwSquad=p=>DB.squads.find(s=>s.name===p.name)||(p.alias?DB.squads.find(s=>s.name===p.alias):null);
 /* Coaches tag squads by name, with an optional "(assistant)" after it. */
@@ -96,29 +103,29 @@ const pwHrs=m=>{const h=Math.round(m/60*4)/4;return `${h} hr${h===1?"":"s"}`;};
 
 /* ---------- drawing ---------- */
 function pwSvg(){
-  const ticks=[];
-  for(let a=6;a<=18;a++)ticks.push(`<line class="pw-grid" x1="${PW_X(a)}" y1="80" x2="${PW_X(a)}" y2="800"/>
-    <text class="pw-tick" x="${PW_X(a)}" y="826">${a===18?"18+":a}</text>`);
-  const bands=Object.entries(PW_BRANCHES).filter(([,b])=>b.from).map(([k,b])=>{
-    const [x1,y1]=[PW_X(b.from[0]),b.from[1]],[x2,y2]=[PW_X(b.to[0]),b.to[1]],h=46;
-    const ang=Math.atan2(y2-y1,x2-x1)*180/Math.PI;
-    return `<polygon class="pw-band" style="--c:${b.color}" points="${x1},${y1-h} ${x2},${y2-h} ${x2},${y2+h} ${x1},${y1+h}"/>
-      <text class="pw-band-label" style="--c:${b.color}" transform="translate(${x1+10},${y1-h-10}) rotate(${ang})">${esc(b.label)}</text>`;
+  const at=n=>pwRaw(PATHWAY.find(p=>p.name===n));
+  const line=(a,b,cls,extra="")=>`<line class="${cls}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"${extra}/>`;
+  /* Each lane: a leaning ribbon, its name on top, and a spine up the middle. */
+  const lanes=Object.values(PW_BRANCHES).filter(b=>b.bx).map(b=>{
+    const lo=b.from||PW_BASE,hi=b.to||PW_TOP,h=b.w/2;
+    const [x1,x2]=[pwLaneX(b.bx,lo),pwLaneX(b.bx,hi)];
+    return `<polygon class="pw-band" style="--c:${b.color}" points="${x1-h},${lo} ${x1+h},${lo} ${x2+h},${hi} ${x2-h},${hi}"/>
+      ${line({x:x1,y:lo},{x:x2,y:hi},"pw-spine",` style="--c:${b.color}"`)}
+      <text class="pw-lane-label" style="--c:${b.color}" x="${x2}" y="${hi-16}">${esc(b.label)}</text>`;
   }).join("");
-  /* The structural flows: through the hats, into Junior Pathway, and out to every branch. */
-  const at=n=>pwPos(PATHWAY.find(p=>p.name===n));
-  const flow=(a,b,cls="")=>{const p=at(a),q=at(b);return `<line class="pw-flow ${cls}" x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}"/>`;};
-  const flows=flow("Green Hats","Red Hats","solid")+flow("Red Hats","Junior Pathway")
-    +flow("Junior Pathway","Gold 3")+flow("Junior Pathway","Silver 3")+flow("Junior Pathway","Bronze 2")+flow("Red Hats","Bronze 2","faint");
-  return `<svg class="pw-svg" viewBox="0 0 ${PW_W} ${PW_H}" width="${PW_W}" height="${PW_H}" aria-hidden="true">
-    <defs><marker id="pwArrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="pw-arrowhead"/></marker></defs>
-    ${ticks.join("")}
-    <line class="pw-axis" x1="70" y1="800" x2="${PW_W-40}" y2="800" marker-end="url(#pwArrow)"/>
-    <line class="pw-axis" x1="70" y1="800" x2="70" y2="70" marker-end="url(#pwArrow)"/>
-    <text class="pw-axis-label" x="${PW_W-44}" y="852" text-anchor="end">Age</text>
-    <text class="pw-axis-label" transform="translate(48,800) rotate(-90)">Performance expectation</text>
-    <rect class="pw-age-range" id="pwAgeRange" x="0" y="794" width="0" height="12" rx="6"/>
-    ${bands}${flows}
+  const links=PW_LINKS.map(([a,b])=>line(at(a),at(b),"pw-link")).join("");
+  /* Up through the hats into Junior Pathway; Blue Hats can go straight there too. */
+  const hats=["Green Hats","Yellow Hats","Blue Hats","Red Hats"].map(at),jp=at("Junior Pathway");
+  const climb=hats.slice(1).map((h,i)=>line(hats[i],h,"pw-flow solid")).join("")
+    +line(hats[3],{x:hats[3].x,y:jp.y},"pw-flow solid")+line(hats[2],{x:hats[2].x,y:jp.y},"pw-flow");
+  /* The slant itself, alongside Gold: further up any lane means more is expected. */
+  const g=PW_BRANCHES.gold,ax=g.bx+g.w/2+70,a1={x:pwLaneX(ax,600),y:600},a2={x:pwLaneX(ax,270),y:270};
+  const ang=Math.atan2(a2.y-a1.y,a2.x-a1.x)*180/Math.PI,mid={x:(a1.x+a2.x)/2,y:(a1.y+a2.y)/2};
+  return `<svg class="pw-svg" viewBox="${PW_MINX} ${PW_MINY} ${PW_W} ${PW_H}" width="${PW_W}" height="${PW_H}" aria-hidden="true">
+    <defs><marker id="pwArrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="pw-arrowhead"/></marker></defs>
+    ${lanes}${links}${climb}
+    ${line(a1,a2,"pw-axis",' marker-end="url(#pwArrow)"')}
+    <text class="pw-axis-label" text-anchor="middle" transform="translate(${mid.x+22},${mid.y}) rotate(${ang})">Higher expectations</text>
     <path class="pw-journey" id="pwJourney" d=""/>
     <circle class="pw-journey-dot" id="pwJourneyDot" r="9" cx="-50" cy="-50"/>
   </svg>`;
@@ -126,7 +133,7 @@ function pwSvg(){
 function pwNodeHtml(p){
   const {x,y}=pwPos(p),b=PW_BRANCHES[p.branch];
   return `<button type="button" class="pw-node${p.light?" light":""}${p.branch==="jp"?" hub":p.branch==="academy"?" hat":""}" data-pw="${pwSlug(p.name)}"
-    style="left:${x}px;top:${y}px;--c:${p.fill||b.color}">
+    style="left:${x}px;top:${y}px;--c:${p.fill||b.color}${p.width?`;width:${p.width}px`:""}">
     <strong>${esc(p.name)}</strong><span>${esc(p.ageLabel)}</span></button>`;
 }
 
@@ -198,8 +205,8 @@ function pwCentre(x,y,k){
 }
 function pwHome(){
   const {vp}=pwEls();
-  /* Phones start zoomed in on the Academy end, ready to be dragged; computers see it all. */
-  if(vp.clientWidth<760)pwCentre(PW_X(8.6),600,Math.max(pwFitK(),.55));
+  /* Phones start zoomed in on Junior Pathway and the hats, ready to be dragged; computers see it all. */
+  if(vp.clientWidth<760){const jp=pwPos(PATHWAY.find(p=>p.branch==="jp"));pwCentre(jp.x,jp.y+20,Math.max(pwFitK(),.55));}
   else{pw.k=pwFitK();pw.x=(vp.clientWidth-PW_W*pw.k)/2;pw.y=(vp.clientHeight-PW_H*pw.k)/2;pwApply(true);}
 }
 
@@ -212,14 +219,9 @@ function pwSelect(slug,{centre=true}={}){
     n.classList.toggle("sel",on);n.setAttribute("aria-pressed",String(on));
   });
   vp.classList.toggle("has-sel",!!p);
-  const range=$("#pwAgeRange");
-  if(!p){panel.hidden=true;range.setAttribute("width",0);return;}
+  if(!p){panel.hidden=true;return;}
   $("#pwPanelBody").innerHTML=pwDetailHtml(p);
   panel.hidden=false;panel.scrollTop=0;
-  if(p.ages){
-    const [a1,a2]=p.ages,x1=PW_X(Math.max(a1,5.2)),x2=PW_X(Math.min(a2,19.4));
-    range.setAttribute("x",x1);range.setAttribute("width",x2-x1);
-  }else range.setAttribute("width",0);
   if(centre){const {x,y}=pwPos(p);pwCentre(x,y,Math.max(pw.k,vp.clientWidth<760?.7:pw.k));}
 }
 function pwStopJourney(){
@@ -235,8 +237,9 @@ function pwPlayJourney(i){
   pwStopJourney();pwSelect(null);
   $("#pwViewport").classList.add("journey");
   document.querySelector(`[data-pw-journey="${i}"]`).classList.add("active");
-  const pts=j.route.map(n=>pwPos(PATHWAY.find(p=>p.name===n)));
-  path.setAttribute("d","M"+pts.map(p=>`${p.x},${p.y}`).join("L"));
+  /* The line is drawn inside the SVG, in its coordinates; framing the view uses the map's. */
+  const raw=j.route.map(n=>pwRaw(PATHWAY.find(p=>p.name===n))),pts=j.route.map(n=>pwPos(PATHWAY.find(p=>p.name===n)));
+  path.setAttribute("d","M"+raw.map(p=>`${p.x},${p.y}`).join("L"));
   /* Frame the whole route. */
   const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y),b=pwBounds();
   const k=Math.min(1.1,(b.fullW-80)/(Math.max(...xs)-Math.min(...xs)+260),(b.fullH-80)/(Math.max(...ys)-Math.min(...ys)+200));

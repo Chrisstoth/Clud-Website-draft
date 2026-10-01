@@ -112,6 +112,16 @@ create table if not exists public.news_topics (
   updated_at  timestamptz not null default now()
 );
 
+-- The "Proud Partners" strip under the header on every page (migration 019).
+create table if not exists public.partners (
+  id          bigint generated always as identity primary key,
+  name        text not null,
+  url         text,
+  sort_order  int not null default 0,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
 create table if not exists public.volunteer_roles (
   id          bigint generated always as identity primary key,
   title       text not null,
@@ -221,6 +231,7 @@ alter table public.welfare_page    enable row level security;
 alter table public.committee_roles enable row level security;
 alter table public.instagram_settings enable row level security;
 alter table public.news_topics     enable row level security;
+alter table public.partners        enable row level security;
 alter table public.members         enable row level security;
 
 -- Anyone may read published content; the public site uses the publishable key.
@@ -233,6 +244,7 @@ create policy "public read welfare"   on public.welfare_page    for select using
 create policy "public read committee" on public.committee_roles for select using (true);
 create policy "public read instagram" on public.instagram_settings for select using (true);
 create policy "public read topics"    on public.news_topics     for select using (true);
+create policy "public read partners"  on public.partners        for select using (true);
 
 -- Signed-in club accounts may see their own membership row (drives the members' area menu).
 create policy "read own membership" on public.members for select
@@ -262,6 +274,8 @@ create policy "instagram write" on public.instagram_settings for all to authenti
   using (public.can_edit('instagram')) with check (public.can_edit('instagram'));
 create policy "topics write" on public.news_topics for all to authenticated
   using (public.can_edit('topics')) with check (public.can_edit('topics'));
+create policy "partners write" on public.partners for all to authenticated
+  using (public.can_edit('partners')) with check (public.can_edit('partners'));
 
 create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $$
@@ -270,7 +284,7 @@ begin new.updated_at = now(); return new; end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['feed','coaches','squads','volunteer_roles','news_defaults','welfare_page','committee_roles','instagram_settings','news_topics'] loop
+  foreach t in array array['feed','coaches','squads','volunteer_roles','news_defaults','welfare_page','committee_roles','instagram_settings','news_topics','partners'] loop
     execute format('drop trigger if exists touch_%1$s on public.%1$I', t);
     execute format('create trigger touch_%1$s before update on public.%1$I
                     for each row execute function public.touch_updated_at()', t);

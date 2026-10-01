@@ -860,7 +860,31 @@ function renderArticle(){
     +`<div style="margin-top:28px"><a class="btn small ghost" href="${back.href}">${back.label}</a></div>`;
   wireArticleGallery((it.photos||[]).length);
 }
-function renderAllPublic(){renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();renderCommittee();renderFollowPanel();renderFollowBadge();if(typeof renderPathway==="function")renderPathway();}
+/* ================= PROUD PARTNERS =================
+   The strip under the header. Every page's HTML carries a copy of the list, so the strip is
+   never empty while the database loads (or if the partners table hasn't been set up); once the
+   real list arrives it replaces that copy. The last list seen is kept in this browser and drawn
+   straight away on the next page, so a changed partner doesn't flash up as the old one first.
+   Two copies of the list are drawn: phones scroll them end to end as a ticker (see site.css). */
+const PARTNERS_KEY="bpsc_partners_v1";
+function renderPartners(list){
+  const strip=document.querySelector(".partners"),track=strip&&strip.querySelector(".logos-track");
+  if(!track||!list)return;
+  strip.hidden=!list.length;
+  const copy=hidden=>`<div class="logos"${hidden?' aria-hidden="true"':""}>${list.map(p=>{
+    const href=partnerUrl(p.url);
+    return href?`<a href="${esc(href)}"${hidden?' tabindex="-1"':""} target="_blank" rel="noopener">${esc(p.name)}</a>`:`<a>${esc(p.name)}</a>`;
+  }).join("")}</div>`;
+  track.innerHTML=copy(false)+copy(true);
+}
+try{renderPartners(JSON.parse(localStorage.getItem(PARTNERS_KEY)));}catch(e){}
+function renderPartnersFromDb(){
+  if(!DB.partners)return;
+  renderPartners(DB.partners);
+  try{localStorage.setItem(PARTNERS_KEY,JSON.stringify(DB.partners.map(({name,url})=>({name,url}))));}catch(e){}
+}
+
+function renderAllPublic(){renderPartnersFromDb();renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();renderCommittee();renderFollowPanel();renderFollowBadge();if(typeof renderPathway==="function")renderPathway();}
 
 /* ================= NAV ================= */
 const infoDropdown=$("#infoDropdown"), infoToggle=$("#infoToggle");

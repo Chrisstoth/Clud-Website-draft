@@ -13,7 +13,7 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const TT_LOC={lc:"BSV Long Course",deep:"BSV Short Course – Deep End",shallow:"BSV Short Course – Shallow End",bill:"Billericay Pool",land:"BSV Meeting Room"};
 
 /* In-memory copy of what is published, filled by loadContent() on every page load. */
-const DB={feed:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfare:[],committee:[],enquiries:[]};
+const DB={feed:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfare:[],committee:[],partners:null,enquiries:[]};
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
@@ -57,6 +57,16 @@ const pictureToRow=p=>({key:p.key,label:p.label,icon:p.icon||null,bg:p.bg||null,
 const welfareFromRow=r=>({id:r.id,body:r.body||""});
 const welfareToRow=w=>({body:w.body||""});
 const committeeFromRow=r=>({id:r.id,title:r.title,tier:r.tier||"committee",person:r.person||"",email:r.email||"",photo:r.photo||"",summary:r.summary||"",commitment:r.commitment||"",skills:r.skills||[],duties:r.duties||[]});
+const partnerFromRow=r=>({id:r.id,name:r.name,url:r.url||"",sortOrder:r.sort_order??0});
+const partnerToRow=p=>({name:p.name,url:partnerUrl(p.url)||null,...(p.sortOrder!==undefined&&{sort_order:p.sortOrder})});
+/* Partner links are typed in by hand: "www.arena.com" is taken to mean https://, and anything
+   that isn't an ordinary web address (a typo, or a javascript: link) is dropped rather than linked. */
+function partnerUrl(u){
+  const s=String(u||"").trim();
+  if(!s)return "";
+  const full=/^[a-z][a-z0-9+.-]*:/i.test(s)?s:"https://"+s.replace(/^\/+/,"");
+  try{const x=new URL(full);return /^https?:$/.test(x.protocol)&&x.hostname.includes(".")?x.href:"";}catch(e){return "";}
+}
 const committeeToRow=c=>({title:c.title,tier:c.tier||"committee",person:c.person||null,email:c.email||null,photo:c.photo||null,summary:c.summary||null,commitment:c.commitment||null,skills:c.skills||[],duties:c.duties||[]});
 
 /* Each members'-area section, and the table and translation it reads and writes. */
@@ -68,15 +78,21 @@ const SECTIONS={
   roles:{table:"volunteer_roles",from:roleFromRow,to:roleToRow,order:"sort_order"},
   newsDefaults:{table:"news_defaults",from:pictureFromRow,to:pictureToRow,order:"id"},
   welfare:{table:"welfare_page",from:welfareFromRow,to:welfareToRow,order:"id"},
-  committee:{table:"committee_roles",from:committeeFromRow,to:committeeToRow,order:"sort_order"}
+  committee:{table:"committee_roles",from:committeeFromRow,to:committeeToRow,order:"sort_order"},
+  /* optional: if the table isn't there yet (migration 019 not run), DB.partners stays null and
+     the pages keep the partner list written into their HTML, instead of the whole load failing */
+  partners:{table:"partners",from:partnerFromRow,to:partnerToRow,order:"sort_order",optional:true}
 };
 
 async function loadContent(){
   const keys=Object.keys(SECTIONS);
   const results=await Promise.all(keys.map(k=>sb.from(SECTIONS[k].table).select("*").order(SECTIONS[k].order,{ascending:true,nullsFirst:false})));
-  const failed=results.find(r=>r.error);
+  const failed=results.find((r,i)=>r.error&&!SECTIONS[keys[i]].optional);
   if(failed)throw failed.error;
-  keys.forEach((k,i)=>{DB[k]=results[i].data.map(SECTIONS[k].from);});
+  keys.forEach((k,i)=>{
+    if(results[i].error){console.warn(`Couldn't load ${SECTIONS[k].table}`,results[i].error);DB[k]=null;return;}
+    DB[k]=results[i].data.map(SECTIONS[k].from);
+  });
 }
 
 /* Trial enquiries carry children's names and dates of birth, so they are deliberately kept

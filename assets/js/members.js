@@ -9,7 +9,7 @@ const ROLES = {
   membership: {label:"Membership Team",      desc:"View trial & squad enquiries",     sections:["enquiries"]},
   welfare:    {label:"Welfare Officer",      desc:"Edit the Welfare & Safeguarding page", sections:["welfare"]},
   secretary:  {label:"Club Secretary",       desc:"Edit the Club Committee page",     sections:["committee"]},
-  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","topics","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","instagram","images"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
+  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","topics","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","partners","instagram","images"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
 };
 const SECTION_META = {
   feed:{name:"Club Feed", empty:"Nothing published yet — add the first item."},
@@ -21,6 +21,7 @@ const SECTION_META = {
   newsDefaults:{name:"Default News Pictures", empty:"No default picture categories yet."},
   welfare:{name:"Welfare & Safeguarding Page", empty:""},
   committee:{name:"Club Committee", empty:"No committee roles yet."},
+  partners:{name:"Proud Partners", empty:"No partners listed — the Proud Partners strip is hidden on every page until one is added."},
   instagram:{name:"Instagram on the News Page", empty:""},
   images:{name:"Manage Images", empty:""}
 };
@@ -155,6 +156,10 @@ const SCHEMAS = {
     {k:"note",label:"Details for parents & swimmers",type:"textarea"},
     {k:"img",label:"Picture",type:"imagepicker"}
   ],
+  partners:[
+    {k:"name",label:"Partner name (the text shown in the strip)",type:"text",req:1},
+    {k:"url",label:"Link — the partner's website (leave blank for no link)",type:"text"}
+  ],
   topics:[
     {k:"name",label:"Tag name (e.g. Trips, Open Water, Officials)",type:"text",req:1}
   ],
@@ -264,6 +269,7 @@ function itemSummary(sec,it){
     case "roles":{const catLabel={officiating:"Officiating",team_manager:"Team Manager",volunteering:"Volunteering"}[it.category]||"Volunteering";
       return {t:it.title,s:`${catLabel}${it.commitment?" · "+it.commitment:""}`};}
     case "committee":return {t:it.title,s:`${it.tier==="executive"?"Executive · ":""}${it.person||"Vacant"}`};
+    case "partners":return {t:it.name,s:it.url||"No link"};
     case "newsDefaults":return {t:it.label,s:it.img?"Custom photo set":`Gradient placeholder ${it.icon||""}`};
   }
 }
@@ -329,14 +335,21 @@ function renderAdminSection(){
     showImagesSection();
     return;
   }
+  if(sec==="partners"&&!DB.partners){
+    main.innerHTML=`<h2>${SECTION_META.partners.name}</h2>
+      <div class="admin-note">The partners list hasn't been set up in the database yet. The webmaster needs to run <code>supabase/migrations/019_partners.sql</code> in the Supabase SQL Editor. Until then every page keeps showing the partners written into its HTML.</div>`;
+    return;
+  }
   const items=sec==="feed"?feedItemsForRole(role):DB[sec];
-  const note=sec==="topics"
+  const note=sec==="partners"
+    ?"The Proud Partners strip under the header on every page. Each partner's name links to the web address given (opening in a new tab); leave the link blank to show the name without one. Use the arrows to change the order. Changes show on the public site straight away."
+    :sec==="topics"
     ?"These are the club's own tags for news stories. Every squad in Squad Timetables is a tag automatically, so there's no need to add squads here. Visitors can follow any tag on the News page and get a count of new stories for it. Renaming a tag updates every story that has it; deleting one just takes it off those stories."
     :sec==="feed"&&role.feedTypes.length>1
     ?"Changes here publish straight to the public page — no webmaster needed. This feed is shared across several types of item; pick the type when you add something new."
     :"Changes here publish straight to the public page — no webmaster needed.";
   const slides=sec==="feed"?homepageSlides():[];
-  const REORDERABLE=["coaches"];
+  const REORDERABLE=["coaches","partners"];
   const rowHtml=(it,i,arr)=>{const s=itemSummary(sec,it);
     const h=sec==="feed"?homeStatus(it,slides):null;
     const cls=h?(h.pinned&&h.slot>=0?" is-pinned":h.slot>=0?" on-home":""):"";
@@ -959,6 +972,12 @@ function showForm(sec,id,forcedType){
       data.name=(data.name||"").trim();
       const clash=newsTagList().find(t=>t.name.toLowerCase()===data.name.toLowerCase()&&t.ref!=="t:"+id);
       if(clash){toast(clash.squad?`"${clash.name}" is already a squad, so it's a tag already`:`There's already a tag called "${clash.name}"`);return;}
+    }
+    if(sec==="partners"){
+      data.name=(data.name||"").trim();
+      if(data.url&&data.url.trim()&&!partnerUrl(data.url)){toast("That link doesn't look like a web address — check it, or leave it blank");formTarget.querySelector('[name="url"]').focus();return;}
+      /* new partners go on the end of the strip, not the front */
+      if(!id)data.sortOrder=DB.partners.length?Math.max(...DB.partners.map(p=>p.sortOrder))+1:0;
     }
     if(sec==="coaches"){data.squads=(data.squadsRaw||"").split(",").map(s=>s.trim()).filter(Boolean);delete data.squadsRaw;}
     if(sec==="committee"){
