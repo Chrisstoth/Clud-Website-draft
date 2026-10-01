@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=65">
+<link rel="stylesheet" href="assets/css/site.css?v=66">
 </head>
 <body class="theme-dark">
 <script>(function(){var t=null;try{t=localStorage.getItem("bpsc_theme")}catch(e){}if(t?t==="light":window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches)document.body.classList.remove("theme-dark")})()</script>
@@ -114,7 +114,7 @@
       <p class="eyebrow">The team</p>
       <h2 class="display">Coaches &amp; Squads</h2>
       <div class="lane-rope"></div>
-      <p>Our coaching team is Swim England qualified, DBS-checked and safeguarding trained. Squads run from Academy hat groups through to Performance.</p>
+      <p>Our coaching team is Swim England qualified, DBS-checked and safeguarding trained. Squads run from Academy hat groups through to Gold.</p>
     </div>
     <div class="grid cols-2" id="coachesList"></div>
 
@@ -124,6 +124,14 @@
       <p>Our Academy team takes swimmers from their first hat group through to the competitive squads.</p>
     </div>
     <div class="grid cols-2" id="academyCoachesList"></div>
+
+    <div class="page-head" id="squads" style="margin-top:56px">
+      <p class="eyebrow">Our squads</p>
+      <h3 class="display">The slanted approach</h3>
+      <div class="lane-rope"></div>
+      <p>From the Academy hat groups, Junior Pathway finds where each swimmer fits best. The higher the branch, the higher the performance expected, and each branch climbs as swimmers get older. Explore the map and tap a squad to see who it's for, its coaches and its weekly training.</p>
+    </div>
+    <div id="pathwayMap"></div>
   </div>
 </section>
 </main>
@@ -163,6 +171,7 @@
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <script src="assets/js/core.js?v=26"></script>
-<script src="assets/js/site.js?v=35"></script>
+<script src="assets/js/site.js?v=36"></script>
+<script src="assets/js/pathway.js?v=1"></script>
 </body>
 </html>

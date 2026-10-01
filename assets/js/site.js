@@ -237,6 +237,8 @@ const ttTodayKey=()=>TT_DAYS[(new Date().getDay()+6)%7];
 const ttLandTag=s=>s.type==="land"?'<span class="tt-tag">Land</span>':"";
 let ttView="squad",ttDay=ttTodayKey(),ttSquadId=null;
 try{ttSquadId=+localStorage.getItem("bpsc_tt_squad")||null;}catch(e){}
+/* "timetables?squad=<id>" (from the squad pathway map) opens straight on that squad. */
+{const q=+new URLSearchParams(location.search).get("squad");if(q)ttSquadId=q;}
 
 function renderTimetable(){
   const body=$("#ttBody"),chips=$("#ttChips"),today=ttTodayKey();
@@ -858,7 +860,7 @@ function renderArticle(){
     +`<div style="margin-top:28px"><a class="btn small ghost" href="${back.href}">${back.label}</a></div>`;
   wireArticleGallery((it.photos||[]).length);
 }
-function renderAllPublic(){renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();renderCommittee();renderFollowPanel();renderFollowBadge();}
+function renderAllPublic(){renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();renderCommittee();renderFollowPanel();renderFollowBadge();if(typeof renderPathway==="function")renderPathway();}
 
 /* ================= NAV ================= */
 const infoDropdown=$("#infoDropdown"), infoToggle=$("#infoToggle");
