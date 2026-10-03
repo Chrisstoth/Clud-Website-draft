@@ -1796,7 +1796,7 @@ body.theme-dark .page-tabs button.active{color:#101014}
 .guide-section h4{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.1rem;color:var(--text);margin:0 0 10px;padding-bottom:8px;border-bottom:2px solid var(--line)}
 .guide-section .guide-lines{margin-top:0}
 .guide-section details.info{margin-top:8px}
-.guide-lines .link-line{position:relative;padding:6px 0 6px 20px}
+.guide-lines .link-line{position:relative;padding:6px 0 6px 20px;overflow-wrap:anywhere}
 .guide-lines .link-line::before{content:"";position:absolute;left:2px;top:15px;width:6px;height:6px;border-radius:50%;background:var(--flame)}
 .guide-lines .link-line[class*="hl-"]{padding:12px 14px;margin:6px 0;border-left:4px solid var(--hl-edge);background:var(--hl-bg);color:var(--text)}
 .guide-lines .link-line[class*="hl-"]::before{content:none}
