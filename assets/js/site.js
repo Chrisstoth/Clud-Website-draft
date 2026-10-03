@@ -128,7 +128,7 @@ function renderCoaches(){
     $("#academyCoachesHead").hidden=!academy.length;
   }
 }
-/* Coaches & Squads has two tabs; "coaches#squads" opens straight on the squad map. */
+/* Coaches & Squads has two tabs; "coaches#squads" opens straight on the squads. */
 const coachTabs=$("#coachTabs");
 function showCoachTab(tab){
   coachTabs.querySelectorAll("[data-ctab]").forEach(b=>{
@@ -136,8 +136,6 @@ function showCoachTab(tab){
     b.classList.toggle("active",on);b.setAttribute("aria-selected",String(on));
   });
   document.querySelectorAll("[data-ctab-panel]").forEach(p=>{p.hidden=p.dataset.ctabPanel!==tab;});
-  /* The map can only size itself once it's on screen. */
-  if(tab==="squads"&&typeof pwShown==="function")pwShown();
 }
 if(coachTabs){
   const fromHash=()=>location.hash==="#squads"?"squads":"coaches";
