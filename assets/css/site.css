@@ -1786,19 +1786,22 @@ body.theme-dark .page-tabs button.active{color:#101014}
 .guide-panel{padding:30px 32px}
 .guide-panel h3{font-size:1.35rem}
 .guide-intro{margin-top:8px;color:var(--muted)}
-/* the steps flow into columns so a guide uses the width rather than one long narrow list */
-.guide-lines{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));column-gap:34px;margin-top:14px;color:var(--muted);font-size:.95rem}
+.guide-lines{margin-top:14px;color:var(--muted);font-size:.95rem}
 .guide-lines .link-line{padding:14px 0;border-top:1px solid var(--line)}
 .guide-lines a{font-weight:700;color:var(--flame-dark);text-decoration:underline;text-underline-offset:3px}
 .guide-lines a:hover{color:var(--flame)}
-/* Longer guides (Academy to Club) break into labelled sections rather than one flat list. */
-.guide-section{margin-top:28px}
-.guide-section:first-of-type{margin-top:20px}
-.guide-section h4{font-family:'Montserrat',sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.08em;font-size:.8rem;color:var(--flame-dark);margin-bottom:6px}
-.guide-section .guide-lines{margin-top:4px}
-.guide-section details.info{margin-top:6px}
+/* Every guide reads as a numbered run of titled steps, not a flat FAQ grid, so it's
+   unmistakably a guide rather than a list of unrelated tips. Numbering is per-panel via
+   a CSS counter so each of the four guides starts back at 1. */
+.guide-panel{counter-reset:guide-step}
+.guide-section{position:relative;counter-increment:guide-step;margin-top:28px;padding-left:50px;min-height:34px}
+.guide-section:first-of-type{margin-top:22px}
+.guide-section::before{content:counter(guide-step);position:absolute;left:0;top:0;width:34px;height:34px;border-radius:50%;background:var(--flame);color:#fff;font-family:'Montserrat',sans-serif;font-weight:800;font-size:1rem;line-height:34px;text-align:center}
+.guide-section h4{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.08rem;color:var(--text);margin:4px 0 6px}
+.guide-section .guide-lines{margin-top:2px}
+.guide-section details.info{margin-top:8px}
 .guide-lines .link-line[class*="hl-"]{padding:12px 14px;margin:4px 0;border-top-color:transparent;border-left:4px solid var(--hl-edge);background:var(--hl-bg);color:var(--text)}
-@media(max-width:520px){.guide-panel{padding:22px 18px}}
+@media(max-width:520px){.guide-panel{padding:22px 18px}.guide-section{padding-left:42px}.guide-section::before{width:28px;height:28px;font-size:.88rem;line-height:28px}}
 body.theme-dark .mission-num{opacity:.75}
 
 /* The timeline rail is a lane rope stood on its end: same flame/ink alternation as .lane-rope,
