@@ -1791,6 +1791,13 @@ body.theme-dark .page-tabs button.active{color:#101014}
 .guide-lines .link-line{padding:14px 0;border-top:1px solid var(--line)}
 .guide-lines a{font-weight:700;color:var(--flame-dark);text-decoration:underline;text-underline-offset:3px}
 .guide-lines a:hover{color:var(--flame)}
+/* Longer guides (Academy to Club) break into labelled sections rather than one flat list. */
+.guide-section{margin-top:28px}
+.guide-section:first-of-type{margin-top:20px}
+.guide-section h4{font-family:'Montserrat',sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:.08em;font-size:.8rem;color:var(--flame-dark);margin-bottom:6px}
+.guide-section .guide-lines{margin-top:4px}
+.guide-section details.info{margin-top:6px}
+.guide-lines .link-line[class*="hl-"]{padding:12px 14px;margin:4px 0;border-top-color:transparent;border-left:4px solid var(--hl-edge);background:var(--hl-bg);color:var(--text)}
 @media(max-width:520px){.guide-panel{padding:22px 18px}}
 body.theme-dark .mission-num{opacity:.75}
 
