@@ -2045,8 +2045,8 @@ main{overflow-x:clip}
 }
 
 /* ================= HOMEPAGE V2: CLUB PULSE =================
-   (HOMEPAGE V1 / V2 in site.js.) Everything V2 adds is shown only while the body has .home-v2, so
-   V1 stays exactly as it was. Same visual language as the rest of the site: ink and flame, the
+   (HOMEPAGE V1 / V2 in site.js.) V2 is the default homepage. Everything it adds is shown only while
+   the body has .home-v2, so Classic (V1) stays exactly as it was. Same visual language as the rest of the site: ink and flame, the
    one --slant-deg lean on tabs, ticks and buttons, square-edged blocks on phones. */
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 body:not(.home-v2) .v2-only{display:none!important}
@@ -2065,8 +2065,6 @@ body:not(.home-v2) .v2-only{display:none!important}
 .home-version button[aria-pressed="true"]::before{background:#101014;border-color:#101014}
 .home-version button:focus-visible{outline:none}
 .home-version button:focus-visible::before{box-shadow:0 0 0 3px #fff}
-.home-version-tag{font-size:.55rem;letter-spacing:.1em;padding:2px 5px;background:#101014;color:var(--ember)}
-.home-version button[aria-pressed="true"] .home-version-tag{background:var(--flame);color:#101014}
 
 /* --- Club Pulse: the "today" area above the orange banner --- */
 .pulse{padding:6px 0 18px;animation:pulse-in .35s ease-out both}
@@ -2195,10 +2193,9 @@ body.home-v2.content-failed .hero-photo-strip,body.home-v2.content-failed #nextM
   .home-version button{padding:3px 11px}
   .pulse-demo-exit{margin-left:0}
 }
-/* three buttons in the orange bar on the narrowest phones: the "Preview" tag gives way */
+/* three buttons in the orange bar on the narrowest phones */
 @media(max-width:400px){
   .home-version{gap:4px}
   .home-version button{padding:3px 9px;letter-spacing:.05em}
-  .home-version-tag{display:none}
 }
 @media(prefers-reduced-motion:reduce){.pulse,.pulse-live-flag .live-dot,.pulse-k .live-dot{animation:none}}

@@ -1084,12 +1084,13 @@ if($("#roleCatTabs")){
 }
 
 /* ================= HOMEPAGE V1 / V2 (CLUB PULSE) =================
-   V2 is a preview of a homepage that knows what's on at the club today. It is the same page: the
-   V2 parts sit in index.html all along and site.css only shows them while the body has .home-v2,
-   which a line at the top of index.html sets before anything is drawn (so V1 never flashes up
-   first). The visitor's pick is kept in this browser; with no pick, data-home-default on
-   index.html's <body> decides -- set it to "v2" to make V2 the default, and remove #homeVersion
-   to retire the switch. The navigation and every other page are untouched either way. */
+   V2 is the homepage that knows what's on at the club today, and is what every visitor gets
+   unless they pick Classic (V1, the homepage as it was) with the switch under the slideshow. It is
+   one page: the V2 parts sit in index.html all along and site.css only shows them while the body
+   has .home-v2, which a line at the top of index.html sets before anything is drawn (so the wrong
+   version never flashes up first). The visitor's pick is kept in this browser; with no pick,
+   data-home-default on index.html's <body> decides ("v2"). Remove #homeVersion to retire the
+   switch. The navigation and every other page are untouched either way. */
 const HOME_VERSION_KEY="bpsc_home_version",HOME_CONTEXT_KEY="bpsc_home_context";
 const homePref=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
 const setHomePref=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
@@ -1278,7 +1279,7 @@ document.addEventListener("click",e=>{
     setHomeDemo(null);
     setHomePref(HOME_VERSION_KEY,pick);
     syncHomeVersion();
-    toast(pick==="v2"?"Homepage V2 preview — switch back any time":"Classic homepage");
+    toast(pick==="v2"?"The new homepage":"Classic homepage — switch back any time");
     return;
   }
   const d=e.target.closest("[data-home-demo]");

@@ -13,9 +13,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=75">
+<link rel="stylesheet" href="assets/css/site.css?v=76">
 </head>
-<body class="theme-dark" data-home-default="v1">
+<body class="theme-dark" data-home-default="v2">
 <script>(function(){var t=null;try{t=localStorage.getItem("bpsc_theme")}catch(e){}if(t?t==="light":window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches)document.body.classList.remove("theme-dark")})()</script>
 <!-- Homepage V1 / V2 (see HOMEPAGE V1 / V2 in site.js): set before anything is drawn, so V1 never flashes up first -->
 <script>(function(){var v=null;try{v=localStorage.getItem("bpsc_home_version")}catch(e){}if(v!=="v1"&&v!=="v2")v=document.body.dataset.homeDefault;if(/[?&]demo=(race-day|home-meet)(&|$)/.test(location.search))v="v2";if(v==="v2")document.body.classList.add("home-v2")})()</script>
@@ -136,8 +136,8 @@
   <div class="hero-bottom-bar">
     <div class="container home-version-wrap">
       <div class="home-version" id="homeVersion" role="group" aria-label="Homepage version">
-        <button type="button" data-home-version="v1" aria-pressed="true">Classic</button>
-        <button type="button" data-home-version="v2" aria-pressed="false">V2<span class="home-version-tag">Preview</span></button>
+        <button type="button" data-home-version="v1" aria-pressed="false">Classic</button>
+        <button type="button" data-home-version="v2" aria-pressed="true">V2</button>
         <button type="button" data-home-version="demo" aria-pressed="false">Race Day demo</button>
       </div>
     </div>
@@ -203,6 +203,6 @@
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
 <script src="assets/js/core.js?v=30"></script>
-<script src="assets/js/site.js?v=42"></script>
+<script src="assets/js/site.js?v=43"></script>
 </body>
 </html>
