@@ -1515,7 +1515,7 @@ body.theme-dark .brand .name .line-two{color:var(--ember)}
 body.theme-dark .burger{color:#fff;border-color:rgba(255,255,255,.3)}
 body.theme-dark .theme-toggle{color:#fff;border-color:rgba(255,255,255,.3)}
 body.theme-dark .eyebrow{color:var(--ember)}
-body.theme-dark .lane-rope{background:repeating-linear-gradient(90deg,var(--flame) 0 16px,transparent 16px 22px,#fff 22px 38px,transparent 38px 44px)}
+body.theme-dark .lane-rope:not(.on-dark){background:repeating-linear-gradient(90deg,var(--flame) 0 16px,transparent 16px 22px,#fff 22px 38px,transparent 38px 44px)}
 body.theme-dark .pill.open{color:#5fce93}
 body.theme-dark .pill.open::before{background:rgba(31,138,76,.2)}
 body.theme-dark .feed-badge.home{background:rgba(31,138,76,.2);color:#5fce93}
@@ -2145,6 +2145,22 @@ body.theme-dark .pulse-k{color:var(--flame)}
 .pulse-v{font-weight:700;font-size:.95rem;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pulse-s{font-size:.8rem;color:var(--muted)}
 
+/* Race Day demo (?demo=race-day): a plain ink bar that says it's a sample, with the two samples
+   and a way out -- deliberately not the flame of the real panel */
+.pulse-demo{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin-bottom:12px;padding:8px 12px;
+  border:1.5px dashed var(--line);background:var(--card)}
+.pulse-demo-note{margin:0 6px 0 0;font-size:.8rem;color:var(--muted)}
+.pulse-demo-note strong{color:var(--text);text-transform:uppercase;letter-spacing:.1em;font-size:.72rem}
+.pulse-demo-btn{position:relative;z-index:0;min-height:30px;padding:5px 13px;background:none;border:none;cursor:pointer;color:var(--text);
+  font-family:'Montserrat',sans-serif;font-weight:700;font-size:.72rem;letter-spacing:.03em;line-height:1.15}
+.pulse-demo-btn::before{content:"";position:absolute;inset:0;z-index:-1;border:1.5px solid var(--line);transform:skewX(calc(-1 * var(--slant-deg)));transition:border-color .15s,background .15s}
+.pulse-demo-btn:hover::before{border-color:var(--flame)}
+.pulse-demo-btn[aria-pressed="true"]{color:var(--paper);cursor:default}
+.pulse-demo-btn[aria-pressed="true"]::before{background:var(--text);border-color:var(--text)}
+.pulse-demo-exit{margin-left:auto}
+.pulse-demo-btn:focus-visible{outline:none}
+.pulse-demo-btn:focus-visible::before{box-shadow:0 0 0 3px rgba(245,132,31,.55)}
+
 /* the rest of the V2 homepage adapting around the panel */
 body.home-v2.home-event .hero h1{font-size:clamp(1.4rem,2.4vw,1.85rem)}
 /* the panel already carries the live button -- two pulsing red things would compete */
@@ -2177,5 +2193,12 @@ body.home-v2.content-failed .hero-photo-strip,body.home-v2.content-failed #nextM
   .pulse-cell:last-child:nth-child(odd){grid-column:1/-1}
   .pulse-v{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;font-size:.88rem}
   .home-version button{padding:3px 11px}
+  .pulse-demo-exit{margin-left:0}
+}
+/* three buttons in the orange bar on the narrowest phones: the "Preview" tag gives way */
+@media(max-width:400px){
+  .home-version{gap:4px}
+  .home-version button{padding:3px 9px;letter-spacing:.05em}
+  .home-version-tag{display:none}
 }
 @media(prefers-reduced-motion:reduce){.pulse,.pulse-live-flag .live-dot,.pulse-k .live-dot{animation:none}}

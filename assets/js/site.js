@@ -1103,10 +1103,38 @@ let pulseState="loading",pulseDay=null;
 function safely(fn){try{fn();}catch(e){console.error(e);}}
 
 function syncHomeVersion(){
-  const v2=homeVersion()==="v2";
+  const demo=homeDemo(),v2=!!demo||homeVersion()==="v2";
   document.body.classList.toggle("home-v2",v2);
-  document.querySelectorAll("[data-home-version]").forEach(b=>b.setAttribute("aria-pressed",String((b.dataset.homeVersion==="v2")===v2)));
+  document.body.classList.toggle("home-demo",!!demo);
+  const on=demo?"demo":v2?"v2":"v1";
+  document.querySelectorAll("[data-home-version]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.homeVersion===on)));
   safely(renderClubPulse);
+}
+
+/* ---- Race Day demo ----
+   For showing people what V2 does on a gala day, on any day. It lives in the address
+   (?demo=race-day, or ?demo=home-meet for one with live results), not in the browser, so a demo
+   link can be sent round, and nobody is left in demo mode by a refresh or a later visit. The sample
+   gala is labelled as a sample; its outside links (live results, league, documents) don't go
+   anywhere, and only Full meet details and the venue page are real. It changes nothing saved --
+   not the V1/V2 choice, not the Race Day / Club Home choice. */
+const HOME_DEMOS={"race-day":"Team gala, no live results","home-meet":"Home meet, live results"};
+const homeDemo=()=>{const d=new URLSearchParams(location.search).get("demo");return HOME_DEMOS[d]?d:null;};
+function setHomeDemo(d){
+  const u=new URL(location.href);
+  if(d)u.searchParams.set("demo",d);else u.searchParams.delete("demo");
+  history.replaceState(null,"",u.pathname+u.search+u.hash);
+}
+let demoCtx="auto";
+function demoEvent(key){
+  const today=isoToday();
+  if(key==="home-meet")return {id:"demo",demo:true,type:"meet",title:"BPSC Autumn Meet",start:today,end:isoShift(today,1),
+    venue:"Basildon Sporting Village",poolType:"25m Short Course",liveUrl:"#demo",notes:"Spectator seating opens at 08:15.",
+    docLinks:[{label:"Programme",url:"#demo"},{label:"Visitor information",url:"#demo"}]};
+  return {id:"demo",demo:true,type:"teamMeet",title:"Arena League — Round 1",league:"Arena League",start:today,
+    venue:"Basildon Sporting Village",poolType:"25m Short Course",leagueUrl:"#demo",
+    notes:"Warm-up 17:00 · Racing 18:00. Team sheets have been emailed — please arrive by 16:45 in club kit.",
+    docLinks:[{label:"Team sheet",url:"#demo"}]};
 }
 
 /* Links in the panel come from what an editor typed; anything that isn't a plain link is dropped. */
@@ -1209,9 +1237,15 @@ function renderClubPulse(){
   if(!el)return;
   const body=document.body;
   body.classList.remove("home-event","home-live");
-  /* V1, still loading, or nothing loaded: no panel, and the ordinary homepage carries on below */
-  if(!body.classList.contains("home-v2")||pulseState!=="ready"){el.hidden=true;el.innerHTML="";return;}
-  const p=clubPulse(DB.feed),ctx=homeContext(),f=p.focus;
+  const demo=homeDemo();
+  /* V1, still loading, or nothing loaded: no panel, and the ordinary homepage carries on below
+     (a demo needs nothing loaded -- its gala is made up) */
+  if(!body.classList.contains("home-v2")||(pulseState!=="ready"&&!demo)){el.hidden=true;el.innerHTML="";return;}
+  const sample=demo&&demoEvent(demo);
+  const p=clubPulse(sample?DB.feed.concat(sample):DB.feed);
+  /* the sample leads whatever else is really on today */
+  if(sample){p.today=[sample].concat(p.today.filter(x=>x!==sample));p.focus=sample;}
+  const ctx=demo?demoCtx:homeContext(),f=p.focus;
   const lead=!!f&&ctx==="auto";
   body.classList.toggle("home-event",lead);
   body.classList.toggle("home-live",lead&&meetLive(f));
@@ -1219,7 +1253,13 @@ function renderClubPulse(){
   const opt=(key,text)=>`<button type="button" class="pulse-ctx-btn" data-home-context="${key}" aria-pressed="${ctx===key}">${text}</button>`;
   const switcher=f?`<div class="pulse-ctx" role="group" aria-label="What the homepage shows first"><span class="pulse-ctx-label" aria-hidden="true">Viewing</span>${opt("auto",label)}${opt("normal","Club Home")}</div>`:"";
   const date=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
+  const demoBar=demo?`<div class="pulse-demo" role="group" aria-label="Race Day demo">
+      <p class="pulse-demo-note"><strong>Demo</strong> · a sample gala, not a real event</p>
+      ${Object.entries(HOME_DEMOS).map(([k,l])=>`<button type="button" class="pulse-demo-btn" data-home-demo="${k}" aria-pressed="${k===demo}">${esc(l)}</button>`).join("")}
+      <button type="button" class="pulse-demo-btn pulse-demo-exit" data-home-demo="">Exit demo</button>
+    </div>`:"";
   el.innerHTML=`<div class="container">
+    ${demoBar}
     <div class="pulse-head"><h2 class="pulse-title" id="pulseTitle">Today at BPSC <span class="pulse-date">${esc(date)}</span></h2>${switcher}</div>
     ${p.training.map(pulseTrainingNotice).join("")}
     ${lead?pulseEventPanel(f,p.today.slice(1)):""}
@@ -1233,21 +1273,47 @@ document.addEventListener("click",e=>{
   const v=e.target.closest("[data-home-version]");
   if(v){
     if(v.getAttribute("aria-pressed")==="true")return;
-    setHomePref(HOME_VERSION_KEY,v.dataset.homeVersion);
+    const pick=v.dataset.homeVersion;
+    if(pick==="demo"){startHomeDemo("race-day");return;}
+    setHomeDemo(null);
+    setHomePref(HOME_VERSION_KEY,pick);
     syncHomeVersion();
-    toast(v.dataset.homeVersion==="v2"?"Homepage V2 preview — switch back any time":"Classic homepage");
+    toast(pick==="v2"?"Homepage V2 preview — switch back any time":"Classic homepage");
     return;
   }
+  const d=e.target.closest("[data-home-demo]");
+  if(d){
+    if(d.getAttribute("aria-pressed")==="true")return;
+    if(d.dataset.homeDemo)startHomeDemo(d.dataset.homeDemo);
+    else{setHomeDemo(null);syncHomeVersion();toast("Demo ended");}
+    return;
+  }
+  /* the sample gala's outside links have nowhere real to go */
+  const fake=e.target.closest('a[href="#demo"]');
+  if(fake){e.preventDefault();toast("Demo — on a real race day this opens the gala's own link");return;}
   const c=e.target.closest("[data-home-context]");
   if(c){
     if(c.getAttribute("aria-pressed")==="true")return;
-    setHomePref(HOME_CONTEXT_KEY,c.dataset.homeContext);
+    if(homeDemo())demoCtx=c.dataset.homeContext;   // a demo doesn't touch the visitor's real choice
+    else setHomePref(HOME_CONTEXT_KEY,c.dataset.homeContext);
     safely(renderClubPulse);
     /* the buttons were redrawn: keep keyboard focus on the one just chosen */
     const again=document.querySelector(`[data-home-context="${c.dataset.homeContext}"]`);
     if(again)again.focus();
   }
 });
+function startHomeDemo(key){
+  const first=!homeDemo();
+  setHomeDemo(key);demoCtx="auto";
+  syncHomeVersion();
+  if(!first)return;
+  toast("Race Day demo — a sample gala");
+  /* the panel is at the top of the page, the button down by the slideshow -- bring it up to just
+     under the sticky header, so the "sample gala" note isn't hidden behind it */
+  const el=$("#clubPulse");
+  if(el)window.scrollTo({top:Math.max(0,el.getBoundingClientRect().top+scrollY-(document.querySelector("header.site")?.offsetHeight||0)-8),
+    behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});
+}
 /* A tab left open overnight (or a phone woken the next morning) shouldn't still show yesterday. */
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&pulseDay&&pulseDay!==isoToday())safely(renderClubPulse);});
 if($("#homeVersion"))syncHomeVersion();
