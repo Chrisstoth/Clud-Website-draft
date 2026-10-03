@@ -17,7 +17,7 @@ const DB={feed:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfar
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",topics:"topics"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",topics:"topics",raceDays:"race_days",homepageMode:"homepage_mode"};
 /* Highlight colours a meet's documents & links line can be given, so one that matters (a changed
    warm-up time, a late programme) stands out. The key is stored on the link; "" is no highlight. */
 const LINK_HIGHLIGHTS=[["","No highlight"],["orange","Orange"],["yellow","Yellow"],["green","Green"],["blue","Blue"],["red","Red"]];
@@ -42,7 +42,20 @@ function feedToRow(it){
   if(row.photos===null)row.photos=[];
   if(row.doc_links===null)row.doc_links=[];
   if(row.topics===null)row.topics=[];
+  if(Array.isArray(row.race_days)&&!row.race_days.length)row.race_days=null;
+  /* columns from a migration that may not have been run yet: leave them out rather than have
+     every save fail with "column not found" (see checkFeedLateCols) */
+  if(!feedLateColsReady)Object.values(FEED_LATE_COLS).forEach(c=>delete row[c]);
   return row;
+}
+/* Galas' racing days and homepage style (migration 021). The members' area asks once, at sign-in,
+   whether the columns exist yet; until it knows they do, saves leave them out. */
+const FEED_LATE_COLS={raceDays:"race_days",homepageMode:"homepage_mode"};
+let feedLateColsReady=false;
+async function checkFeedLateCols(){
+  const {error}=await sb.from("feed").select(Object.values(FEED_LATE_COLS).join(",")).limit(1);
+  feedLateColsReady=!error;
+  return feedLateColsReady;
 }
 const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads:r.squads||[],photo:r.photo||"",bio:r.bio||"",sortOrder:r.sort_order??0});
 const coachToRow=c=>({name:c.name,role:c.role,quals:c.quals||null,squads:c.squads||[],photo:c.photo||null,bio:c.bio||null});
@@ -465,7 +478,13 @@ const meetTooFarAhead=m=>m.type!=="teamMeet"&&m.start>isoPlusMonths(4);
    live results feed from the poolside laptop is worth pointing people at. meetLive() also needs a
    liveUrl, because a gala with no results page set up has nothing to show. */
 const meetRunning=m=>{const t=isoToday();return m.start<=t&&t<=(m.end||m.start);};
-const meetLive=m=>!!m.liveUrl&&meetRunning(m);
+/* A gala's start-to-end dates can include days with no racing (a championship over three weekends).
+   If the editor has ticked its racing days (raceDays), only those count -- for live results too, so
+   the button doesn't pulse on the Wednesday in between. With none ticked, every day counts. */
+const meetRaceDays=m=>(Array.isArray(m.raceDays)?m.raceDays:[]).filter(d=>d>=m.start&&d<=(m.end||m.start)).sort();
+const meetRacingOn=(m,iso)=>{const days=meetRaceDays(m);return days.length?days.includes(iso):m.start<=iso&&iso<=(m.end||m.start);};
+const meetRacingToday=m=>meetRacingOn(m,isoToday());
+const meetLive=m=>!!m.liveUrl&&meetRacingToday(m);
 
 /* Three kinds of meet share the Open Meets page: "meet" = open meet hosted by BPSC, "externalMeet" = open meet
    hosted by someone else (county champs etc.), "teamMeet" = league/team gala (no entries or volunteers). */
@@ -475,14 +494,14 @@ const isMeet=it=>MEET_TYPES.includes(it.type);
 const isHomeVenue=m=>/basildon/i.test(m.venue||"");
 
 /* ================= CLUB PULSE (homepage V2) =================
-   What matters at the club today, worked out from the feed alone -- no extra fields to fill in.
-   Uses the same "running" window as the live-results button (meetRunning: first day to last day
-   inclusive), for every kind of item, so the homepage and Open Meets can never disagree about
-   whether something is on. Returns:
+   What matters at the club today, worked out from the feed. A gala is on on its racing days --
+   the same test as the live-results button (meetRacingToday), so the homepage and Open Meets can
+   never disagree -- and an editor can switch it off for the homepage or pick its style
+   (homepageMode); nothing needs filling in for the automatic version. Returns:
    - training: training changes on today (or starting tomorrow -- worth knowing the night before);
    - today: events on today, most important first (BPSC gala, team gala, other gala, social; one
      with live results ahead of one without); focus is the first of them, or null;
-   - next: the next event after today; results: a gala finished in the last 3 days with results;
+   - next / nextDay: the next event after today, and its next day on; results: a gala finished in the last 3 days with results;
    - weekNews / weekEvents: stories posted in the past 7 days, events in the next 7 after today. */
 const PULSE_EVENT_RANK={meet:0,teamMeet:1,externalMeet:2,social:3};
 const feedDaysBetween=(a,b)=>Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000);
@@ -492,22 +511,39 @@ function clubPulse(feed){
   const dated=(feed||[]).filter(it=>it&&it.start);
   const events=dated.filter(it=>it.type in PULSE_EVENT_RANK);
   const training=dated.filter(it=>it.type==="training"&&(meetRunning(it)||it.start===tomorrow)).sort(byStart);
-  const on=events.filter(meetRunning).sort((a,b)=>
+  /* a gala is "on" only on its racing days, and not at all if an editor switched it off for the homepage */
+  const onToday=it=>isMeet(it)?it.homepageMode!=="off"&&meetRacingToday(it):meetRunning(it);
+  const on=events.filter(onToday).sort((a,b)=>
     PULSE_EVENT_RANK[a.type]-PULSE_EVENT_RANK[b.type]||meetLive(b)-meetLive(a)||byStart(a,b));
-  /* an open meet months away is left off Open Meets until it's close (meetTooFarAhead), so here too */
-  const next=events.filter(it=>it.start>today&&!(isMeet(it)&&meetTooFarAhead(it))).sort(byStart)[0]||null;
+  /* the soonest racing day (or event day) after today -- which can be the next weekend of a
+     championship that's already started. An open meet months away is left off Open Meets until
+     it's close (meetTooFarAhead), so here too. */
+  const upcoming=events.filter(it=>!(isMeet(it)&&meetTooFarAhead(it))&&!(isMeet(it)&&it.homepageMode==="off"))
+    .map(it=>({it,day:nextEventDay(it,today)})).filter(x=>x.day).sort((a,b)=>a.day<b.day?-1:a.day>b.day?1:0);
   const results=events.filter(it=>isMeet(it)&&it.resultsUrl&&meetDone(it)&&(it.end||it.start)>=isoShift(today,-3))
     .sort((a,b)=>byStart(b,a))[0]||null;
   return {
-    training,today:on,focus:on[0]||null,next,results,
+    training,today:on,focus:on[0]||null,next:upcoming[0]?upcoming[0].it:null,nextDay:upcoming[0]?upcoming[0].day:null,results,
     weekNews:dated.filter(it=>it.type==="news"&&it.start>=isoShift(today,-6)&&it.start<=today).length,
-    weekEvents:events.filter(it=>it.start>today&&it.start<=isoShift(today,6)).length
+    weekEvents:upcoming.filter(x=>x.day<=isoShift(today,6)).length
   };
 }
-/* Where an event that's on today is up to: "Today", "Day 2 of 3" -- or, for a long run of dates
-   (county champs spread over several weekends), just "Under way", since the days in between
-   may well have no racing and we don't know which ones those are. */
+/* The first day after `after` that the event is on: its start, or for a gala with racing days
+   ticked, the next of those. Null once it's all behind us. */
+function nextEventDay(it,after){
+  const days=isMeet(it)?meetRaceDays(it):[];
+  if(days.length)return days.find(d=>d>after)||null;
+  return it.start>after?it.start:null;
+}
+/* Where an event that's on today is up to: "Today", "Day 2 of 3" (counting only racing days when
+   they're ticked) -- or, for a long run of dates with none ticked, just "Under way", since the days
+   in between may have no racing and we can't tell which. */
 function eventDayLabel(it){
+  const days=isMeet(it)?meetRaceDays(it):[];
+  if(days.length){
+    const i=days.indexOf(isoToday());
+    return days.length===1||i<0?"Today":`Day ${i+1} of ${days.length}`;
+  }
   const span=feedDaysBetween(it.start,it.end||it.start)+1;
   if(span<=1)return "Today";
   if(span<=4)return `Day ${feedDaysBetween(it.start,isoToday())+1} of ${span}`;

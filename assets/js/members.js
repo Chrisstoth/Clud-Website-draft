@@ -50,6 +50,7 @@ const SCHEMAS = {
     {k:"poolType",label:"Pool / course (e.g. 25m Short Course)",type:"text"},
     {k:"start",label:"Start date",type:"date",req:1},
     {k:"end",label:"End date (optional)",type:"date"},
+    {k:"homepageMode",label:"Homepage on the day",type:"homefeature"},
     {k:"venue",label:"Venue & pool",type:"text",req:1},
     {k:"closing",label:"Entries close",type:"date"},
     {k:"status",label:"Entry status (moves to Completed galas automatically after the last day)",type:"select",opts:["open","closed"]},
@@ -97,6 +98,7 @@ const SCHEMAS = {
     {k:"poolType",label:"Pool / course (e.g. 50m Long Course)",type:"text"},
     {k:"start",label:"Start date",type:"date",req:1},
     {k:"end",label:"End date (optional)",type:"date"},
+    {k:"homepageMode",label:"Homepage on the day",type:"homefeature"},
     {k:"venue",label:"Venue & pool",type:"text",req:1},
     {k:"closing",label:"Entries close",type:"date"},
     {k:"status",label:"Entry status (moves to Completed galas automatically after the last day)",type:"select",opts:["open","closed"]},
@@ -116,6 +118,7 @@ const SCHEMAS = {
     {k:"poolType",label:"Pool / course (e.g. 25m Short Course)",type:"text"},
     {k:"start",label:"Date",type:"date",req:1},
     {k:"end",label:"End date (optional)",type:"date"},
+    {k:"homepageMode",label:"Homepage on the day",type:"homefeature"},
     {k:"venue",label:"Venue & pool",type:"text"},
     {k:"notes",label:"Info for parents & swimmers (team selection, arrival times…)",type:"textarea"},
     {k:"leagueUrl",label:"League info link (URL — optional)",type:"text"},
@@ -257,9 +260,12 @@ function itemSummary(sec,it){
     const typeLabel=FEED_TYPE_META[it.type].label;
     if(isMeet(it)){
       /* Flag a gala that is running today so the Open Meets Secretary can see at a glance whether the live link is set. */
-      const state=meetRunning(it)?(it.liveUrl?"● LIVE NOW — results linked":"● running today — add live results link"):meetDone(it)?(it.resultsUrl?"completed · results linked":"completed · add results link"):it.type==="teamMeet"?(it.league||"team meet"):"entries "+it.status;
+      const state=meetRacingToday(it)?(it.liveUrl?"● LIVE NOW — results linked":"● racing today — add live results link")
+        :meetRunning(it)?"on, but no racing today":meetDone(it)?(it.resultsUrl?"completed · results linked":"completed · add results link"):it.type==="teamMeet"?(it.league||"team meet"):"entries "+it.status;
       const who=it.type==="externalMeet"?` · host: ${it.host||"?"}`:"";
-      return {t:it.title,s:`${typeLabel}${who} · ${fmtDate(it.start)} · ${it.venue||"Venue TBC"} · ${state}`};
+      const home=it.homepageMode==="off"?" · not on the homepage":"";
+      const racing=meetRaceDays(it).length?` · ${meetRaceDays(it).length} racing days`:"";
+      return {t:it.title,s:`${typeLabel}${who} · ${fmtDate(it.start)} · ${it.venue||"Venue TBC"}${racing} · ${state}${home}`};
     }
     if(it.type==="social")return {t:it.title,s:`${typeLabel} · ${fmtDate(it.start)}`};
     if(it.type==="news"){const tags=storyTags(it).map(t=>t.name).join(", ");
@@ -679,6 +685,22 @@ function showForm(sec,id,forcedType){
         </div>
       </div>`;
     }
+    if(f.type==="homefeature"){
+      /* V2 homepage: how this gala is featured on the day, and which days are actually racing days
+         (ticked in renderRaceDayPicks below, from the start and end dates). Both need migration 021. */
+      const ready=feedLateColsReady;
+      const opts=[["","Automatic — feature it while it's on"],["race","Feature it as Race Day"],["home_meet","Feature it as Home Meet"],
+        ["championship","Feature it as Championships"],["off","Don't feature it on the homepage"]];
+      return `<label class="f">${f.label}
+        <select name="${f.k}"${ready?"":" disabled"}>${opts.map(([v,l])=>`<option value="${v}" ${(it[f.k]||"")===v?"selected":""}>${esc(l)}</option>`).join("")}</select></label>
+      <div class="f">
+        ${ready?"":`<p class="hint" style="margin:0;color:var(--warn)">This setting and the racing days below need a one-off database update (migration 021) before they can be saved. Everything else on this form saves as normal.</p>`}
+        <p class="hint" style="margin:0">On the new homepage, a gala that's on today gets a panel at the top with its venue, notes and links. Automatic picks the style for you.</p>
+        <p class="tag-group-label">Racing days</p>
+        <div class="squad-picks" id="raceDayPicks" role="group" aria-label="Racing days"></div>
+        <p class="hint" style="margin:0">Only needed when the dates above include days with no racing, like a championship over three weekends. Tick the racing days and the homepage panel and live results button show only on those days. Leave them all unticked if every day is a racing day.</p>
+      </div>`;
+    }
     if(f.type==="links"){
       return `<div class="f">${f.label}
         <div class="doclink-rows" id="docLinkRows">${(it[f.k]||[]).map(docLinkRowHtml).join("")}</div>
@@ -949,6 +971,24 @@ function showForm(sec,id,forcedType){
     });
   }
   const docLinkRows=$("#docLinkRows");
+  /* Racing days: one tick box per day from the start date to the end date, redrawn as those dates
+     change. Ticks are kept by date, so shortening and re-lengthening the range doesn't lose them. */
+  const raceDayPicks=$("#raceDayPicks");
+  const raceDaysTicked=new Set(it.raceDays||[]);
+  function renderRaceDayPicks(){
+    if(!raceDayPicks)return;
+    const start=formTarget.querySelector('[name="start"]').value,end=formTarget.querySelector('[name="end"]').value;
+    const days=[];
+    if(start&&end&&end>start)for(let d=start;d<=end&&days.length<62;d=isoShift(d,1))days.push(d);
+    raceDayPicks.innerHTML=days.length?days.map(d=>`<label class="squad-pick"><input type="checkbox" data-raceday="${d}"${raceDaysTicked.has(d)?" checked":""}${feedLateColsReady?"":" disabled"}>
+        ${esc(new Date(d+"T12:00:00").toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"}))}</label>`).join("")
+      :`<span class="hint">Set an end date to pick racing days — a one-day gala doesn't need any.</span>`;
+  }
+  if(raceDayPicks){
+    renderRaceDayPicks();
+    formTarget.querySelectorAll('[name="start"],[name="end"]').forEach(i=>i.addEventListener("change",renderRaceDayPicks));
+    raceDayPicks.addEventListener("change",e=>{const d=e.target.dataset.raceday;if(d){e.target.checked?raceDaysTicked.add(d):raceDaysTicked.delete(d);}});
+  }
   if(docLinkRows){
     docLinkRows.addEventListener("change",e=>{
       if(e.target.dataset.k!=="hl")return;
@@ -1040,6 +1080,13 @@ function showForm(sec,id,forcedType){
       const bad=links.findIndex(l=>!l.url&&(l.label||l.text));
       if(bad>-1){toast("Each document or link needs its link (URL) — or remove that line");rowEls[bad].querySelector('[data-k="url"]').focus();return;}
       data.docLinks=links.filter(l=>l.url);
+    }
+    if(raceDayPicks){
+      /* only days still inside the dates count; ticking every day is the same as ticking none */
+      const days=[...raceDayPicks.querySelectorAll("[data-raceday]")];
+      const ticked=days.filter(i=>i.checked).map(i=>i.dataset.raceday);
+      data.raceDays=ticked.length&&ticked.length<days.length?ticked:null;
+      if(!feedLateColsReady){delete data.raceDays;delete data.homepageMode;}
     }
     if(heroSetsField){
       const own=Object.fromEntries(["hd","hp"].filter(heroUsed).map(k=>[k,heroSets[k]]));
@@ -1674,7 +1721,7 @@ async function start(){
   const defaults=ROLES[member.role];
   session={email:member.email,role:{...defaults,label:member.label||defaults.label,feedTypes:member.feed_types||defaults.feedTypes||[]}};
   adminSection=session.role.sections[0];
-  try{await loadContent();}
+  try{await Promise.all([loadContent(),checkFeedLateCols()]);}
   catch(e){return renderLogin(`Couldn't load the club content: ${e.message}`);}
   renderAdminShell();
 }

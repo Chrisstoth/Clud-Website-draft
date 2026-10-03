@@ -74,6 +74,14 @@ alter table public.feed add column if not exists doc_links jsonb not null defaul
 -- News tags on a story, as references: "s:<squads.id>" / "t:<news_topics.id>"; empty = whole club.
 -- Visitors follow tags on the News page (migration 017). Replaces the free-text "tag" (category).
 alter table public.feed add column if not exists topics jsonb not null default '[]'::jsonb;
+-- Galas, homepage V2 (migration 021): the days there's actually racing when start-to-end includes
+-- days without (null = every day), and how the homepage features it (null = automatic, 'off',
+-- 'race', 'home_meet', 'championship').
+alter table public.feed add column if not exists race_days date[];
+alter table public.feed add column if not exists homepage_mode text;
+alter table public.feed drop constraint if exists feed_homepage_mode_check;
+alter table public.feed add constraint feed_homepage_mode_check
+  check (homepage_mode is null or homepage_mode in ('off','race','home_meet','championship'));
 
 create table if not exists public.coaches (
   id          bigint generated always as identity primary key,

@@ -1142,12 +1142,14 @@ function pulseButtons(list){
   return list.map((a,i)=>`<a class="btn small${a.live?" live":i===0?"":" ghost"}" href="${esc(a.href)}"${a.ext?' target="_blank" rel="noopener"':""}>${a.live?'<span class="live-dot" aria-hidden="true"></span>':""}${esc(a.label)}${a.ext?'<span class="sr-only"> (opens in a new tab)</span>':""}</a>`).join("");
 }
 
+const PULSE_STYLES={race:"Race Day",home_meet:"Home Meet",championship:"Championships"};
 /* The event panel: what's on, where, and the ways into it. Wording keeps who's hosting clear --
    a county championship says who runs it rather than implying it's ours. */
 function pulseEventPanel(it,alsoToday){
   const meet=isMeet(it),live=meetLive(it);
   const champs=/champ/i.test(it.title||"")||/regional|national/i.test(it.level||"");
-  const tag=!meet?"Club Event":it.type==="meet"&&isHomeVenue(it)?"Home Meet":it.type==="externalMeet"&&champs?"Championships":"Race Day";
+  /* the editor's pick (homepageMode) wins; otherwise worked out from the gala */
+  const tag=PULSE_STYLES[it.homepageMode]||(!meet?"Club Event":it.type==="meet"&&isHomeVenue(it)?"Home Meet":it.type==="externalMeet"&&champs?"Championships":"Race Day");
   const who=it.type==="teamMeet"?(it.league||"Team gala")
     :it.type==="meet"?"Hosted by BPSC"
     :it.type==="externalMeet"?(it.host?`Hosted by ${it.host}`:"Open meet")
@@ -1195,7 +1197,7 @@ function pulseStrip(p,lead){
   }else if(!p.focus&&!p.training.length){
     cells.push(cell("Today","No training changes posted","Squad timetables →",'href="timetables"'));
   }
-  if(p.next)cells.push(cell("Next",p.next.title,`${pulseWhen(p.next.start)} · ${fmtDate(p.next.start)}`,pulseLinkAttrs(p.next)));
+  if(p.next)cells.push(cell("Next",p.next.title,`${pulseWhen(p.nextDay)} · ${fmtDate(p.nextDay)}`,pulseLinkAttrs(p.next)));
   if(p.results){const h=pulseHref(p.results.resultsUrl);if(h)cells.push(cell("Results",p.results.title,"Results are in →",`href="${esc(h)}"`,true));}
   if(p.weekNews)cells.push(cell("This week",`${p.weekNews} new club ${p.weekNews===1?"story":"stories"}`,"Club News →",'href="news"'));
   else if(p.weekEvents)cells.push(cell("This week",`${p.weekEvents} ${p.weekEvents===1?"event":"events"} coming up`,"Club Calendar →",'href="club-calendar"'));
