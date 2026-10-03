@@ -1784,23 +1784,25 @@ body.theme-dark .page-tabs button.active{color:#101014}
 .guide-tabs{flex-wrap:wrap}
 @media(max-width:680px){.guide-tabs{display:grid;grid-template-columns:1fr 1fr;width:100%}.guide-tabs button{padding:11px 6px;font-size:.88rem}}
 .guide-panel{padding:30px 32px}
-.guide-panel h3{font-size:1.35rem}
-.guide-intro{margin-top:8px;color:var(--muted)}
-.guide-lines{margin-top:10px;color:var(--muted);font-size:.95rem}
-.guide-lines a{font-weight:700;color:var(--flame-dark);text-decoration:underline;text-underline-offset:3px}
-.guide-lines a:hover{color:var(--flame)}
-/* Guides read as a classic document: bold headers with an underline rule, then plain
-   bullet points underneath -- not a numbered wizard, not a bordered FAQ grid. */
-.guide-section{margin-top:32px}
-.guide-section:first-of-type{margin-top:24px}
-.guide-section h4{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.1rem;color:var(--text);margin:0 0 10px;padding-bottom:8px;border-bottom:2px solid var(--line)}
-.guide-section .guide-lines{margin-top:0}
-.guide-section details.info{margin-top:8px}
-.guide-lines .link-line{position:relative;padding:6px 0 6px 20px;overflow-wrap:anywhere}
-.guide-lines .link-line::before{content:"";position:absolute;left:2px;top:15px;width:6px;height:6px;border-radius:50%;background:var(--flame)}
-.guide-lines .link-line[class*="hl-"]{padding:12px 14px;margin:6px 0;border-left:4px solid var(--hl-edge);background:var(--hl-bg);color:var(--text)}
-.guide-lines .link-line[class*="hl-"]::before{content:none}
-@media(max-width:520px){.guide-panel{padding:22px 18px}.guide-section{padding-left:42px}.guide-section::before{width:28px;height:28px;font-size:.88rem;line-height:28px}}
+.guide-panel>h3{font-size:1.35rem}
+/* A guide is plain document markup -- opening paragraph, h3 headings, bullet lists, blockquote
+   highlights -- written in the members' area editor. This one block styles it as a classic
+   document (bold underlined headings, orange bullets) both on the page and in that editor,
+   so the editor shows exactly what will publish. */
+.guide-doc{color:var(--muted);font-size:.95rem}
+.guide-doc p{margin:8px 0 0}
+.guide-doc h3{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.1rem;line-height:1.3;color:var(--text);margin:32px 0 10px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+.guide-doc h3:first-child{margin-top:8px}
+.guide-doc h3+p{margin-top:0}
+.guide-doc ul{list-style:none;margin:0;padding:0}
+.guide-doc li{position:relative;padding:6px 0 6px 20px;overflow-wrap:anywhere}
+.guide-doc li::before{content:"";position:absolute;left:2px;top:15px;width:6px;height:6px;border-radius:50%;background:var(--flame)}
+.guide-doc blockquote{margin:6px 0;padding:12px 14px;border-left:4px solid #f5841f;background:rgba(245,132,31,.16);color:var(--text);overflow-wrap:anywhere}
+.guide-doc strong,.guide-doc b{color:var(--text)}
+.guide-doc a{font-weight:700;color:var(--flame-dark);text-decoration:underline;text-underline-offset:3px}
+.guide-doc a:hover{color:var(--flame)}
+.rte-editor.guide-doc{font-size:.95rem}
+@media(max-width:520px){.guide-panel{padding:22px 18px}}
 body.theme-dark .mission-num{opacity:.75}
 
 /* The timeline rail is a lane rope stood on its end: same flame/ink alternation as .lane-rope,

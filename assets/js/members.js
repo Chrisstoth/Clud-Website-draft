@@ -1,15 +1,15 @@
 /* ================= ROLES & PERMISSIONS ================= */
 const ROLES = {
-  meets:      {label:"Open Meets Secretary", desc:"Add club, external & team meets, entry packs & results", sections:["feed"], feedTypes:["meet","externalMeet","teamMeet"]},
-  coaching:   {label:"Coaching Lead",        desc:"Edit coach profiles & squad timetables", sections:["coaches","squads"]},
-  volunteers: {label:"Volunteer Coordinator",desc:"Edit volunteer role explainers",   sections:["roles"]},
-  socials:    {label:"Socials Team",         desc:"Add events, links & graphics",     sections:["feed","instagram"], feedTypes:["social"]},
-  comms:      {label:"Comms / Club News",    desc:"Post club news & announcements",   sections:["feed","topics","instagram"], feedTypes:["news"]},
-  training:   {label:"Coaching / Training Changes", desc:"Post key training schedule changes", sections:["feed"], feedTypes:["training"]},
-  membership: {label:"Membership Team",      desc:"View trial & squad enquiries",     sections:["enquiries"]},
-  welfare:    {label:"Welfare Officer",      desc:"Edit the Welfare & Safeguarding page", sections:["welfare"]},
-  secretary:  {label:"Club Secretary",       desc:"Edit the Club Committee page",     sections:["committee"]},
-  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","topics","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","partners","instagram","images"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
+  meets:      {label:"Open Meets Secretary", desc:"Add club, external & team meets, entry packs & results", sections:["feed","guides"], feedTypes:["meet","externalMeet","teamMeet"]},
+  coaching:   {label:"Coaching Lead",        desc:"Edit coach profiles & squad timetables", sections:["coaches","squads","guides"]},
+  volunteers: {label:"Volunteer Coordinator",desc:"Edit volunteer role explainers",   sections:["roles","guides"]},
+  socials:    {label:"Socials Team",         desc:"Add events, links & graphics",     sections:["feed","instagram","guides"], feedTypes:["social"]},
+  comms:      {label:"Comms / Club News",    desc:"Post club news & announcements",   sections:["feed","topics","instagram","guides"], feedTypes:["news"]},
+  training:   {label:"Coaching / Training Changes", desc:"Post key training schedule changes", sections:["feed","guides"], feedTypes:["training"]},
+  membership: {label:"Membership Team",      desc:"View trial & squad enquiries",     sections:["enquiries","guides"]},
+  welfare:    {label:"Welfare Officer",      desc:"Edit the Welfare & Safeguarding page", sections:["welfare","guides"]},
+  secretary:  {label:"Club Secretary",       desc:"Edit the Club Committee page",     sections:["committee","guides"]},
+  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","topics","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","partners","instagram","images","guides"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
 };
 const SECTION_META = {
   feed:{name:"Club Feed", empty:"Nothing published yet — add the first item."},
@@ -22,6 +22,7 @@ const SECTION_META = {
   welfare:{name:"Welfare & Safeguarding Page", empty:""},
   committee:{name:"Club Committee", empty:"No committee roles yet."},
   partners:{name:"Proud Partners", empty:"No partners listed — the Proud Partners strip is hidden on every page until one is added."},
+  guides:{name:"Member Guides", empty:"No guides yet — the Member Guides page has no tabs until one is added."},
   instagram:{name:"Instagram on the News Page", empty:""},
   images:{name:"Manage Images", empty:""}
 };
@@ -163,6 +164,10 @@ const SCHEMAS = {
   topics:[
     {k:"name",label:"Tag name (e.g. Trips, Open Water, Officials)",type:"text",req:1}
   ],
+  guides:[
+    {k:"title",label:"Tab name (e.g. Gala Entry) — the guide's heading adds “Guide” on the end",type:"text",req:1},
+    {k:"body",label:"Guide",type:"richtext",variant:"guide"}
+  ],
   newsDefaults:[
     {k:"label",label:"Category name",type:"text",req:1},
     {k:"icon",label:"Fallback icon (emoji, shown until a photo is set)",type:"text"},
@@ -270,6 +275,8 @@ function itemSummary(sec,it){
       return {t:it.title,s:`${catLabel}${it.commitment?" · "+it.commitment:""}`};}
     case "committee":return {t:it.title,s:`${it.tier==="executive"?"Executive · ":""}${it.person||"Vacant"}`};
     case "partners":return {t:it.name,s:it.url||"No link"};
+    case "guides":{const n=(it.body.match(/<h3[\s>]/gi)||[]).length;
+      return {t:it.title,s:`${n} section${n===1?"":"s"} · web address: member-guides#${it.slug}`};}
     case "newsDefaults":return {t:it.label,s:it.img?"Custom photo set":`Gradient placeholder ${it.icon||""}`};
   }
 }
@@ -340,8 +347,15 @@ function renderAdminSection(){
       <div class="admin-note">The partners list hasn't been set up in the database yet. The webmaster needs to run <code>supabase/migrations/019_partners.sql</code> in the Supabase SQL Editor. Until then every page keeps showing the partners written into its HTML.</div>`;
     return;
   }
+  if(sec==="guides"&&!DB.guides){
+    main.innerHTML=`<h2>${SECTION_META.guides.name}</h2>
+      <div class="admin-note">The guides haven't been set up in the database yet. The webmaster needs to run <code>supabase/migrations/020_member_guides.sql</code> in the Supabase SQL Editor. Until then the Member Guides page keeps showing the guides written into its HTML.</div>`;
+    return;
+  }
   const items=sec==="feed"?feedItemsForRole(role):DB[sec];
-  const note=sec==="partners"
+  const note=sec==="guides"
+    ?"Each guide is a tab on the <a href=\"member-guides\" target=\"_blank\" rel=\"noopener\">Member Guides</a> page, in this order — use the arrows to move one. Open a guide to edit it: the editor shows it exactly as it will look. Changes show on the public site straight away."
+    :sec==="partners"
     ?"The Proud Partners strip under the header on every page. Each partner's name links to the web address given (opening in a new tab); leave the link blank to show the name without one. Use the arrows to change the order. Changes show on the public site straight away."
     :sec==="topics"
     ?"These are the club's own tags for news stories. Every squad in Squad Timetables is a tag automatically, so there's no need to add squads here. Visitors can follow any tag on the News page and get a count of new stories for it. Renaming a tag updates every story that has it; deleting one just takes it off those stories."
@@ -349,7 +363,7 @@ function renderAdminSection(){
     ?"Changes here publish straight to the public page — no webmaster needed. This feed is shared across several types of item; pick the type when you add something new."
     :"Changes here publish straight to the public page — no webmaster needed.";
   const slides=sec==="feed"?homepageSlides():[];
-  const REORDERABLE=["coaches","partners"];
+  const REORDERABLE=["coaches","partners","guides"];
   const rowHtml=(it,i,arr)=>{const s=itemSummary(sec,it);
     const h=sec==="feed"?homeStatus(it,slides):null;
     const cls=h?(h.pinned&&h.slot>=0?" is-pinned":h.slot>=0?" on-home":""):"";
@@ -473,6 +487,10 @@ async function moveItem(sec,id,dir){
   renderAdminShell();
 }
 async function deleteItem(sec,id){
+  if(sec==="guides"){
+    const g=DB.guides.find(x=>x.id===id);
+    if(g&&!confirm(`Delete the whole "${g.title}" guide? Its tab disappears from the Member Guides page straight away, and this can't be undone.`))return;
+  }
   const {error}=await sb.from(SECTIONS[sec].table).delete().eq("id",id);
   if(error)return toast(saveErrorMessage(error));
   await loadContent();
@@ -574,6 +592,14 @@ function docLinkRowHtml(l={}){
     <button type="button" class="sess-del" data-doclink-del aria-label="Remove link">×</button>
   </div>`;
 }
+/* What someone types into the editor's link box: an email address becomes a mailto: link and
+   "www.…" a web address; anything else (a page here like "timetables", "#gala-entry") is kept. */
+function rteLinkTarget(s){
+  s=String(s||"").trim();
+  if(/^[^\s@:/]+@[^\s@]+\.[^\s@]+$/.test(s))return "mailto:"+s;
+  if(/^www\./i.test(s))return "https://"+s;
+  return s;
+}
 const tagPickHtml=(t,on)=>`<label class="checkbox-f squad-pick"><input type="checkbox" data-tagpick value="${esc(t.ref)}" ${on?"checked":""}> ${esc(t.name)}</label>`;
 function showForm(sec,id,forcedType){
   editingId=id;
@@ -582,6 +608,7 @@ function showForm(sec,id,forcedType){
   const it=id?(isFeed?DB.feed.find(x=>x.id===id):DB[sec].find(x=>x.id===id)):(isFeed?{type:forcedType}:{});
   const type=isFeed?(it.type||forcedType):null;
   const schemaKey=isFeed?type:sec;
+  const guideDoc=SCHEMAS[schemaKey].some(f=>f.variant==="guide");
   if(sec==="coaches"&&it.squads)it.squadsRaw=it.squads.join(", ");
   if(sec==="committee"){it.skillsRaw=(it.skills||[]).join("\n");it.dutiesRaw=(it.duties||[]).join("\n");}
   /* Coach and committee photos are drawn as plain square headshots, not through the framing
@@ -657,6 +684,23 @@ function showForm(sec,id,forcedType){
         <div class="doclink-rows" id="docLinkRows">${(it[f.k]||[]).map(docLinkRowHtml).join("")}</div>
         <button type="button" class="btn small ghost" id="addDocLink" style="justify-self:start">+ Add link</button>
         <p class="hint" style="margin:0">Shown in the card's "Meet documents &amp; links" panel, in this order, as <b>Name: link text</b> — e.g. conditions, entry file, results file, warm-up times. Link text is optional. Pick a highlight colour to make a line stand out.</p>
+      </div>`;
+    }
+    if(f.type==="richtext"&&f.variant==="guide"){
+      /* A new guide starts from the shape every guide has, so there's something to type over. */
+      const body=it[f.k]||`<p>A sentence or two on who this guide is for and what it covers.</p><h3>First heading</h3><ul><li>A point under that heading</li><li>Another point</li></ul>`;
+      return `<div class="f">${f.label}
+        <div class="rte-toolbar" id="rteToolbar">
+          <button type="button" data-cmd="formatBlock" data-val="&lt;h3&gt;" title="Make this line a section heading">Heading</button>
+          <button type="button" data-cmd="formatBlock" data-val="&lt;p&gt;" title="Make this line plain text">Plain text</button>
+          <button type="button" data-cmd="insertUnorderedList" title="Turn bullet points on or off">• Bullets</button>
+          <button type="button" data-cmd="formatBlock" data-val="&lt;blockquote&gt;" title="Put this line in an orange highlight box">Highlight box</button>
+          <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+          <button type="button" data-cmd="createLink" title="Select some text first, then link it">🔗 Link</button>
+          <button type="button" data-cmd="unlink" title="Take the link off the selected text">Remove link</button>
+        </div>
+        <div class="rte-editor guide-doc" id="rteEditor" contenteditable="true">${sanitizeGuideHtml(body)}</div>
+        <p class="hint" style="margin-top:6px">This box shows the guide exactly as it will look. Click into a line and use the buttons: <b>Heading</b> starts a new section, <b>• Bullets</b> makes points under it, <b>Highlight box</b> makes an orange call-out (<b>Plain text</b> turns it back). To add a link, select the words first, then <b>🔗 Link</b> — you can give a web address, an email address, or a page on this site such as <code>timetables</code>, or <code>#gala-entry</code> for another guide.</p>
       </div>`;
     }
     if(f.type==="richtext"){
@@ -924,18 +968,20 @@ function showForm(sec,id,forcedType){
   }
   const rteEditor=$("#rteEditor");
   if(rteEditor){
+    /* Enter should start a new paragraph -- Chrome's default <div> isn't kept when the text is saved */
+    document.execCommand("defaultParagraphSeparator",false,"p");
     $("#rteToolbar").addEventListener("click",e=>{
       if(e.target.closest("[data-rte-library]"))return insertLibraryImages(rteEditor);
       const b=e.target.closest("[data-cmd]");if(!b)return;
       rteEditor.focus();
       if(b.dataset.cmd==="createLink"){
-        const url=prompt("Link URL (https://…)");
+        const url=rteLinkTarget(prompt(guideDoc?"Link to — a web address, an email address, or a page on this site (e.g. timetables)":"Link URL (https://…)"));
         if(url)document.execCommand("createLink",false,url);
         return;
       }
       document.execCommand(b.dataset.cmd,false,b.dataset.val||null);
     });
-    $("#rteImgInput").addEventListener("change",async e=>{
+    $("#rteImgInput")?.addEventListener("change",async e=>{
       const file=e.target.files[0];
       if(!file)return;
       try{
@@ -999,7 +1045,18 @@ function showForm(sec,id,forcedType){
       const own=Object.fromEntries(["hd","hp"].filter(heroUsed).map(k=>[k,heroSets[k]]));
       data.heroPhotos=Object.keys(own).length?own:null;
     }
-    if(rteEditor)data.body=sanitizeArticleHtml(rteEditor.innerHTML);
+    if(rteEditor)data.body=guideDoc?sanitizeGuideHtml(rteEditor.innerHTML):sanitizeArticleHtml(rteEditor.innerHTML);
+    if(sec==="guides"){
+      data.title=(data.title||"").trim();
+      if(!rteEditor.textContent.trim()){toast("The guide is empty — write something, or delete the guide instead");return;}
+      /* a new guide gets a fixed web address from its name, and goes on the end of the tabs */
+      if(!id){
+        const base=slugify(data.title)||"guide";
+        let uniq=base,n=2;while(DB.guides.some(g=>g.slug===uniq))uniq=`${base}-${n++}`;
+        data.slug=uniq;
+        data.sortOrder=DB.guides.length?Math.max(...DB.guides.map(g=>g.sortOrder))+1:0;
+      }
+    }
     if(galleryField&&galleryPhotos.length)data.img=galleryPhotos[0];
     if(!id&&sec==="newsDefaults"){
       const base=slugify(data.label)||"category";

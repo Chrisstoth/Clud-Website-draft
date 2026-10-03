@@ -906,7 +906,69 @@ function renderPartnersFromDb(){
   try{localStorage.setItem(PARTNERS_KEY,JSON.stringify(DB.partners.map(({name,url})=>({name,url}))));}catch(e){}
 }
 
-function renderAllPublic(){renderPartnersFromDb();renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();renderCommittee();renderFollowPanel();renderFollowBadge();if(typeof renderPathway==="function")renderPathway();}
+/* ================= MEMBER GUIDES =================
+   Each guide is a tab over one panel area. The page's HTML carries a copy of the guides, so the
+   page is never empty while the database loads (or before migration 020 is run); once the real
+   list arrives it's redrawn from that, and the last list seen is kept in this browser like the
+   partners strip. The hash picks the tab (member-guides#gala-entry), so a link or bookmark can
+   land on any guide; switching rewrites it with replaceState rather than a jump. Links between
+   guides are plain #hash links, picked up by hashchange, which brings the tab bar into view. */
+const GUIDES_KEY="bpsc_guides_v1";
+const guideBar=$("#guideTabs");
+const guideTabs=()=>[...guideBar.querySelectorAll("[data-tab]")];
+function showGuide(name,{focus=false,setHash=true}={}){
+  const tabs=guideTabs();
+  if(!tabs.some(t=>t.dataset.tab===name))name=tabs.length?tabs[0].dataset.tab:"";
+  tabs.forEach(t=>{
+    const on=t.dataset.tab===name,panel=document.getElementById("panel-"+t.dataset.tab);
+    t.classList.toggle("active",on);
+    t.setAttribute("aria-selected",on?"true":"false");
+    t.tabIndex=on?0:-1;
+    if(panel)panel.hidden=!on;
+    if(on&&focus)t.focus();
+  });
+  if(setHash&&name)history.replaceState(null,"","#"+name);
+}
+const guideFromHash=()=>decodeURIComponent(location.hash.slice(1));
+const hashIsGuide=()=>guideTabs().some(t=>t.dataset.tab===guideFromHash());
+function renderGuides(list){
+  const wrap=$("#guidePanels");
+  /* no sanitizer, no guides: keep the page's own copy rather than blanking it */
+  if(!guideBar||!wrap||!list||!window.DOMPurify)return;
+  /* the address can name a guide the old tabs didn't have (one just added), so check the new list */
+  const open=guideBar.querySelector('[aria-selected="true"]'),want=guideFromHash();
+  const hashed=list.some(g=>g.slug===want),keep=hashed?want:open&&open.dataset.tab;
+  guideBar.innerHTML=list.map(g=>`<button type="button" role="tab" data-tab="${esc(g.slug)}" id="tab-${esc(g.slug)}" aria-controls="panel-${esc(g.slug)}">${esc(g.title)}</button>`).join("");
+  guideBar.hidden=!list.length;
+  wrap.innerHTML=list.length?list.map(g=>`<div class="card guide-panel" id="panel-${esc(g.slug)}" role="tabpanel" aria-labelledby="tab-${esc(g.slug)}" tabindex="0" hidden>
+      <h3 class="display">${esc(guideHeading(g.title))}</h3>
+      <div class="guide-doc">${sanitizeGuideHtml(g.body)}</div>
+    </div>`).join(""):`<p style="color:var(--muted)">No guides have been published yet.</p>`;
+  showGuide(keep,{setHash:hashed});
+}
+if(guideBar){
+  try{renderGuides(JSON.parse(localStorage.getItem(GUIDES_KEY)));}catch(e){}
+  guideBar.addEventListener("click",e=>{const t=e.target.closest("[data-tab]");if(t)showGuide(t.dataset.tab);});
+  guideBar.addEventListener("keydown",e=>{
+    if(e.key!=="ArrowLeft"&&e.key!=="ArrowRight")return;
+    e.preventDefault();
+    const tabs=guideTabs(),i=tabs.indexOf(document.activeElement);
+    showGuide(tabs[(i+(e.key==="ArrowRight"?1:tabs.length-1))%tabs.length].dataset.tab,{focus:true});
+  });
+  window.addEventListener("hashchange",()=>{
+    if(!hashIsGuide())return;
+    showGuide(guideFromHash());
+    guideBar.scrollIntoView({behavior:"smooth",block:"start"});
+  });
+  if(hashIsGuide())showGuide(guideFromHash());
+}
+function renderGuidesFromDb(){
+  if(!DB.guides)return;
+  renderGuides(DB.guides);
+  try{localStorage.setItem(GUIDES_KEY,JSON.stringify(DB.guides.map(({slug,title,body})=>({slug,title,body}))));}catch(e){}
+}
+
+function renderAllPublic(){renderPartnersFromDb();renderGuidesFromDb();renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();renderCommittee();renderFollowPanel();renderFollowBadge();if(typeof renderPathway==="function")renderPathway();}
 
 /* ================= NAV ================= */
 const infoDropdown=$("#infoDropdown"), infoToggle=$("#infoToggle");

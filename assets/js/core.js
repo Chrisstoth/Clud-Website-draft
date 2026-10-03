@@ -13,7 +13,7 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const TT_LOC={lc:"BSV Long Course",deep:"BSV Short Course – Deep End",shallow:"BSV Short Course – Shallow End",bill:"Billericay Pool",land:"BSV Meeting Room"};
 
 /* In-memory copy of what is published, filled by loadContent() on every page load. */
-const DB={feed:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfare:[],committee:[],partners:null,enquiries:[]};
+const DB={feed:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfare:[],committee:[],partners:null,guides:null,enquiries:[]};
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
@@ -67,6 +67,9 @@ function partnerUrl(u){
   const full=/^[a-z][a-z0-9+.-]*:/i.test(s)?s:"https://"+s.replace(/^\/+/,"");
   try{const x=new URL(full);return /^https?:$/.test(x.protocol)&&x.hostname.includes(".")?x.href:"";}catch(e){return "";}
 }
+const guideFromRow=r=>({id:r.id,slug:r.slug,title:r.title,body:r.body||"",sortOrder:r.sort_order??0});
+/* slug is only written when a guide is created -- a rename mustn't break links to it */
+const guideToRow=g=>({title:g.title,body:g.body||"",...(g.slug&&{slug:g.slug}),...(g.sortOrder!==undefined&&{sort_order:g.sortOrder})});
 const committeeToRow=c=>({title:c.title,tier:c.tier||"committee",person:c.person||null,email:c.email||null,photo:c.photo||null,summary:c.summary||null,commitment:c.commitment||null,skills:c.skills||[],duties:c.duties||[]});
 
 /* Each members'-area section, and the table and translation it reads and writes. */
@@ -81,7 +84,9 @@ const SECTIONS={
   committee:{table:"committee_roles",from:committeeFromRow,to:committeeToRow,order:"sort_order"},
   /* optional: if the table isn't there yet (migration 019 not run), DB.partners stays null and
      the pages keep the partner list written into their HTML, instead of the whole load failing */
-  partners:{table:"partners",from:partnerFromRow,to:partnerToRow,order:"sort_order",optional:true}
+  partners:{table:"partners",from:partnerFromRow,to:partnerToRow,order:"sort_order",optional:true},
+  /* optional for the same reason (migration 020): the guides page keeps its HTML copy */
+  guides:{table:"member_guides",from:guideFromRow,to:guideToRow,order:"sort_order",optional:true}
 };
 
 async function loadContent(){
@@ -327,6 +332,27 @@ if(window.DOMPurify){
 function sanitizeArticleHtml(html){
   return window.DOMPurify?DOMPurify.sanitize(html||"",{ALLOWED_TAGS:ARTICLE_TAGS,ALLOWED_ATTR:ARTICLE_ATTR}):"";
 }
+
+/* ================= MEMBER GUIDES =================
+   A guide is a document: an opening paragraph, then headings (h3) with bullet points under them,
+   and blockquotes for the orange highlight boxes. .guide-doc (site.css) styles exactly this, both
+   on the page and in the members' area editor, so what an editor types is what publishes.
+   Links to other pages on this site or to another guide (#gala-entry) stay in the same tab;
+   only links off the site open a new one. */
+const GUIDE_TAGS=["p","br","strong","b","em","i","u","h3","ul","li","a","blockquote"];
+function sanitizeGuideHtml(html){
+  if(!window.DOMPurify)return "";
+  const t=document.createElement("template");
+  t.innerHTML=DOMPurify.sanitize(html||"",{ALLOWED_TAGS:GUIDE_TAGS,ALLOWED_ATTR:["href"]});
+  t.content.querySelectorAll("a").forEach(a=>{
+    if(!/^https?:/i.test(a.getAttribute("href")||"")){a.removeAttribute("target");a.removeAttribute("rel");}
+  });
+  /* pressing Enter a few times in the editor leaves empty lines behind; drop them */
+  t.content.querySelectorAll("p,h3,li,blockquote,ul").forEach(el=>{if(!el.textContent.trim())el.remove();});
+  return t.innerHTML;
+}
+/* "Gala Entry" is headed "Gala Entry Guide"; a name that already says guide is left alone */
+const guideHeading=t=>/guide\s*$/i.test(t||"")?t:`${t} Guide`;
 
 /* Gallery + body markup, shared by the public article page (site.js) and the admin "preview as
    article page" (members.js) so an admin sees exactly what will publish. */
