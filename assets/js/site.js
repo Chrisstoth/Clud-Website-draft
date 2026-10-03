@@ -90,7 +90,7 @@ function renderMeets(){
   }
 
   if(!$("#nextMeetCard"))return;
-  const isHome=m=>/basildon/i.test(m.venue||"");
+  const isHome=isHomeVenue;
   const clubUpcoming=upcoming.filter(m=>m.type==="meet");
   const next=clubUpcoming.find(isHome)||clubUpcoming[0]||upcomingOpen[0];
   $("#nextMeetCard").classList.toggle("tap-card",!!next);
@@ -602,8 +602,9 @@ function newsCard(n,featured){
   const r=resolveNewsImage(n.img);
   const thumb=r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
   const forWho=storySquadLabel(n);
-  const marks=followedStory(n)
-    ?`<p class="news-marks"><span class="news-mark mine">For you</span>${unreadStory(n)?`<span class="news-mark new">New</span>`:""}</p>`:"";
+  const pin=heroPinned(n)?`<span class="news-mark pin">📌 Pinned</span>`:"";
+  const mine=followedStory(n)?`<span class="news-mark mine">For you</span>${unreadStory(n)?`<span class="news-mark new">New</span>`:""}`:"";
+  const marks=pin||mine?`<p class="news-marks">${pin}${mine}</p>`:"";
   return `<article class="card news-card tap-card${featured?" is-latest":""}${followedStory(n)?" is-mine":""}">${thumb}${marks}<p class="eyebrow">${esc(storyTopicLabel(n))}</p>
     <h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3>
     <p class="news-date"><time datetime="${esc(n.start)}">${fmtDate(n.start)}</time>${forWho?` · For ${esc(forWho)}`:""}</p>
@@ -612,7 +613,7 @@ function newsCard(n,featured){
 }
 function renderNews(){
   if(!$("#newsList"))return;
-  const all=DB.feed.filter(it=>it.type==="news").sort((a,b)=>a.start<b.start?1:-1);
+  const all=DB.feed.filter(it=>it.type==="news").sort(newestFirst);
   /* A chip for every tag at least one story has -- the club's topics first, then squads. */
   const tags=newsTagList().filter(t=>all.some(n=>(n.topics||[]).includes(t.ref)));
   const mine=follow.tags.length>0;
@@ -631,8 +632,10 @@ function renderNews(){
     return;
   }
   const today=new Date(isoToday()+"T12:00:00");
-  const eras=[];
-  list.forEach(n=>{
+  /* A pinned story sits above everything while its pin is in date, then drops back to its date. */
+  const pinned=list.filter(heroPinned);
+  const eras=pinned.length?[{key:"pinned",label:"Pinned",chip:"📌 Pinned",recent:true,items:pinned}]:[];
+  list.filter(n=>!pinned.includes(n)).forEach(n=>{
     const era=newsEraFor(n.start,today);
     const last=eras[eras.length-1];
     if(last&&last.key===era.key)last.items.push(n);
@@ -730,9 +733,40 @@ document.addEventListener("click",e=>{
   if(next>=0&&next<newsEraKeys.length)newsScrollToEra(newsEraKeys[next]);
 });
 
+/* Which view of the slideshow this visitor picked (HERO_VIEWS in core.js), kept in this browser. */
+const HERO_VIEW_KEY="bpsc_hero_view";
+let heroView="all";
+try{const v=localStorage.getItem(HERO_VIEW_KEY);if(HERO_VIEWS.some(x=>x.key===v))heroView=v;}catch(e){}
+function renderHeroViews(){
+  if(!$("#heroViews"))return;
+  $("#heroViews").innerHTML=HERO_VIEWS.map(v=>
+    `<button type="button" class="hero-view${v.key===heroView?" active":""}" data-view="${v.key}" aria-pressed="${v.key===heroView}">${esc(v.label)}</button>`).join("");
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("#heroViews .hero-view");
+  if(!b||b.dataset.view===heroView)return;
+  heroView=b.dataset.view;
+  try{localStorage.setItem(HERO_VIEW_KEY,heroView);}catch(err){}
+  renderHeroFeed();
+});
+/* A narrowed view can come up empty (a quiet week) -- say so in a slide rather than show nothing. */
+const HERO_EMPTY={
+  week:{tag:"This Week",title:"A quiet week",blurb:"Nothing on the calendar and no new stories in the past 7 days.",linkAttrs:'href="club-calendar"',more:"See the calendar →"},
+  news:{tag:"Club News",title:"No news yet",blurb:"Stories will show here as soon as they're posted.",linkAttrs:'href="news"',more:"Club News →"}
+};
 function renderHeroFeed(){
   if(!$("#heroSlides"))return;
-  const items=heroFeedItems(DB.feed);
+  renderHeroViews();
+  const items=heroFeedItems(DB.feed,heroView);
+  const empty=!items.length&&HERO_EMPTY[heroView];
+  if(empty){
+    $("#heroSlides").innerHTML=`<div class="hero-slide" style="background:${HERO_SLIDE_BG[0]}">
+      <div class="hero-news-card tap-card"><p class="eyebrow">${esc(empty.tag)}</p><h3>${esc(empty.title)}</h3>
+        <p>${esc(empty.blurb)}</p>${cardLink(empty.linkAttrs,empty.more)}</div></div>`;
+    $("#heroDots").innerHTML="";
+    heroIndex=0;updateHeroSlide();restartHeroAuto();
+    return;
+  }
   $("#heroSlides").innerHTML=items.map((it,i)=>{
     const c=heroFeedContent(it);
     /* An article with a gallery shows all of it here, cross-fading (see cycleHeroPhotos);
@@ -1049,6 +1083,173 @@ if($("#roleCatTabs")){
   defaultTab.setAttribute("aria-pressed","true");
 }
 
+/* ================= HOMEPAGE V1 / V2 (CLUB PULSE) =================
+   V2 is a preview of a homepage that knows what's on at the club today. It is the same page: the
+   V2 parts sit in index.html all along and site.css only shows them while the body has .home-v2,
+   which a line at the top of index.html sets before anything is drawn (so V1 never flashes up
+   first). The visitor's pick is kept in this browser; with no pick, data-home-default on
+   index.html's <body> decides -- set it to "v2" to make V2 the default, and remove #homeVersion
+   to retire the switch. The navigation and every other page are untouched either way. */
+const HOME_VERSION_KEY="bpsc_home_version",HOME_CONTEXT_KEY="bpsc_home_context";
+const homePref=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
+const setHomePref=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
+const homeVersion=()=>{const v=homePref(HOME_VERSION_KEY);return v==="v1"||v==="v2"?v:document.body.dataset.homeDefault==="v2"?"v2":"v1";};
+/* On a day something's on, V2 leads with it ("auto"); the visitor can put the ordinary homepage
+   first instead ("normal"). Only the order of the homepage changes -- nothing is hidden for good. */
+const homeContext=()=>homePref(HOME_CONTEXT_KEY)==="normal"?"normal":"auto";
+/* "loading" until the content arrives, then "ready" -- or "failed", when V2 just steps aside. */
+let pulseState="loading",pulseDay=null;
+/* One part of the homepage going wrong mustn't stop the rest from drawing. */
+function safely(fn){try{fn();}catch(e){console.error(e);}}
+
+function syncHomeVersion(){
+  const v2=homeVersion()==="v2";
+  document.body.classList.toggle("home-v2",v2);
+  document.querySelectorAll("[data-home-version]").forEach(b=>b.setAttribute("aria-pressed",String((b.dataset.homeVersion==="v2")===v2)));
+  safely(renderClubPulse);
+}
+
+/* Links in the panel come from what an editor typed; anything that isn't a plain link is dropped. */
+const pulseHref=u=>{const s=String(u||"").trim();return s&&!/^(javascript|data|vbscript):/i.test(s)?s:"";};
+const pulseLinkAttrs=it=>heroFeedContent(it).linkAttrs;
+/* "Tomorrow", "Saturday" (this week), or "In 12 days" */
+function pulseWhen(iso){
+  const n=feedDaysBetween(isoToday(),iso);
+  if(n===1)return "Tomorrow";
+  if(n<7)return new Date(iso+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long"});
+  return `In ${n} days`;
+}
+
+/* The buttons an event gets, built only from what's actually filled in -- never an empty button,
+   never a made-up link. Live results only while the gala is on AND has a live link (meetLive):
+   a pulsing button that goes nowhere is worse than no button. */
+function pulseActions(it){
+  const out=[];
+  const add=(href,label,o={})=>{const h=pulseHref(href);if(h&&label)out.push({href:h,label,...o});};
+  if(meetLive(it))add(it.liveUrl,"Live results",{live:true,ext:true});
+  const docs=(it.docLinks||[]).filter(l=>l&&pulseHref(l.url));
+  docs.slice(0,3).forEach(l=>add(l.url,l.label||l.text||"Meet document"));
+  if(it.leagueUrl)add(it.leagueUrl,"League information",{ext:true});
+  if(it.type==="social"){
+    if(it.link)add(it.link,"Details / tickets");
+    add(`article?id=${it.id}`,"Event details");
+  }
+  if(isMeet(it))add("open-meets",docs.length>3?"All meet documents":"Full meet details");
+  if(isHomeVenue(it))add("venue","Venue & getting here");
+  return out;
+}
+function pulseButtons(list){
+  return list.map((a,i)=>`<a class="btn small${a.live?" live":i===0?"":" ghost"}" href="${esc(a.href)}"${a.ext?' target="_blank" rel="noopener"':""}>${a.live?'<span class="live-dot" aria-hidden="true"></span>':""}${esc(a.label)}${a.ext?'<span class="sr-only"> (opens in a new tab)</span>':""}</a>`).join("");
+}
+
+/* The event panel: what's on, where, and the ways into it. Wording keeps who's hosting clear --
+   a county championship says who runs it rather than implying it's ours. */
+function pulseEventPanel(it,alsoToday){
+  const meet=isMeet(it),live=meetLive(it);
+  const champs=/champ/i.test(it.title||"")||/regional|national/i.test(it.level||"");
+  const tag=!meet?"Club Event":it.type==="meet"&&isHomeVenue(it)?"Home Meet":it.type==="externalMeet"&&champs?"Championships":"Race Day";
+  const who=it.type==="teamMeet"?(it.league||"Team gala")
+    :it.type==="meet"?"Hosted by BPSC"
+    :it.type==="externalMeet"?(it.host?`Hosted by ${it.host}`:"Open meet")
+    :"Club Calendar";
+  const day=eventDayLabel(it);
+  const dayText=day==="Today"?(meet?"Racing today":"Today"):day==="Under way"?`Under way · ${fmtDate(it.start)} – ${fmtDate(it.end)}`:day;
+  const where=[it.venue?`${dayText} at ${it.venue}`:dayText,it.poolType||""].filter(Boolean).join(" · ");
+  const note=meet?it.notes:it.blurb;
+  const actions=pulseActions(it);
+  const also=alsoToday.length?`<p class="pulse-also"><span>Also today:</span> ${alsoToday.map(x=>`<a ${pulseLinkAttrs(x)}>${esc(x.title)}</a>`).join(", ")}</p>`:"";
+  return `<article class="pulse-event${live?" is-live":""}" aria-labelledby="pulseEventTitle">
+    <div class="pulse-event-main">
+      <p class="pulse-event-tags"><span class="pulse-tag">${esc(tag)}</span>${live?'<span class="pulse-live-flag"><span class="live-dot" aria-hidden="true"></span>Live now</span>':""}<span class="pulse-who">${esc(who)}</span></p>
+      <h3 class="display pulse-event-title" id="pulseEventTitle">${esc(it.title)}</h3>
+      <p class="pulse-where">${esc(where)}</p>
+      ${note?`<p class="pulse-note">${esc(note)}</p>`:""}
+      ${also}
+    </div>
+    ${actions.length?`<div class="pulse-actions">${pulseButtons(actions)}</div>`:""}
+  </article>`;
+}
+
+/* A training change is the first thing a parent needs on the day -- visible, but not an alarm. */
+function pulseTrainingNotice(t){
+  const when=!meetRunning(t)?"Tomorrow":t.end&&t.end!==t.start?`Today · until ${fmtDate(t.end)}`:"Today";
+  return `<article class="pulse-notice tap-card">
+    <p class="pulse-notice-k"><span class="pulse-notice-tag">Session update</span><span>${esc(when)}</span></p>
+    <h3>${esc(t.title)}</h3>
+    ${t.note?`<p class="pulse-notice-note">${esc(t.note)}</p>`:""}
+    <div class="pulse-notice-foot">${cardLink('href="club-calendar"',"View details →")}</div>
+  </article>`;
+}
+
+/* Today / Next / Results / This week: only the cells that have something real to say. While the
+   event panel leads, "Today" is already said by it; on Club Home it's the one line that keeps
+   the event in view. */
+function pulseStrip(p,lead){
+  const cell=(k,v,s,attrs,ext)=>`<a class="pulse-cell" ${attrs}${ext?' target="_blank" rel="noopener"':""}>
+      <span class="pulse-k">${k}</span><span class="pulse-v">${esc(v)}</span>${s?`<span class="pulse-s">${esc(s)}${ext?'<span class="sr-only"> (opens in a new tab)</span>':""}</span>`:""}</a>`;
+  const cells=[];
+  if(!lead&&p.focus){
+    const f=p.focus;
+    cells.push(cell(meetLive(f)?'<span class="live-dot" aria-hidden="true"></span>Today · live':"Today",f.title,
+      [eventDayLabel(f)==="Today"?"":eventDayLabel(f),f.venue].filter(Boolean).join(" · ")||"See details →",pulseLinkAttrs(f)));
+  }else if(!p.focus&&!p.training.length){
+    cells.push(cell("Today","No training changes posted","Squad timetables →",'href="timetables"'));
+  }
+  if(p.next)cells.push(cell("Next",p.next.title,`${pulseWhen(p.next.start)} · ${fmtDate(p.next.start)}`,pulseLinkAttrs(p.next)));
+  if(p.results){const h=pulseHref(p.results.resultsUrl);if(h)cells.push(cell("Results",p.results.title,"Results are in →",`href="${esc(h)}"`,true));}
+  if(p.weekNews)cells.push(cell("This week",`${p.weekNews} new club ${p.weekNews===1?"story":"stories"}`,"Club News →",'href="news"'));
+  else if(p.weekEvents)cells.push(cell("This week",`${p.weekEvents} ${p.weekEvents===1?"event":"events"} coming up`,"Club Calendar →",'href="club-calendar"'));
+  return cells.length?`<nav class="pulse-strip" aria-label="Club at a glance">${cells.join("")}</nav>`:"";
+}
+
+function renderClubPulse(){
+  const el=$("#clubPulse");
+  if(!el)return;
+  const body=document.body;
+  body.classList.remove("home-event","home-live");
+  /* V1, still loading, or nothing loaded: no panel, and the ordinary homepage carries on below */
+  if(!body.classList.contains("home-v2")||pulseState!=="ready"){el.hidden=true;el.innerHTML="";return;}
+  const p=clubPulse(DB.feed),ctx=homeContext(),f=p.focus;
+  const lead=!!f&&ctx==="auto";
+  body.classList.toggle("home-event",lead);
+  body.classList.toggle("home-live",lead&&meetLive(f));
+  const label=f&&(isMeet(f)?"Race Day":"Club Event");
+  const opt=(key,text)=>`<button type="button" class="pulse-ctx-btn" data-home-context="${key}" aria-pressed="${ctx===key}">${text}</button>`;
+  const switcher=f?`<div class="pulse-ctx" role="group" aria-label="What the homepage shows first"><span class="pulse-ctx-label" aria-hidden="true">Viewing</span>${opt("auto",label)}${opt("normal","Club Home")}</div>`:"";
+  const date=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
+  el.innerHTML=`<div class="container">
+    <div class="pulse-head"><h2 class="pulse-title" id="pulseTitle">Today at BPSC <span class="pulse-date">${esc(date)}</span></h2>${switcher}</div>
+    ${p.training.map(pulseTrainingNotice).join("")}
+    ${lead?pulseEventPanel(f,p.today.slice(1)):""}
+    ${pulseStrip(p,lead)}
+  </div>`;
+  el.hidden=false;
+  pulseDay=isoToday();
+}
+
+document.addEventListener("click",e=>{
+  const v=e.target.closest("[data-home-version]");
+  if(v){
+    if(v.getAttribute("aria-pressed")==="true")return;
+    setHomePref(HOME_VERSION_KEY,v.dataset.homeVersion);
+    syncHomeVersion();
+    toast(v.dataset.homeVersion==="v2"?"Homepage V2 preview — switch back any time":"Classic homepage");
+    return;
+  }
+  const c=e.target.closest("[data-home-context]");
+  if(c){
+    if(c.getAttribute("aria-pressed")==="true")return;
+    setHomePref(HOME_CONTEXT_KEY,c.dataset.homeContext);
+    safely(renderClubPulse);
+    /* the buttons were redrawn: keep keyboard focus on the one just chosen */
+    const again=document.querySelector(`[data-home-context="${c.dataset.homeContext}"]`);
+    if(again)again.focus();
+  }
+});
+/* A tab left open overnight (or a phone woken the next morning) shouldn't still show yesterday. */
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&pulseDay&&pulseDay!==isoToday())safely(renderClubPulse);});
+if($("#homeVersion"))syncHomeVersion();
+
 /* ================= INIT ================= */
 const CONTENT_SLOTS="#meetsList,#otherMeetsList,#teamMeetsList,#completedMeetsList,#coachesList,#academyCoachesList,#rolesList,#newsList,#ttBody,#socialsList,#compList,#leagueList,#committeeList,#committeeDetail";
 document.querySelectorAll(CONTENT_SLOTS).forEach(el=>{el.innerHTML=`<p style="color:var(--muted)">Loading…</p>`;});
@@ -1056,8 +1257,11 @@ loadContent().then(()=>{
   /* Admins can hide a meet from the public site (without deleting it) by unticking "Show on
      the website" in the members' area; members.js keeps the full list, but nothing here should. */
   DB.feed=DB.feed.filter(it=>it.visible!==false);
+  /* drawn on its own, so a slip anywhere else on the page can't take Club Pulse with it (or vice versa) */
+  pulseState="ready";safely(renderClubPulse);
 }).then(renderAllPublic).catch(e=>{
   console.error("Could not load content",e);
+  if(pulseState!=="ready"){pulseState="failed";document.body.classList.add("content-failed");safely(renderClubPulse);}
   document.querySelectorAll(CONTENT_SLOTS)
     .forEach(el=>{el.innerHTML=`<p style="color:var(--muted)">Content couldn't be loaded just now. Please refresh the page.</p>`;});
 });

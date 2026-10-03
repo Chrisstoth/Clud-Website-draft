@@ -13,10 +13,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=73">
+<link rel="stylesheet" href="assets/css/site.css?v=74">
 </head>
-<body class="theme-dark">
+<body class="theme-dark" data-home-default="v1">
 <script>(function(){var t=null;try{t=localStorage.getItem("bpsc_theme")}catch(e){}if(t?t==="light":window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches)document.body.classList.remove("theme-dark")})()</script>
+<!-- Homepage V1 / V2 (see HOMEPAGE V1 / V2 in site.js): set before anything is drawn, so V1 never flashes up first -->
+<script>(function(){var v=null;try{v=localStorage.getItem("bpsc_home_version")}catch(e){}if(v!=="v1"&&v!=="v2")v=document.body.dataset.homeDefault;if(v==="v2")document.body.classList.add("home-v2")})()</script>
 <div class="proto-badge">Draft prototype &mdash; sample content for review. Edits made in the members&rsquo; area are saved and shared across devices.</div>
 <header class="site">
   <div class="nav-wrap">
@@ -109,6 +111,8 @@
 
 <main>
 <section class="page" id="page-home">
+  <!-- V2 only: what's on at the club today (renderClubPulse in site.js) -->
+  <section class="pulse v2-only" id="clubPulse" aria-labelledby="pulseTitle" hidden></section>
   <div class="hero">
     <div class="container hero-grid">
       <a class="live-results" id="liveResultsPill" href="open-meets" target="_blank" rel="noopener" hidden><span class="live-dot"></span>Live Results</a>
@@ -122,13 +126,21 @@
   </div>
   <div class="hero-photo-strip" id="heroPhotoStrip" aria-roledescription="carousel" aria-label="Club news, swipeable">
     <div class="hero-carousel-inner">
+      <div class="hero-views" id="heroViews" role="group" aria-label="Show in the slideshow"></div>
       <div class="hero-slides" id="heroSlides"></div>
       <button class="hero-arrow prev" id="heroPrev" aria-label="Previous story">‹</button>
       <button class="hero-arrow next" id="heroNext" aria-label="Next story">›</button>
       <div class="hero-dots" id="heroDots"></div>
     </div>
   </div>
-  <div class="hero-bottom-bar"></div>
+  <div class="hero-bottom-bar">
+    <div class="container home-version-wrap">
+      <div class="home-version" id="homeVersion" role="group" aria-label="Homepage version">
+        <button type="button" data-home-version="v1" aria-pressed="true">Classic</button>
+        <button type="button" data-home-version="v2" aria-pressed="false">V2<span class="home-version-tag">Preview</span></button>
+      </div>
+    </div>
+  </div>
 
   <div class="container" style="padding-top:56px">
     <div class="grid cols-3 pointed-grid">
@@ -189,7 +201,7 @@
 
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js"></script>
-<script src="assets/js/core.js?v=28"></script>
-<script src="assets/js/site.js?v=39"></script>
+<script src="assets/js/core.js?v=29"></script>
+<script src="assets/js/site.js?v=40"></script>
 </body>
 </html>

@@ -251,16 +251,35 @@ const storySquadLabel=it=>storyTags(it).filter(t=>t.squad).map(t=>t.name).join("
    then the latest news -- with more events filling in if there isn't enough news, and vice versa.
    Lives here rather than in site.js so the members' area can show which items are on the
    homepage right now; pass it only the items the public can see. */
+/* Newest first by the story's date; two on the same day go most recently added first. */
+const newestFirst=(a,b)=>(b.start||"").localeCompare(a.start||"")||(b.createdAt||"").localeCompare(a.createdAt||"");
 const HERO_SLOTS=6,HERO_UPCOMING=3;
 const heroIsEvent=it=>it.type!=="news"||it.start>(it.created||isoToday());
 const heroPinned=it=>!!(it.start&&it.pinUntil&&it.pinUntil>=isoToday());
-function heroFeedItems(feed){
+/* Visitors can narrow the slideshow (the chips over it; remembered per browser):
+   - "week": what's on in the next 7 days (soonest first), then news from the past 7 days;
+   - "news": news stories only, newest first;
+   - "all" (the default, and what the members' area reports on): the mix described above.
+   Pinned items lead every view they belong in. */
+const HERO_VIEWS=[{key:"all",label:"All"},{key:"week",label:"This Week"},{key:"news",label:"Latest News"}];
+const isoShift=(iso,days)=>{const d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+days);return isoDay(d);};
+const pinnedFirst=list=>list.filter(heroPinned).concat(list.filter(it=>!heroPinned(it)));
+function heroFeedItems(feed,view){
   const today=isoToday();
-  const pinned=feed.filter(heroPinned).sort((a,b)=>a.start<b.start?1:-1);
+  if(view==="news")
+    return pinnedFirst(feed.filter(it=>it.type==="news"&&it.start).sort(newestFirst)).slice(0,HERO_SLOTS);
+  if(view==="week"){
+    const weekEnd=isoShift(today,6),weekAgo=isoShift(today,-6);
+    const on=feed.filter(it=>it.start&&heroIsEvent(it)&&it.start<=weekEnd&&(it.end||it.start)>=today)
+      .sort((a,b)=>a.start<b.start?-1:1);
+    const fresh=feed.filter(it=>it.start&&!heroIsEvent(it)&&it.start>=weekAgo&&it.start<=today).sort(newestFirst);
+    return pinnedFirst(on.concat(fresh)).slice(0,HERO_SLOTS);
+  }
+  const pinned=feed.filter(heroPinned).sort(newestFirst);
   const rest=feed.filter(it=>it.start&&!pinned.includes(it));
   const isEvent=heroIsEvent;
   const upcoming=rest.filter(it=>isEvent(it)&&(it.end||it.start)>=today).sort((a,b)=>a.start<b.start?-1:1);
-  const news=rest.filter(it=>!isEvent(it)).sort((a,b)=>a.start<b.start?1:-1);
+  const news=rest.filter(it=>!isEvent(it)).sort(newestFirst);
   const room=HERO_SLOTS-pinned.length;
   const nUp=Math.min(upcoming.length,Math.max(HERO_UPCOMING,room-news.length));
   return pinned.concat(upcoming.slice(0,nUp),news).slice(0,HERO_SLOTS);
@@ -452,6 +471,48 @@ const meetLive=m=>!!m.liveUrl&&meetRunning(m);
    hosted by someone else (county champs etc.), "teamMeet" = league/team gala (no entries or volunteers). */
 const MEET_TYPES=["meet","externalMeet","teamMeet"];
 const isMeet=it=>MEET_TYPES.includes(it.type);
+/* Our own pool -- the homepage calls a gala there a home meet, and points at the venue page for it. */
+const isHomeVenue=m=>/basildon/i.test(m.venue||"");
+
+/* ================= CLUB PULSE (homepage V2) =================
+   What matters at the club today, worked out from the feed alone -- no extra fields to fill in.
+   Uses the same "running" window as the live-results button (meetRunning: first day to last day
+   inclusive), for every kind of item, so the homepage and Open Meets can never disagree about
+   whether something is on. Returns:
+   - training: training changes on today (or starting tomorrow -- worth knowing the night before);
+   - today: events on today, most important first (BPSC gala, team gala, other gala, social; one
+     with live results ahead of one without); focus is the first of them, or null;
+   - next: the next event after today; results: a gala finished in the last 3 days with results;
+   - weekNews / weekEvents: stories posted in the past 7 days, events in the next 7 after today. */
+const PULSE_EVENT_RANK={meet:0,teamMeet:1,externalMeet:2,social:3};
+const feedDaysBetween=(a,b)=>Math.round((new Date(b+"T12:00:00")-new Date(a+"T12:00:00"))/86400000);
+const byStart=(a,b)=>a.start<b.start?-1:a.start>b.start?1:0;
+function clubPulse(feed){
+  const today=isoToday(),tomorrow=isoShift(today,1);
+  const dated=(feed||[]).filter(it=>it&&it.start);
+  const events=dated.filter(it=>it.type in PULSE_EVENT_RANK);
+  const training=dated.filter(it=>it.type==="training"&&(meetRunning(it)||it.start===tomorrow)).sort(byStart);
+  const on=events.filter(meetRunning).sort((a,b)=>
+    PULSE_EVENT_RANK[a.type]-PULSE_EVENT_RANK[b.type]||meetLive(b)-meetLive(a)||byStart(a,b));
+  /* an open meet months away is left off Open Meets until it's close (meetTooFarAhead), so here too */
+  const next=events.filter(it=>it.start>today&&!(isMeet(it)&&meetTooFarAhead(it))).sort(byStart)[0]||null;
+  const results=events.filter(it=>isMeet(it)&&it.resultsUrl&&meetDone(it)&&(it.end||it.start)>=isoShift(today,-3))
+    .sort((a,b)=>byStart(b,a))[0]||null;
+  return {
+    training,today:on,focus:on[0]||null,next,results,
+    weekNews:dated.filter(it=>it.type==="news"&&it.start>=isoShift(today,-6)&&it.start<=today).length,
+    weekEvents:events.filter(it=>it.start>today&&it.start<=isoShift(today,6)).length
+  };
+}
+/* Where an event that's on today is up to: "Today", "Day 2 of 3" -- or, for a long run of dates
+   (county champs spread over several weekends), just "Under way", since the days in between
+   may well have no racing and we don't know which ones those are. */
+function eventDayLabel(it){
+  const span=feedDaysBetween(it.start,it.end||it.start)+1;
+  if(span<=1)return "Today";
+  if(span<=4)return `Day ${feedDaysBetween(it.start,isoToday())+1} of ${span}`;
+  return "Under way";
+}
 
 /* ================= INSTAGRAM (via Behold) =================
    Behold (behold.so) holds the club's Instagram login and serves its latest posts as JSON.
