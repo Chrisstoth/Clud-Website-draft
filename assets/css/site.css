@@ -2189,12 +2189,14 @@ body.home-v2.content-failed .hero-photo-strip,body.home-v2.content-failed #nextM
   .pulse-event.is-secondary .pulse-event-title{font-size:1.2rem}
   .pulse-where{font-size:.9rem}
   .pulse-actions{gap:10px 12px}
-  /* a 2-up grid with hairline gaps rather than leaning ticks, which read oddly across rows */
-  .pulse-strip{grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
-  .pulse-cell{background:var(--card);padding:10px 12px}
-  .pulse-cell+.pulse-cell::before{display:none}
-  /* an odd one out takes the full row rather than leaving a hole */
-  .pulse-cell:last-child:nth-child(odd){grid-column:1/-1}
+  /* one row, like on a computer: two boxes fill the width, and a third or fourth sits off to the
+     right with its edge peeking in, a swipe away -- rather than wrapping onto a second row */
+  .pulse-strip{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(46%,1fr);
+    overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none}
+  .pulse-strip::-webkit-scrollbar{display:none}
+  .pulse-cell{padding:10px 12px 10px 16px;scroll-snap-align:start}
+  /* the small grey line stays on one line, trimmed with "..." if it must be */
+  .pulse-s{font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pulse-v{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;font-size:.88rem}
   .home-version button{padding:3px 11px}
   .pulse-demo-exit{margin-left:0}
