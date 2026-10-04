@@ -1119,7 +1119,7 @@ function syncHomeVersion(){
    gala is labelled as a sample; its outside links (live results, league, documents) don't go
    anywhere, and only Full meet details and the venue page are real. It changes nothing saved --
    not the V1/V2 choice, not the Race Day / Club Home choice. */
-const HOME_DEMOS={"race-day":"Team gala, no live results","home-meet":"Home meet, live results"};
+const HOME_DEMOS={"race-day":"Team gala, no live results","home-meet":"Home meet, live results","two-galas":"Two galas in one day"};
 const homeDemo=()=>{const d=new URLSearchParams(location.search).get("demo");return HOME_DEMOS[d]?d:null;};
 function setHomeDemo(d){
   const u=new URL(location.href);
@@ -1127,15 +1127,20 @@ function setHomeDemo(d){
   history.replaceState(null,"",u.pathname+u.search+u.hash);
 }
 let demoCtx="auto";
-function demoEvent(key){
+/* The sample galas for a demo, most important first. */
+function demoEvents(key){
   const today=isoToday();
-  if(key==="home-meet")return {id:"demo",demo:true,type:"meet",title:"BPSC Autumn Meet",start:today,end:isoShift(today,1),
-    venue:"Basildon Sporting Village",poolType:"25m Short Course",liveUrl:"#demo",notes:"Spectator seating opens at 08:15.",
-    docLinks:[{label:"Programme",url:"#demo"},{label:"Visitor information",url:"#demo"}]};
-  return {id:"demo",demo:true,type:"teamMeet",title:"Arena League — Round 1",league:"Arena League",start:today,
-    venue:"Basildon Sporting Village",poolType:"25m Short Course",leagueUrl:"#demo",
+  const arena=venue=>({id:"demo-arena",demo:true,type:"teamMeet",title:"Arena League — Round 1",league:"Arena League",start:today,
+    venue,poolType:"25m Short Course",leagueUrl:"#demo",
     notes:"Warm-up 17:00 · Racing 18:00. Team sheets have been emailed — please arrive by 16:45 in club kit.",
-    docLinks:[{label:"Team sheet",url:"#demo"}]};
+    docLinks:[{label:"Team sheet",url:"#demo"}]});
+  if(key==="home-meet")return [{id:"demo-meet",demo:true,type:"meet",title:"BPSC Autumn Meet",start:today,end:isoShift(today,1),
+    venue:"Basildon Sporting Village",poolType:"25m Short Course",liveUrl:"#demo",notes:"Spectator seating opens at 08:15.",
+    docLinks:[{label:"Programme",url:"#demo"},{label:"Visitor information",url:"#demo"}]}];
+  if(key==="two-galas")return [{id:"demo-800",demo:true,type:"meet",title:"BPSC 800m Gala",start:today,
+    venue:"Basildon Sporting Village",poolType:"25m Short Course",liveUrl:"#demo",notes:"Warm-up 08:00 · First heat 09:00. Lap counters needed — please see the programme.",
+    docLinks:[{label:"Programme",url:"#demo"}]},arena("London Aquatics Centre")];
+  return [arena("Basildon Sporting Village")];
 }
 
 /* Links in the panel come from what an editor typed; anything that isn't a plain link is dropped. */
@@ -1174,7 +1179,10 @@ function pulseButtons(list){
 const PULSE_STYLES={race:"Race Day",home_meet:"Home Meet",championship:"Championships"};
 /* The event panel: what's on, where, and the ways into it. Wording keeps who's hosting clear --
    a county championship says who runs it rather than implying it's ours. */
-function pulseEventPanel(it,alsoToday){
+/* idx 0 is the lead panel; any further gala on the same day gets a slimmer one below it (n of them
+   at most -- PULSE_MAX_PANELS), with its own buttons, live results included. */
+const PULSE_MAX_PANELS=3;
+function pulseEventPanel(it,alsoToday,idx=0){
   const meet=isMeet(it),live=meetLive(it);
   const champs=/champ/i.test(it.title||"")||/regional|national/i.test(it.level||"");
   /* the editor's pick (homepageMode) wins; otherwise worked out from the gala */
@@ -1189,10 +1197,11 @@ function pulseEventPanel(it,alsoToday){
   const note=meet?it.notes:it.blurb;
   const actions=pulseActions(it);
   const also=alsoToday.length?`<p class="pulse-also"><span>Also today:</span> ${alsoToday.map(x=>`<a ${pulseLinkAttrs(x)}>${esc(x.title)}</a>`).join(", ")}</p>`:"";
-  return `<article class="pulse-event${live?" is-live":""}" aria-labelledby="pulseEventTitle">
+  const tid="pulseEventTitle"+(idx||"");
+  return `<article class="pulse-event${live?" is-live":""}${idx?" is-secondary":""}" aria-labelledby="${tid}">
     <div class="pulse-event-main">
       <p class="pulse-event-tags"><span class="pulse-tag">${esc(tag)}</span>${live?'<span class="pulse-live-flag"><span class="live-dot" aria-hidden="true"></span>Live now</span>':""}<span class="pulse-who">${esc(who)}</span></p>
-      <h3 class="display pulse-event-title" id="pulseEventTitle">${esc(it.title)}</h3>
+      <h3 class="display pulse-event-title" id="${tid}">${esc(it.title)}</h3>
       <p class="pulse-where">${esc(where)}</p>
       ${note?`<p class="pulse-note">${esc(note)}</p>`:""}
       ${also}
@@ -1221,8 +1230,10 @@ function pulseStrip(p,lead){
   const cells=[];
   if(!lead&&p.focus){
     const f=p.focus;
-    cells.push(cell(meetLive(f)?'<span class="live-dot" aria-hidden="true"></span>Today · live':"Today",f.title,
-      [eventDayLabel(f)==="Today"?"":eventDayLabel(f),f.venue].filter(Boolean).join(" · ")||"See details →",pulseLinkAttrs(f)));
+    const more=p.today.slice(1);
+    cells.push(cell(p.today.some(meetLive)?'<span class="live-dot" aria-hidden="true"></span>Today · live':"Today",f.title,
+      more.length?`Also ${more.map(x=>x.title).join(", ")}`
+        :[eventDayLabel(f)==="Today"?"":eventDayLabel(f),f.venue].filter(Boolean).join(" · ")||"See details →",pulseLinkAttrs(f)));
   }else if(!p.focus&&!p.training.length){
     cells.push(cell("Today","No training changes posted","Squad timetables →",'href="timetables"'));
   }
@@ -1242,20 +1253,24 @@ function renderClubPulse(){
   /* V1, still loading, or nothing loaded: no panel, and the ordinary homepage carries on below
      (a demo needs nothing loaded -- its gala is made up) */
   if(!body.classList.contains("home-v2")||(pulseState!=="ready"&&!demo)){el.hidden=true;el.innerHTML="";return;}
-  const sample=demo&&demoEvent(demo);
-  const p=clubPulse(sample?DB.feed.concat(sample):DB.feed);
-  /* the sample leads whatever else is really on today */
-  if(sample){p.today=[sample].concat(p.today.filter(x=>x!==sample));p.focus=sample;}
+  const samples=demo?demoEvents(demo):[];
+  const p=clubPulse(DB.feed.concat(samples));
+  /* the samples lead whatever else is really on today */
+  if(samples.length){p.today=samples.concat(p.today.filter(x=>!samples.includes(x)));p.focus=samples[0];}
   const ctx=demo?demoCtx:homeContext(),f=p.focus;
   const lead=!!f&&ctx==="auto";
+  const panels=lead?p.today.slice(0,PULSE_MAX_PANELS):[];
   body.classList.toggle("home-event",lead);
-  body.classList.toggle("home-live",lead&&meetLive(f));
+  /* the banner's red pill points at the first gala that's live (renderMeets); it only steps aside
+     when that gala's own panel is showing its live button, so no live link drops off the page */
+  const pillGala=DB.feed.filter(isMeet).sort(byStart).find(meetLive);
+  body.classList.toggle("home-live",!!pillGala&&panels.includes(pillGala));
   const label=f&&(isMeet(f)?"Race Day":"Club Event");
   const opt=(key,text)=>`<button type="button" class="pulse-ctx-btn" data-home-context="${key}" aria-pressed="${ctx===key}">${text}</button>`;
   const switcher=f?`<div class="pulse-ctx" role="group" aria-label="What the homepage shows first"><span class="pulse-ctx-label" aria-hidden="true">Viewing</span>${opt("auto",label)}${opt("normal","Club Home")}</div>`:"";
   const date=new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
   const demoBar=demo?`<div class="pulse-demo" role="group" aria-label="Race Day demo">
-      <p class="pulse-demo-note"><strong>Demo</strong> · a sample gala, not a real event</p>
+      <p class="pulse-demo-note"><strong>Demo</strong> · sample galas, not real events</p>
       ${Object.entries(HOME_DEMOS).map(([k,l])=>`<button type="button" class="pulse-demo-btn" data-home-demo="${k}" aria-pressed="${k===demo}">${esc(l)}</button>`).join("")}
       <button type="button" class="pulse-demo-btn pulse-demo-exit" data-home-demo="">Exit demo</button>
     </div>`:"";
@@ -1263,7 +1278,7 @@ function renderClubPulse(){
     ${demoBar}
     <div class="pulse-head"><h2 class="pulse-title" id="pulseTitle">Today at BPSC <span class="pulse-date">${esc(date)}</span></h2>${switcher}</div>
     ${p.training.map(pulseTrainingNotice).join("")}
-    ${lead?pulseEventPanel(f,p.today.slice(1)):""}
+    ${panels.map((it,i)=>pulseEventPanel(it,i===0?p.today.slice(panels.length):[],i)).join("")}
     ${pulseStrip(p,lead)}
   </div>`;
   el.hidden=false;

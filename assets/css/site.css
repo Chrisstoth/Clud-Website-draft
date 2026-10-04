@@ -2122,6 +2122,10 @@ body:not(.home-v2) .v2-only{display:none!important}
 .pulse-also span{font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:.72rem;margin-right:4px}
 .pulse-also a,body.theme-dark .pulse-also a{color:var(--ember)}
 .pulse-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px 14px;max-width:380px}
+/* a second gala on the same day: the same panel, a size down, so the lead one still reads first */
+.pulse-event.is-secondary{padding-block:18px;border-bottom-width:3px}
+.pulse-event.is-secondary .pulse-event-title{font-size:clamp(1.25rem,2.3vw,1.75rem);margin-top:10px}
+.pulse-event.is-secondary .pulse-note{-webkit-line-clamp:2}
 /* buttons on ink in both themes: flame with ink text, white outlines, the one red live button */
 body .pulse-event .btn{color:#101014}
 body .pulse-event .btn.ghost{color:#fff}
@@ -2181,6 +2185,8 @@ body.home-v2.content-failed .hero-photo-strip,body.home-v2.content-failed #nextM
   .pulse-event{padding:18px 16px 18px 20px;gap:14px}
   .pulse-event::before{width:4px}
   .pulse-event-title{font-size:1.45rem;margin-top:10px}
+  .pulse-event.is-secondary{padding-block:14px}
+  .pulse-event.is-secondary .pulse-event-title{font-size:1.2rem}
   .pulse-where{font-size:.9rem}
   .pulse-actions{gap:10px 12px}
   /* a 2-up grid with hairline gaps rather than leaning ticks, which read oddly across rows */
