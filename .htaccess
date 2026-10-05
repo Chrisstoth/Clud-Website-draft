@@ -1,0 +1,32 @@
+# Apache config for IONOS web hosting (Cloudflare Pages ignores this file and uses
+# _headers/_redirects instead — keep the two in step).
+
+Options -MultiViews
+RewriteEngine On
+
+# Always use HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# /home -> /
+RewriteRule ^home/?$ / [L,R=301]
+
+# Old-style /page.html links -> clean /page
+RewriteCond %{THE_REQUEST} \s/([^.?\s]+)\.html[\s?]
+RewriteRule ^ /%1 [L,R=301]
+
+# Clean URLs: /join serves join.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+RewriteRule ^([^.]+?)/?$ $1.html [L]
+
+ErrorDocument 404 /404.html
+
+<IfModule mod_headers.c>
+  <Files "sw.js">
+    Header set Cache-Control "no-cache"
+  </Files>
+</IfModule>
+
+AddType application/manifest+json .webmanifest

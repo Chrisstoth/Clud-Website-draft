@@ -1241,7 +1241,10 @@ function pulseStrip(p,lead){
   if(p.results){const h=pulseHref(p.results.resultsUrl);if(h)cells.push(cell("Results",p.results.title,"Results are in →",`href="${esc(h)}"`,true));}
   if(p.weekNews)cells.push(cell("This week",`${p.weekNews} new club ${p.weekNews===1?"story":"stories"}`,"Club News →",'href="news"'));
   else if(p.weekEvents)cells.push(cell("This week",`${p.weekEvents} ${p.weekEvents===1?"event":"events"} coming up`,"Club Calendar →",'href="club-calendar"'));
-  return cells.length?`<nav class="pulse-strip" aria-label="Club at a glance">${cells.join("")}</nav>`:"";
+  return cells.length?`<div class="pulse-strip-wrap">
+      <div class="pulse-strip-frame"><nav class="pulse-strip" aria-label="Club at a glance">${cells.join("")}</nav></div>
+      <div class="pulse-strip-dots" aria-hidden="true"></div>
+    </div>`:"";
 }
 
 function renderClubPulse(){
@@ -1283,7 +1286,61 @@ function renderClubPulse(){
   </div>`;
   el.hidden=false;
   pulseDay=isoToday();
+  wirePulseStrip();
 }
+
+/* On a phone the strip is one row you swipe (site.css), so it has to say so: a fade with an arrow
+   at whichever edge has more, and leaning bars underneath for where you are (tap one to jump).
+   It also steps along by itself every PULSE_STRIP_MS, looping back to the start -- until the
+   visitor touches it, from when they're in charge. It doesn't move while the tab is in the
+   background, while it's off screen, or at all for anyone who has asked for reduced motion.
+   Where everything fits (computers), there's nothing to scroll and none of this shows. */
+const PULSE_STRIP_MS=5000;
+let pulseStripTimer=null,pulseStripSync=null;
+const reduceMotion=()=>matchMedia("(prefers-reduced-motion: reduce)").matches;
+function wirePulseStrip(){
+  clearInterval(pulseStripTimer);pulseStripTimer=null;pulseStripSync=null;
+  const strip=$("#clubPulse .pulse-strip"),frame=strip&&strip.parentElement,dotsEl=$("#clubPulse .pulse-strip-dots");
+  if(!strip||!dotsEl)return;
+  /* where scroll-snap can actually stop: each box's start, until the row's end is reached */
+  const stops=()=>{
+    const max=strip.scrollWidth-strip.clientWidth;
+    if(max<=2)return [];
+    const first=strip.firstElementChild.offsetLeft;
+    return [...strip.querySelectorAll(".pulse-cell")].map(c=>c.offsetLeft-first).filter(x=>x<max-2).concat(max);
+  };
+  const current=list=>list.reduce((best,x,i)=>Math.abs(x-strip.scrollLeft)<Math.abs(list[best]-strip.scrollLeft)?i:best,0);
+  let dotCount=-1;
+  const sync=()=>{
+    const list=stops(),i=current(list);
+    frame.classList.toggle("more-left",list.length>0&&strip.scrollLeft>2);
+    frame.classList.toggle("more-right",list.length>0&&strip.scrollLeft<list[list.length-1]-2);
+    if(list.length!==dotCount){
+      dotCount=list.length;
+      dotsEl.innerHTML=list.map((_,j)=>`<button type="button" class="pulse-strip-dot" data-stop="${j}" tabindex="-1"></button>`).join("");
+    }
+    dotsEl.querySelectorAll(".pulse-strip-dot").forEach((d,j)=>d.classList.toggle("active",j===i));
+  };
+  const go=i=>{const list=stops();if(list.length)strip.scrollTo({left:list[(i+list.length)%list.length],behavior:reduceMotion()?"auto":"smooth"});};
+  const stop=()=>{clearInterval(pulseStripTimer);pulseStripTimer=null;};
+  let queued=false;
+  strip.addEventListener("scroll",()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;sync();});},{passive:true});
+  ["pointerdown","touchstart","wheel","focusin"].forEach(ev=>strip.addEventListener(ev,stop,{passive:true}));
+  dotsEl.addEventListener("click",e=>{const d=e.target.closest("[data-stop]");if(d){stop();go(+d.dataset.stop);}});
+  pulseStripSync=sync;
+  sync();
+  if(reduceMotion()||!stops().length)return;
+  pulseStripTimer=setInterval(()=>{
+    if(document.hidden||!strip.isConnected)return;
+    const r=strip.getBoundingClientRect();
+    if(r.bottom<0||r.top>innerHeight)return;
+    const list=stops();
+    if(list.length)go(current(list)+1);
+  },PULSE_STRIP_MS);
+}
+/* turning the phone round (or resizing) can change how many boxes fit */
+let pulseStripResize;
+window.addEventListener("resize",()=>{clearTimeout(pulseStripResize);pulseStripResize=setTimeout(()=>{if(pulseStripSync)pulseStripSync();},120);});
 
 document.addEventListener("click",e=>{
   const v=e.target.closest("[data-home-version]");
