@@ -34,11 +34,13 @@ function renderMeets(){
   const extLink=(url,label,cls="big ghost")=>`<a class="btn ${cls}" href="${esc(url)}" target="_blank" rel="noopener">${label}</a>`;
   /* Live results are published by the poolside laptop to a separate host, so this is always an external link. */
   const liveLink=url=>`<a class="btn big live" href="${esc(url)}" target="_blank" rel="noopener"><span class="live-dot"></span>Live results</a>`;
+  /* The live video stream (YouTube, Facebook etc.) is external too, and sits beside live results. */
+  const streamLink=url=>`<a class="btn big ghost stream" href="${esc(url)}" target="_blank" rel="noopener"><span class="stream-play" aria-hidden="true">▶</span>Watch live stream</a>`;
   const meetCard=m=>{
     const done=meetDone(m),team=m.type==="teamMeet",ours=m.type==="meet";
     const dp=dateParts(m.start);
     const pills=[
-      meetLive(m)?'<span class="pill live"><span class="live-dot"></span>Live now</span>':"",
+      meetLive(m)||meetStreaming(m)?'<span class="pill live"><span class="live-dot"></span>Live now</span>':"",
       done?'<span class="pill closed">Completed</span>':team?"":m.status==="open"?'<span class="pill open">Entries open</span>':'<span class="pill closed">Entries closed</span>',
       team?`<span class="pill results">${esc(m.league||"Team meet")}</span>`:ours?'<span class="pill hosted">BPSC hosted</span>':"",
       m.level&&!team?`<span class="pill level">${esc(m.level)}</span>`:""
@@ -51,6 +53,7 @@ function renderMeets(){
       +(m.officialsUrl?extLink(m.officialsUrl,"Officials sign-up"):"")
       +(m.volunteerUrl?extLink(m.volunteerUrl,"Volunteer here"):"");
     /* A gala in progress leads with its live-results button, whatever else the card offers. */
+    if(meetStreaming(m))actions=streamLink(m.streamUrl)+actions;
     if(meetLive(m))actions=liveLink(m.liveUrl)+actions;
     const dates=m.end?`${fmtDate(m.start)} – ${fmtDate(m.end)}`:fmtDate(m.start);
     /* Each line reads "Name: link text", or just the link when it has no name. */
@@ -61,7 +64,7 @@ function renderMeets(){
     }).join("");
     const r=resolveNewsImage(m.img);
     const thumb=r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
-    return `<article class="card meet${meetLive(m)?" live":""}${done?" done":""}${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
+    return `<article class="card meet${meetLive(m)||meetStreaming(m)?" live":""}${done?" done":""}${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
       ${thumb}
       <div class="datebox"><div class="d">${dp.d}</div><div class="m">${dp.m}</div></div>
       <div class="meet-main">
@@ -765,7 +768,7 @@ document.addEventListener("click",e=>{
 /* A narrowed view can come up empty (a quiet week) -- say so in a slide rather than show nothing. */
 const HERO_EMPTY={
   week:{tag:"This Week",title:"A quiet week",blurb:"Nothing on the calendar and no new stories in the past 7 days.",linkAttrs:'href="club-calendar"',more:"See the calendar →"},
-  news:{tag:"Club News",title:"No news yet",blurb:"Stories will show here as soon as they're posted.",linkAttrs:'href="news"',more:"Club News →"}
+  all:{tag:"Club News",title:"No news yet",blurb:"Stories will show here as soon as they're posted.",linkAttrs:'href="news"',more:"Club News →"}
 };
 function renderHeroFeed(){
   if(!$("#heroSlides"))return;
@@ -1148,7 +1151,7 @@ function demoEvents(key){
     notes:"Warm-up 17:00 · Racing 18:00. Team sheets have been emailed — please arrive by 16:45 in club kit.",
     docLinks:[{label:"Team sheet",url:"#demo"}]});
   if(key==="home-meet")return [{id:"demo-meet",demo:true,type:"meet",title:"BPSC Autumn Meet",start:today,end:isoShift(today,1),
-    venue:"Basildon Sporting Village",poolType:"25m Short Course",liveUrl:"#demo",notes:"Spectator seating opens at 08:15.",
+    venue:"Basildon Sporting Village",poolType:"25m Short Course",liveUrl:"#demo",streamUrl:"#demo",notes:"Spectator seating opens at 08:15.",
     docLinks:[{label:"Programme",url:"#demo"},{label:"Visitor information",url:"#demo"}]}];
   if(key==="two-galas")return [{id:"demo-800",demo:true,type:"meet",title:"BPSC 800m Gala",start:today,
     venue:"Basildon Sporting Village",poolType:"25m Short Course",liveUrl:"#demo",notes:"Warm-up 08:00 · First heat 09:00. Lap counters needed — please see the programme.",
@@ -1169,11 +1172,12 @@ function pulseWhen(iso){
 
 /* The buttons an event gets, built only from what's actually filled in -- never an empty button,
    never a made-up link. Live results only while the gala is on AND has a live link (meetLive):
-   a pulsing button that goes nowhere is worse than no button. */
+   a pulsing button that goes nowhere is worse than no button. The live stream follows the same rule. */
 function pulseActions(it){
   const out=[];
   const add=(href,label,o={})=>{const h=pulseHref(href);if(h&&label)out.push({href:h,label,...o});};
   if(meetLive(it))add(it.liveUrl,"Live results",{live:true,ext:true});
+  if(meetStreaming(it))add(it.streamUrl,"Watch live stream",{stream:true,ext:true});
   const docs=(it.docLinks||[]).filter(l=>l&&pulseHref(l.url));
   docs.slice(0,3).forEach(l=>add(l.url,l.label||l.text||"Meet document"));
   if(it.leagueUrl)add(it.leagueUrl,"League information",{ext:true});
@@ -1186,7 +1190,7 @@ function pulseActions(it){
   return out;
 }
 function pulseButtons(list){
-  return list.map((a,i)=>`<a class="btn small${a.live?" live":i===0?"":" ghost"}" href="${esc(a.href)}"${a.ext?' target="_blank" rel="noopener"':""}>${a.live?'<span class="live-dot" aria-hidden="true"></span>':""}${esc(a.label)}${a.ext?'<span class="sr-only"> (opens in a new tab)</span>':""}</a>`).join("");
+  return list.map((a,i)=>`<a class="btn small${a.live?" live":i===0?"":" ghost"}" href="${esc(a.href)}"${a.ext?' target="_blank" rel="noopener"':""}>${a.live?'<span class="live-dot" aria-hidden="true"></span>':a.stream?'<span class="stream-play" aria-hidden="true">▶</span>':""}${esc(a.label)}${a.ext?'<span class="sr-only"> (opens in a new tab)</span>':""}</a>`).join("");
 }
 
 const PULSE_STYLES={race:"Race Day",home_meet:"Home Meet",championship:"Championships"};
@@ -1196,7 +1200,7 @@ const PULSE_STYLES={race:"Race Day",home_meet:"Home Meet",championship:"Champion
    at most -- PULSE_MAX_PANELS), with its own buttons, live results included. */
 const PULSE_MAX_PANELS=3;
 function pulseEventPanel(it,alsoToday,idx=0){
-  const meet=isMeet(it),live=meetLive(it);
+  const meet=isMeet(it),live=meetLive(it)||meetStreaming(it);
   const champs=/champ/i.test(it.title||"")||/regional|national/i.test(it.level||"");
   /* the editor's pick (homepageMode) wins; otherwise worked out from the gala */
   const tag=PULSE_STYLES[it.homepageMode]||(!meet?"Club Event":it.type==="meet"&&isHomeVenue(it)?"Home Meet":it.type==="externalMeet"&&champs?"Championships":"Race Day");
@@ -1244,7 +1248,7 @@ function pulseStrip(p,lead){
   if(!lead&&p.focus){
     const f=p.focus;
     const more=p.today.slice(1);
-    cells.push(cell(p.today.some(meetLive)?'<span class="live-dot" aria-hidden="true"></span>Today · live':"Today",f.title,
+    cells.push(cell(p.today.some(x=>meetLive(x)||meetStreaming(x))?'<span class="live-dot" aria-hidden="true"></span>Today · live':"Today",f.title,
       more.length?`Also ${more.map(x=>x.title).join(", ")}`
         :[eventDayLabel(f)==="Today"?"":eventDayLabel(f),f.venue].filter(Boolean).join(" · ")||"See details →",pulseLinkAttrs(f)));
   }else if(!p.focus&&!p.training.length){

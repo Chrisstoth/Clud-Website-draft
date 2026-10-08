@@ -17,7 +17,7 @@ const DB={feed:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfar
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",topics:"topics",raceDays:"race_days",homepageMode:"homepage_mode"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",streamUrl:"stream_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",topics:"topics",raceDays:"race_days",homepageMode:"homepage_mode"};
 /* Highlight colours a meet's documents & links line can be given, so one that matters (a changed
    warm-up time, a late programme) stands out. The key is stored on the link; "" is no highlight. */
 const LINK_HIGHLIGHTS=[["","No highlight"],["orange","Orange"],["yellow","Yellow"],["green","Green"],["blue","Blue"],["red","Red"]];
@@ -48,15 +48,22 @@ function feedToRow(it){
   /* columns from a migration that may not have been run yet: leave them out rather than have
      every save fail with "column not found" (see checkFeedLateCols) */
   if(!feedLateColsReady)Object.values(FEED_LATE_COLS).forEach(c=>delete row[c]);
+  if(!feedStreamColReady)delete row.stream_url;
   return row;
 }
 /* Galas' racing days and homepage style (migration 021). The members' area asks once, at sign-in,
    whether the columns exist yet; until it knows they do, saves leave them out. */
 const FEED_LATE_COLS={raceDays:"race_days",homepageMode:"homepage_mode"};
 let feedLateColsReady=false;
+/* A gala's live stream link (migration 023), checked on its own so a site that has run 021 but not
+   023 can still save racing days. */
+let feedStreamColReady=false;
 async function checkFeedLateCols(){
-  const {error}=await sb.from("feed").select(Object.values(FEED_LATE_COLS).join(",")).limit(1);
-  feedLateColsReady=!error;
+  const [late,stream]=await Promise.all([
+    sb.from("feed").select(Object.values(FEED_LATE_COLS).join(",")).limit(1),
+    sb.from("feed").select("stream_url").limit(1)]);
+  feedLateColsReady=!late.error;
+  feedStreamColReady=!stream.error;
   return feedLateColsReady;
 }
 const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads:r.squads||[],photo:r.photo||"",bio:r.bio||"",sortOrder:r.sort_order??0});
@@ -255,15 +262,10 @@ const storyTopicLabel=it=>storyTags(it).filter(t=>!t.squad).map(t=>t.name).join(
 /* Who it's for: its squads, e.g. "Gold 1, Silver 2" -- empty when it's for the whole club. */
 const storySquadLabel=it=>storyTags(it).filter(t=>t.squad).map(t=>t.name).join(", ");
 
-/* Hero carousel: pulls across the whole feed (meets, socials, news) so it reads as one connected
-   "what's happening" strip rather than club news alone. Two kinds of item, two rules:
-   - events (meets, socials, training changes -- and a news story written ahead of its date,
-     e.g. a preview of a gala) are about a day: soonest first, gone once that day (or the end
-     date) has passed;
-   - announcements (any other news story) are about when they went up: newest first, until
-     newer ones push them out.
-   Order: anything pinned (feed.pin_until, still in date), then the next HERO_UPCOMING events,
-   then the latest news -- with more events filling in if there isn't enough news, and vice versa.
+/* Hero carousel: the club's latest articles. Anything pinned (feed.pin_until, still in date --
+   a news story, a social, a gala) leads, then the newest news stories by publish date fill the
+   rest of the slides, each staying until newer ones push it off. What's coming up on the calendar
+   is the Club Pulse strip's job on the homepage, and the "This Week" view's below.
    Lives here rather than in site.js so the members' area can show which items are on the
    homepage right now; pass it only the items the public can see. */
 /* When an item went up: the day it was posted -- or its own date, if that's earlier (a story
@@ -273,21 +275,18 @@ const storySquadLabel=it=>storyTags(it).filter(t=>t.squad).map(t=>t.name).join("
 const publishedOn=it=>[it.start,it.created].filter(Boolean).sort()[0]||"";
 /* Newest first by publish date; two on the same day go most recently added first. */
 const newestFirst=(a,b)=>publishedOn(b).localeCompare(publishedOn(a))||(b.createdAt||"").localeCompare(a.createdAt||"");
-const HERO_SLOTS=6,HERO_UPCOMING=3;
+const HERO_SLOTS=6;
 const heroIsEvent=it=>it.type!=="news"||it.start>(it.created||isoToday());
 const heroPinned=it=>!!(it.start&&it.pinUntil&&it.pinUntil>=isoToday());
 /* Visitors can narrow the slideshow (the chips over it; remembered per browser):
-   - "week": what's on in the next 7 days (soonest first), then news from the past 7 days;
-   - "news": news stories only, newest first;
-   - "all" (the default, and what the members' area reports on): the mix described above.
+   - "all" (the default, and what the members' area reports on): pinned, then the latest stories;
+   - "week": what's on in the next 7 days (soonest first), then news from the past 7 days.
    Pinned items lead every view they belong in. */
-const HERO_VIEWS=[{key:"all",label:"All"},{key:"week",label:"This Week"},{key:"news",label:"Latest News"}];
+const HERO_VIEWS=[{key:"all",label:"Latest"},{key:"week",label:"This Week"}];
 const isoShift=(iso,days)=>{const d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+days);return isoDay(d);};
 const pinnedFirst=list=>list.filter(heroPinned).concat(list.filter(it=>!heroPinned(it)));
 function heroFeedItems(feed,view){
   const today=isoToday();
-  if(view==="news")
-    return pinnedFirst(feed.filter(it=>it.type==="news"&&it.start).sort(newestFirst)).slice(0,HERO_SLOTS);
   if(view==="week"){
     const weekEnd=isoShift(today,6),weekAgo=isoShift(today,-6);
     const on=feed.filter(it=>it.start&&heroIsEvent(it)&&it.start<=weekEnd&&(it.end||it.start)>=today)
@@ -296,13 +295,8 @@ function heroFeedItems(feed,view){
     return pinnedFirst(on.concat(fresh)).slice(0,HERO_SLOTS);
   }
   const pinned=feed.filter(heroPinned).sort(newestFirst);
-  const rest=feed.filter(it=>it.start&&!pinned.includes(it));
-  const isEvent=heroIsEvent;
-  const upcoming=rest.filter(it=>isEvent(it)&&(it.end||it.start)>=today).sort((a,b)=>a.start<b.start?-1:1);
-  const news=rest.filter(it=>!isEvent(it)).sort(newestFirst);
-  const room=HERO_SLOTS-pinned.length;
-  const nUp=Math.min(upcoming.length,Math.max(HERO_UPCOMING,room-news.length));
-  return pinned.concat(upcoming.slice(0,nUp),news).slice(0,HERO_SLOTS);
+  const latest=feed.filter(it=>it.type==="news"&&it.start&&!pinned.includes(it)).sort(newestFirst);
+  return pinned.concat(latest).slice(0,HERO_SLOTS);
 }
 /* Homepage hero card text for any feed item. Lives here rather than in site.js so the framing
    editor in the members' area can put the real card over its homepage previews. */
@@ -496,6 +490,8 @@ const meetRaceDays=m=>(Array.isArray(m.raceDays)?m.raceDays:[]).filter(d=>d>=m.s
 const meetRacingOn=(m,iso)=>{const days=meetRaceDays(m);return days.length?days.includes(iso):m.start<=iso&&iso<=(m.end||m.start);};
 const meetRacingToday=m=>meetRacingOn(m,isoToday());
 const meetLive=m=>!!m.liveUrl&&meetRacingToday(m);
+/* Same rule for a live video stream of the racing (streamUrl): only on racing days, only when linked. */
+const meetStreaming=m=>!!m.streamUrl&&meetRacingToday(m);
 
 /* Three kinds of meet share the Open Meets page: "meet" = open meet hosted by BPSC, "externalMeet" = open meet
    hosted by someone else (county champs etc.), "teamMeet" = league/team gala (no entries or volunteers). */
@@ -525,7 +521,7 @@ function clubPulse(feed){
   /* a gala is "on" only on its racing days, and not at all if an editor switched it off for the homepage */
   const onToday=it=>isMeet(it)?it.homepageMode!=="off"&&meetRacingToday(it):meetRunning(it);
   const on=events.filter(onToday).sort((a,b)=>
-    PULSE_EVENT_RANK[a.type]-PULSE_EVENT_RANK[b.type]||meetLive(b)-meetLive(a)||byStart(a,b));
+    PULSE_EVENT_RANK[a.type]-PULSE_EVENT_RANK[b.type]||meetLive(b)-meetLive(a)||meetStreaming(b)-meetStreaming(a)||byStart(a,b));
   /* the soonest racing day (or event day) after today -- which can be the next weekend of a
      championship that's already started. An open meet months away is left off Open Meets until
      it's close (meetTooFarAhead), so here too. */

@@ -58,6 +58,7 @@ const SCHEMAS = {
     {k:"officialsUrl",label:"Officials sign-up link (URL — button hidden if blank)",type:"text"},
     {k:"volunteerUrl",label:"Volunteer here link (URL — leave blank to use the Volunteering page)",type:"text"},
     {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
+    {k:"streamUrl",label:"Live stream link (URL, e.g. YouTube — Watch live stream button shows only on the racing days)",type:"text",late:"stream"},
     {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
     {k:"docLinks",label:"Meet documents & links",type:"links"},
     {k:"notes",label:"Notes for parents & swimmers",type:"textarea"},
@@ -106,6 +107,7 @@ const SCHEMAS = {
     {k:"officialsUrl",label:"Officials sign-up link (URL — button hidden if blank)",type:"text"},
     {k:"volunteerUrl",label:"Volunteer link (URL — button hidden if blank)",type:"text"},
     {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
+    {k:"streamUrl",label:"Live stream link (URL, e.g. YouTube — Watch live stream button shows only on the racing days)",type:"text",late:"stream"},
     {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
     {k:"docLinks",label:"Meet documents & links",type:"links"},
     {k:"notes",label:"Notes for parents & swimmers",type:"textarea"},
@@ -123,6 +125,7 @@ const SCHEMAS = {
     {k:"notes",label:"Info for parents & swimmers (team selection, arrival times…)",type:"textarea"},
     {k:"leagueUrl",label:"League info link (URL — optional)",type:"text"},
     {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
+    {k:"streamUrl",label:"Live stream link (URL, e.g. YouTube — Watch live stream button shows only on the racing days)",type:"text",late:"stream"},
     {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
     {k:"docLinks",label:"Meet documents & links",type:"links"},
     {k:"img",label:"Picture",type:"imagepicker"}
@@ -260,7 +263,7 @@ function itemSummary(sec,it){
     const typeLabel=FEED_TYPE_META[it.type].label;
     if(isMeet(it)){
       /* Flag a gala that is running today so the Open Meets Secretary can see at a glance whether the live link is set. */
-      const state=meetRacingToday(it)?(it.liveUrl?"● LIVE NOW — results linked":"● racing today — add live results link")
+      const state=meetRacingToday(it)?(it.liveUrl?"● LIVE NOW — results linked":"● racing today — add live results link")+(it.streamUrl?" · stream linked":"")
         :meetRunning(it)?"on, but no racing today":meetDone(it)?(it.resultsUrl?"completed · results linked":"completed · add results link"):it.type==="teamMeet"?(it.league||"team meet"):"entries "+autoCloseEntries({...it}).status+(it.status==="open"&&entriesPastClosing(it)?" (closing date passed)":"");
       const who=it.type==="externalMeet"?` · host: ${it.host||"?"}`:"";
       const home=it.homepageMode==="off"?" · not on the homepage":"";
@@ -290,8 +293,8 @@ function feedItemsForRole(role){return DB.feed.filter(it=>role.feedTypes.include
 
 /* Where a Club Feed item stands on the homepage slideshow today. Worked out with the same
    heroFeedItems() the homepage runs (core.js), so these badges can't drift from what visitors
-   actually see. Pinned items count down to their pin date; other events drop off once their
-   last day has passed; ordinary news has no end date -- newer stories push it off. */
+   actually see. Pinned items count down to their pin date; the rest are the latest stories,
+   which have no end date -- newer stories push them off. */
 const homepageSlides=()=>heroFeedItems(DB.feed.filter(it=>it.visible!==false));
 const daysUntil=iso=>Math.round((new Date(iso+"T12:00:00")-new Date(isoToday()+"T12:00:00"))/86400000);
 const daysLeftLabel=n=>n<=0?"last day today":n===1?"1 day left":`${n} days left`;
@@ -299,7 +302,6 @@ function homeStatus(it,slides){
   const slot=slides.indexOf(it),pinned=heroPinned(it);
   let until="";
   if(pinned)until=`pinned until ${fmtDate(it.pinUntil)} · ${daysLeftLabel(daysUntil(it.pinUntil))}`;
-  else if(slot>=0&&heroIsEvent(it))until=`until ${fmtDate(it.end||it.start)} · ${daysLeftLabel(daysUntil(it.end||it.start))}`;
   else if(slot>=0)until="until newer stories push it off";
   return {slot,pinned,until};
 }
@@ -742,6 +744,9 @@ function showForm(sec,id,forcedType){
         <p class="hint" style="margin-top:6px">This box shows exactly how the article text will look on the page.</p>
       </div>`;
     }
+    /* a field whose column comes from a migration that may not have been run yet */
+    if(f.late==="stream"&&!feedStreamColReady)return `<label class="f">${f.label}<input type="text" name="${f.k}" value="${val}" disabled>
+      <span class="hint" style="color:var(--warn)">Needs a one-off database update (migration 023) before it can be saved. Everything else on this form saves as normal.</span></label>`;
     return `<label class="f">${f.label}<input type="${f.type}" name="${f.k}" value="${val}" ${f.req?"required":""}></label>`;
   }).join("");
   const titleLabel=isFeed?FEED_TYPE_META[type].label:SECTION_META[sec].name;

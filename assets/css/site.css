@@ -537,6 +537,9 @@ body.theme-dark .quick-links-divider{background:#31313a}
 .btn.live:hover{color:#fff}
 .btn.live:hover::before{background:#a8121e}
 .btn.live .live-dot{width:8px;height:8px;border-radius:50%;background:#fff;flex:0 0 auto}
+/* live video stream button: a play mark in place of the live dot */
+.btn .stream-play{display:inline-block;margin-right:7px;font-size:.72em;line-height:1;vertical-align:.08em}
+.btn.ghost .stream-play{color:#c81e2c}
 .pill.live{background:#c81e2c;color:#fff;display:inline-flex;align-items:center;gap:6px}
 .pill.live .live-dot{width:7px;height:7px;border-radius:50%;background:#fff;flex:0 0 auto;animation:live-blink 1.4s ease-in-out infinite}
 @keyframes live-blink{0%,100%{opacity:1}50%{opacity:.25}}
