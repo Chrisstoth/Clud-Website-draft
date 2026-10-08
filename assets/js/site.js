@@ -46,7 +46,8 @@ function renderMeets(){
     let actions;
     if(done)actions=m.resultsUrl?extLink(m.resultsUrl,"Results","big"):`<span class="btn big disabled" aria-disabled="true">Results coming soon</span>`;
     else if(team)actions=m.leagueUrl?extLink(m.leagueUrl,"League info"):"";
-    else actions=(meetHasEntry(m)?extLink(m.entryUrl,"Entry pack","big"):"")
+    else actions=(meetHasEntry(m)?extLink(m.entryUrl,"Entry pack","big")
+        :m.entryUrl&&m.status!=="open"?`<span class="btn big entries-closed" aria-disabled="true">Entries CLOSED</span>`:"")
       +(m.officialsUrl?extLink(m.officialsUrl,"Officials sign-up"):"")
       +(m.volunteerUrl?extLink(m.volunteerUrl,"Volunteer here"):"");
     /* A gala in progress leads with its live-results button, whatever else the card offers. */
@@ -582,10 +583,10 @@ document.addEventListener("click",e=>{
    news rather than more of the same. The sticky bar above the timeline is the way back and
    forth through it: Newer/Older step between periods, and the chips jump straight to one.
 
-   Eras are assigned by decreasing recency and rendered in that order, so the page is always
-   strictly newest-first even when a month boundary falls mid-week. A story dated ahead of today
-   (scheduled, or an announcement about something still to come) gets its own "Coming up" era
-   above this week rather than being buried under it. */
+   Stories and training changes are placed by publish date (publishedOn, core.js), so something
+   announced today about a date weeks away still lands under "This week". Eras are assigned by
+   decreasing recency and rendered in that order, so the page is always strictly newest-first
+   even when a month boundary falls mid-week. */
 const NEWS_MS_DAY=86400000;
 function newsEraFor(iso,today){
   const d=new Date(iso+"T12:00:00");
@@ -601,19 +602,31 @@ function newsEraFor(iso,today){
 function newsCard(n,featured){
   const r=resolveNewsImage(n.img);
   const thumb=r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
+  const posted=publishedOn(n);
+  /* A training change has no article of its own: the card says when it applies and points at the calendar. */
+  if(n.type==="training"){
+    const when=fmtDate(n.start)+(n.end&&n.end!==n.start?" – "+fmtDate(n.end):"");
+    return `<article class="card news-card tap-card${featured?" is-latest":""}">${thumb}<p class="eyebrow">Training change</p>
+    <h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3>
+    <p class="news-date"><time datetime="${esc(posted)}">${fmtDate(posted)}</time> · Applies ${esc(when)}</p>
+    ${n.note?`<p style="color:var(--muted);font-size:.9rem;margin-top:8px">${esc(n.note)}</p>`:""}
+    <div style="margin-top:14px">${cardLink('href="club-calendar"','<span class="btn small ghost">Club calendar →</span>')}</div></article>`;
+  }
   const forWho=storySquadLabel(n);
+  const about=n.start>posted?` · About ${fmtDate(n.start)}`:"";
   const pin=heroPinned(n)?`<span class="news-mark pin">📌 Pinned</span>`:"";
   const mine=followedStory(n)?`<span class="news-mark mine">For you</span>${unreadStory(n)?`<span class="news-mark new">New</span>`:""}`:"";
   const marks=pin||mine?`<p class="news-marks">${pin}${mine}</p>`:"";
   return `<article class="card news-card tap-card${featured?" is-latest":""}${followedStory(n)?" is-mine":""}">${thumb}${marks}<p class="eyebrow">${esc(storyTopicLabel(n))}</p>
     <h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3>
-    <p class="news-date"><time datetime="${esc(n.start)}">${fmtDate(n.start)}</time>${forWho?` · For ${esc(forWho)}`:""}</p>
+    <p class="news-date"><time datetime="${esc(posted)}">${fmtDate(posted)}</time>${about}${forWho?` · For ${esc(forWho)}`:""}</p>
     <p style="color:var(--muted);font-size:.9rem;margin-top:8px">${esc(n.blurb)}</p>
     <div style="margin-top:14px">${cardLink(`href="article?id=${n.id}"`,'<span class="btn small ghost">Read more →</span>')}</div></article>`;
 }
 function renderNews(){
   if(!$("#newsList"))return;
-  const all=DB.feed.filter(it=>it.type==="news").sort(newestFirst);
+  /* Training changes are club news too, so they run in the same timeline. */
+  const all=DB.feed.filter(it=>(it.type==="news"||it.type==="training")&&it.start).sort(newestFirst);
   /* A chip for every tag at least one story has -- the club's topics first, then squads. */
   const tags=newsTagList().filter(t=>all.some(n=>(n.topics||[]).includes(t.ref)));
   const mine=follow.tags.length>0;
@@ -636,7 +649,7 @@ function renderNews(){
   const pinned=list.filter(heroPinned);
   const eras=pinned.length?[{key:"pinned",label:"Pinned",chip:"📌 Pinned",recent:true,items:pinned}]:[];
   list.filter(n=>!pinned.includes(n)).forEach(n=>{
-    const era=newsEraFor(n.start,today);
+    const era=newsEraFor(publishedOn(n),today);
     const last=eras[eras.length-1];
     if(last&&last.key===era.key)last.items.push(n);
     else eras.push(Object.assign({items:[n]},era));
@@ -1397,7 +1410,7 @@ document.querySelectorAll(CONTENT_SLOTS).forEach(el=>{el.innerHTML=`<p style="co
 loadContent().then(()=>{
   /* Admins can hide a meet from the public site (without deleting it) by unticking "Show on
      the website" in the members' area; members.js keeps the full list, but nothing here should. */
-  DB.feed=DB.feed.filter(it=>it.visible!==false);
+  DB.feed=DB.feed.filter(it=>it.visible!==false).map(it=>isMeet(it)?autoCloseEntries(it):it);
   /* drawn on its own, so a slip anywhere else on the page can't take Club Pulse with it (or vice versa) */
   pulseState="ready";safely(renderClubPulse);
 }).then(renderAllPublic).catch(e=>{

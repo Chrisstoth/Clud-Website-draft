@@ -30,6 +30,8 @@ function feedFromRow(row){
   /* The day it was first saved (read-only, never written back): tells the homepage whether a news
      story was written ahead of its date -- i.e. it's about something coming up (renderHeroFeed). */
   if(row.created_at){it.created=isoDay(new Date(row.created_at));it.createdAt=row.created_at;}
+  /* Read-only, like created: an "Entries open" story the database posted for this meet (migration 022). */
+  if(row.source_meet_id)it.sourceMeetId=row.source_meet_id;
   return it;
 }
 function feedToRow(it){
@@ -264,8 +266,13 @@ const storySquadLabel=it=>storyTags(it).filter(t=>t.squad).map(t=>t.name).join("
    then the latest news -- with more events filling in if there isn't enough news, and vice versa.
    Lives here rather than in site.js so the members' area can show which items are on the
    homepage right now; pass it only the items the public can see. */
-/* Newest first by the story's date; two on the same day go most recently added first. */
-const newestFirst=(a,b)=>(b.start||"").localeCompare(a.start||"")||(b.createdAt||"").localeCompare(a.createdAt||"");
+/* When an item went up: the day it was posted -- or its own date, if that's earlier (a story
+   back-dated to when something happened, or older items typed in after the fact). An item about
+   something still to come (camp in a fortnight, a training change next week) is therefore filed
+   under the day it was announced, not the day it's about. */
+const publishedOn=it=>[it.start,it.created].filter(Boolean).sort()[0]||"";
+/* Newest first by publish date; two on the same day go most recently added first. */
+const newestFirst=(a,b)=>publishedOn(b).localeCompare(publishedOn(a))||(b.createdAt||"").localeCompare(a.createdAt||"");
 const HERO_SLOTS=6,HERO_UPCOMING=3;
 const heroIsEvent=it=>it.type!=="news"||it.start>(it.created||isoToday());
 const heroPinned=it=>!!(it.start&&it.pinUntil&&it.pinUntil>=isoToday());
@@ -466,6 +473,10 @@ function dateParts(iso){const d=new Date(iso+"T12:00:00");return{d:d.getDate(),m
 function isoDay(n){return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`;}
 function isoToday(){return isoDay(new Date());}
 const meetDone=m=>(m.end||m.start)<isoToday();
+/* Entries close at the end of the closing date, so from the next day an "open" meet counts as
+   closed everywhere -- nobody has to remember to flip the entry status by hand. */
+const entriesPastClosing=m=>!!m.closing&&m.closing<isoToday();
+const autoCloseEntries=m=>{if(m.status==="open"&&entriesPastClosing(m))m.status="closed";return m;};
 
 /* Open meets (BPSC-hosted or another club's) aren't published with entries/officials/volunteering
    details until they're getting close, so a meet still 4+ months out just clutters the Open Meets

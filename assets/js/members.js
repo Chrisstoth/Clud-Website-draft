@@ -261,7 +261,7 @@ function itemSummary(sec,it){
     if(isMeet(it)){
       /* Flag a gala that is running today so the Open Meets Secretary can see at a glance whether the live link is set. */
       const state=meetRacingToday(it)?(it.liveUrl?"● LIVE NOW — results linked":"● racing today — add live results link")
-        :meetRunning(it)?"on, but no racing today":meetDone(it)?(it.resultsUrl?"completed · results linked":"completed · add results link"):it.type==="teamMeet"?(it.league||"team meet"):"entries "+it.status;
+        :meetRunning(it)?"on, but no racing today":meetDone(it)?(it.resultsUrl?"completed · results linked":"completed · add results link"):it.type==="teamMeet"?(it.league||"team meet"):"entries "+autoCloseEntries({...it}).status+(it.status==="open"&&entriesPastClosing(it)?" (closing date passed)":"");
       const who=it.type==="externalMeet"?` · host: ${it.host||"?"}`:"";
       const home=it.homepageMode==="off"?" · not on the homepage":"";
       const racing=meetRaceDays(it).length?` · ${meetRaceDays(it).length} racing days`:"";
@@ -1113,8 +1113,15 @@ function showForm(sec,id,forcedType){
     }
     const submit=e.target.querySelector('button[type="submit"]');
     submit.disabled=true;
-    await publishItem(sec,id,data);
+    const storyBefore=isFeed&&DB.feed.some(x=>x.sourceMeetId&&x.sourceMeetId===id);
+    const saved=await publishItem(sec,id,data);
     submit.disabled=false;
+    /* The database posts an "Entries open" story the first time a gala gets its entry pack link
+       (migration 022); say so, since the Meets Secretary can't see Club News in their list. */
+    if(saved&&isFeed&&(type==="meet"||type==="externalMeet")&&!storyBefore){
+      const meet=id?{id}:DB.feed.filter(x=>x.type===type&&x.title===data.title).sort((a,b)=>b.id-a.id)[0];
+      if(meet&&DB.feed.some(x=>x.sourceMeetId===meet.id))toast("Published — and an “Entries open” story has gone up on Club News");
+    }
   });
 }
 

@@ -4,7 +4,9 @@
 Options -MultiViews
 RewriteEngine On
 
-# Always use HTTPS
+# Always use HTTPS on www.basildonswimming.co.uk (bare domain -> www)
+RewriteCond %{HTTP_HOST} ^basildonswimming\.co\.uk$ [NC]
+RewriteRule ^ https://www.basildonswimming.co.uk%{REQUEST_URI} [L,R=301]
 RewriteCond %{HTTPS} off
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
@@ -14,6 +16,10 @@ RewriteRule ^home/?$ / [L,R=301]
 # Old-style /page.html links -> clean /page
 RewriteCond %{THE_REQUEST} \s/([^.?\s]+)\.html[\s?]
 RewriteRule ^ /%1 [L,R=301]
+
+# /join/ -> /join (pages use relative links, which break under a trailing slash)
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.+)/$ /$1 [L,R=301]
 
 # Clean URLs: /join serves join.html
 RewriteCond %{REQUEST_FILENAME} !-f

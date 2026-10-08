@@ -541,6 +541,9 @@ body.theme-dark .quick-links-divider{background:#31313a}
 .pill.live .live-dot{width:7px;height:7px;border-radius:50%;background:#fff;flex:0 0 auto;animation:live-blink 1.4s ease-in-out infinite}
 @keyframes live-blink{0%,100%{opacity:1}50%{opacity:.25}}
 .card.meet.live{outline:2px solid #c81e2c;outline-offset:-2px}
+/* Shown in place of the entry pack button once the closing date has passed (or entries are set closed). */
+.btn.entries-closed,body.theme-dark .btn.entries-closed{color:#fff;cursor:default;pointer-events:none}
+.btn.entries-closed::before{background:#c81e2c}
 @media(prefers-reduced-motion:reduce){.live-results,.btn.live::before,.pill.live .live-dot{animation:none}}
 
 .hero-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:40px;align-items:center;position:relative}

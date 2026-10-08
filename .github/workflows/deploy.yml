@@ -1,0 +1,56 @@
+# Uploads the website to IONOS every time master is pushed (see HOW-TO-UPDATE.md).
+# Needs repo variables SFTP_HOST, SFTP_USER, SFTP_DIR and secret SFTP_PASSWORD;
+# until SFTP_HOST is set, the upload is skipped rather than failing.
+name: Deploy to IONOS
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.SFTP_HOST != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      - name: Upload site over SFTP
+        env:
+          SFTP_HOST: ${{ vars.SFTP_HOST }}
+          SFTP_USER: ${{ vars.SFTP_USER }}
+          SFTP_DIR: ${{ vars.SFTP_DIR }}
+          LFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD }}
+        run: |
+          # Refuse to upload into the webspace root, where the old WordPress site lives.
+          case "$SFTP_DIR" in ""|"/"|"."|"./") echo "SFTP_DIR must be a subfolder, e.g. bpsc-new"; exit 1;; esac
+          # No --delete: files removed from the repo stay on the server, but a wrong
+          # SFTP_DIR can never wipe anything else.
+          lftp -c "
+            set sftp:auto-confirm yes
+            set net:max-retries 3
+            set net:timeout 30
+            open --env-password -u \"$SFTP_USER\" sftp://$SFTP_HOST
+            mkdir -p -f \"$SFTP_DIR\"
+            mirror --reverse --verbose --parallel=4 \
+              --exclude-glob .git/ \
+              --exclude-glob .github/ \
+              --exclude-glob .claude/ \
+              --exclude-glob supabase/ \
+              --exclude-glob *.md \
+              --exclude-glob _headers \
+              --exclude-glob _redirects \
+              --exclude-glob .nojekyll \
+              --exclude-glob .gitignore \
+              --exclude-glob script0.js \
+              --exclude-glob Logo.png \
+              --exclude-glob 'BPSC Committee Roles.pdf' \
+              ./ \"$SFTP_DIR\"
+          "
