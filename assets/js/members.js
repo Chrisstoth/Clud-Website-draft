@@ -227,7 +227,7 @@ function renderLogin(message){
       : await sb.auth.signInWithOtp({email,options:{shouldCreateUser:false,emailRedirectTo:location.href.split("#")[0]}});
     btn.disabled=false;btn.textContent=label;
     if(error)return toast(loginErrorMessage(error));
-    if(usePassword)return start();
+    if(usePassword){idleMarked=0;markActive();return start();}
     $("#adminBody").querySelector(".card").innerHTML=`
       <p class="eyebrow" style="color:var(--ember)">Check your inbox</p>
       <h2 class="display" style="font-size:1.6rem;margin-top:6px">Sign-in link sent</h2>
@@ -1721,9 +1721,38 @@ async function insertLibraryImages(editor){
 /* ================= INIT =================
    A sign-in link lands back on this page with the session in the URL; supabase-js picks it
    up, so just ask who is signed in, then match them to their row in the members table. */
+/* Sign out after an hour without any clicks or typing, so a session left open on a shared
+   computer doesn't stay open. The time of the last activity is kept in localStorage, so it
+   also applies when the page is closed and reopened later. */
+const IDLE_LIMIT=60*60*1000, IDLE_KEY="bpsc_members_active";
+const IDLE_MESSAGE="You were signed out after an hour without activity. Sign in again to carry on.";
+let idleMarked=0;
+function markActive(){
+  if(Date.now()-idleMarked<15000)return;
+  idleMarked=Date.now();
+  try{localStorage.setItem(IDLE_KEY,String(idleMarked));}catch(err){}
+}
+function idleExpired(auth){
+  let seen=0;try{seen=Number(localStorage.getItem(IDLE_KEY))||0;}catch(err){}
+  /* a fresh sign-in counts as activity, whatever an earlier visit left behind */
+  seen=Math.max(seen,idleMarked,Date.parse(auth.user.last_sign_in_at)||0);
+  return Date.now()-seen>IDLE_LIMIT;
+}
+/* arriving from a sign-in link: the address still carries the sign-in details at this point */
+if(/access_token=|[?&]code=/.test(location.href))markActive();
+["pointerdown","keydown"].forEach(ev=>document.addEventListener(ev,()=>{if(session)markActive();},true));
+setInterval(async()=>{
+  if(!session)return;
+  const {data:{session:auth}}=await sb.auth.getSession();
+  if(!auth||!idleExpired(auth))return;
+  await sb.auth.signOut();session=null;renderLogin(IDLE_MESSAGE);
+},30000);
+
 async function start(){
   const {data:{session:auth}}=await sb.auth.getSession();
   if(!auth)return renderLogin();
+  if(idleExpired(auth)){await sb.auth.signOut();return renderLogin(IDLE_MESSAGE);}
+  markActive();
   const {data:member,error}=await sb.from("members").select("*").ilike("email",auth.user.email).maybeSingle();
   if(error)return renderLogin(`Couldn't check your account: ${error.message}`);
   if(!member||!ROLES[member.role]){

@@ -35,7 +35,7 @@ In GitHub: repository **Settings → Secrets and variables → Actions**.
 |---|---|---|
 | `SFTP_HOST` | Variables tab | IONOS SFTP server, e.g. `access-123456.webspace-host.com` |
 | `SFTP_USER` | Variables tab | IONOS SFTP username |
-| `SFTP_DIR` | Variables tab | Folder the site lives in on IONOS, e.g. `bpsc-new` |
+| `SFTP_DIR` | Variables tab | Folder the site lives in on IONOS, e.g. `bpsc-new`. Use `.` if the SFTP account is locked to the site's own folder (as with `GitSite`) |
 | `SFTP_PASSWORD` | Secrets tab | IONOS SFTP password (hidden; never put it in a file) |
 
 All four are in IONOS under **Hosting → SFTP & SSH**, apart from the folder name. If

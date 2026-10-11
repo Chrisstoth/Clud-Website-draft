@@ -30,7 +30,9 @@ jobs:
           LFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD }}
         run: |
           # Refuse to upload into the webspace root, where the old WordPress site lives.
-          case "$SFTP_DIR" in ""|"/"|"."|"./") echo "SFTP_DIR must be a subfolder, e.g. bpsc-new"; exit 1;; esac
+          # "." is allowed on purpose: it's for an SFTP account that is locked to the
+          # site's own folder, so its home folder is the site and nothing else.
+          case "$SFTP_DIR" in ""|"/"|"./") echo "SFTP_DIR must be a subfolder, e.g. bpsc-new (or . if the SFTP account is locked to the site folder)"; exit 1;; esac
           # No --delete: files removed from the repo stay on the server, but a wrong
           # SFTP_DIR can never wipe anything else.
           lftp -c "
