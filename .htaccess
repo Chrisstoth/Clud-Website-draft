@@ -8,6 +8,8 @@ RewriteEngine On
 RewriteCond %{HTTP_HOST} ^basildonswimming\.co\.uk$ [NC]
 RewriteRule ^ https://www.basildonswimming.co.uk%{REQUEST_URI} [L,R=301]
 RewriteCond %{HTTPS} off
+# TEMPORARY: trial domain has no SSL certificate yet. Remove this line once it does.
+RewriteCond %{HTTP_HOST} !^(www\.)?basildonswimmingclub\.co\.uk$ [NC]
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # /home -> /
