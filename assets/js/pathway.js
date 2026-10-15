@@ -3,8 +3,10 @@
    hats lead up into Junior Pathway, which feeds Bronze, Silver and Gold, three equal pathways
    side by side with each one building from its 3 squad up to its 1. Masters sits alongside.
    Tapping a squad shows who it's for, its coaches and its weekly training underneath.
-   Who-it's-for text lives here in PATHWAY; the sessions, lead coach and coaches come live from
-   Squad Timetables and the coaching team, matched by squad name, so hours can never go stale.
+   Who-it's-for text starts out here in PATHWAY, and the club can reword it (and the intro and
+   note) in the members' area, Squads > Squad details (squad_details, migration 028); the sessions,
+   lead coach and coaches come live from the squad timetables and the coaching team, matched by
+   squad name, so hours can never go stale.
    A squad here with no timetable of its own yet can borrow one through `alias`. */
 
 const PW_BRANCHES={
@@ -67,6 +69,20 @@ const PATHWAY=[
     blurb:"Our Masters offering for younger swimmers. Get in touch to find out more."}
 ];
 
+const PW_INTRO="Swimmers start in our Academy hat groups and move up to Junior Pathway, which finds where each swimmer fits best: Bronze, Silver or Gold. Each pathway builds from its 3 squad up to its 1, and swimmers can move between pathways as they develop. Tap a squad to see who it's for, its coaches and its weekly training.";
+const PW_NOTE="There's no set route — and no guarantees. Swimmers move up, across and sometimes back between pathways as they grow and develop, and the coaches place every swimmer where they'll progress best.";
+const pwSaved=key=>(DB.squadDetails||[]).find(d=>d.key===key);
+/* A squad's wording as the club last saved it, or as written above. */
+function pwText(p){
+  const d=pwSaved(p.name);
+  return d?{...p,ageLabel:d.age||p.ageLabel,level:d.level,blurb:d.blurb||p.blurb,competitive:d.competitive}:p;
+}
+const pwIntro=()=>(pwSaved("_intro")||{}).blurb||PW_INTRO;
+const pwNote=()=>(pwSaved("_note")||{}).blurb||PW_NOTE;
+/* The note's first sentence is its headline. */
+const pwNoteHtml=t=>{const m=t.match(/^(.+?[.!?])(\s+|$)([\s\S]*)$/);
+  return m?`<strong>${esc(m[1])}</strong> ${esc(m[3])}`:esc(t);};
+
 const pwSlug=n=>n.toLowerCase().replace(/[^a-z0-9]+/g,"-");
 const pwSquad=p=>DB.squads.find(s=>s.name===p.name)||(p.alias?DB.squads.find(s=>s.name===p.alias):null);
 /* Coaches tag squads by name, with an optional "(assistant)" after it. */
@@ -82,6 +98,7 @@ const pwHrs=m=>{const h=Math.round(m/60*4)/4;return `${h} hr${h===1?"":"s"}`;};
 
 /* ---------- diagram ---------- */
 function pwCard(p){
+  p=pwText(p);
   const b=PW_BRANCHES[p.branch],light=p.fill?p.light:b.light;
   return `<button type="button" class="pw-card${light?" light":""}" data-pw="${pwSlug(p.name)}" aria-pressed="false"
     style="--c:${p.fill||b.color}"><strong>${esc(p.name)}</strong><span>${esc(p.ageLabel)}</span></button>`;
@@ -107,6 +124,7 @@ function pwDiagramHtml(){
 
 /* ---------- details ---------- */
 function pwDetailHtml(p){
+  p=pwText(p);
   const b=PW_BRANCHES[p.branch],sq=pwSquad(p),coaches=pwCoaches(p);
   const sessions=sq?sq.sessions||[]:[];
   const pool=sessions.filter(s=>s.type!=="land"),land=sessions.filter(s=>s.type==="land");
@@ -124,7 +142,7 @@ function pwDetailHtml(p){
     <div class="pw-detail-main">
       <p class="eyebrow">${esc(b.label)}</p>
       <h3 class="display">${esc(p.name)}</h3>
-      <p class="pw-level">${esc(p.level)}</p>
+      ${p.level?`<p class="pw-level">${esc(p.level)}</p>`:""}
       <p class="pw-blurb">${esc(p.blurb)}</p>
       <div class="pw-actions">
         ${sq&&sessions.length?`<a class="btn small" href="timetables?squad=${sq.id}">See timetable</a>`:""}
@@ -161,11 +179,14 @@ function pwSelect(slug,scroll){
 function renderPathway(){
   const host=$("#pathwayMap");
   if(!host)return;
+  /* Drawn again once the club's own wording has loaded. */
+  const intro=$("#pwIntro");
+  if(intro)intro.textContent=pwIntro();
+  host.innerHTML=`${pwDiagramHtml()}
+    <div class="pw-detail empty" id="pwDetail" aria-live="polite"></div>
+    <p class="pw-note">${pwNoteHtml(pwNote())}</p>`;
   if(!host.dataset.built){
     host.dataset.built="1";
-    host.innerHTML=`${pwDiagramHtml()}
-      <div class="pw-detail empty" id="pwDetail" aria-live="polite"></div>
-      <p class="pw-note"><strong>There's no set route — and no guarantees.</strong> Swimmers move up, across and sometimes back between pathways as they grow and develop, and the coaches place every swimmer where they'll progress best.</p>`;
     host.addEventListener("click",e=>{
       const card=e.target.closest("[data-pw]"),fol=e.target.closest("[data-pw-follow]");
       if(card)pwSelect(card.dataset.pw===pwSel?null:card.dataset.pw,true);
@@ -178,6 +199,5 @@ function renderPathway(){
       }
     });
   }
-  /* Re-draw the open squad's details once the timetables and coaches have loaded. */
   pwSelect(pwSel);
 }

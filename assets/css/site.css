@@ -496,19 +496,7 @@ body.theme-dark .quick-links-divider{background:#31313a}
    but it cuts both ends at --slant-deg, which is the whole read */
 .hero-dot{width:24px;height:4px;background:rgba(255,255,255,.35);border:none;padding:0;cursor:pointer;transition:background .2s;transform:skewX(calc(-1 * var(--slant-deg)))}
 .hero-dot.active{background:var(--ember)}
-/* All / This Week / Latest News (renderHeroViews in site.js): dark glass tabs over the top of the
-   strip, leaning with everything else */
-.hero-views{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:4;display:flex;gap:4px;padding:4px;
-  background:rgba(16,16,20,.55);border:1px solid rgba(255,255,255,.18);border-radius:999px;
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.hero-view{border:none;background:none;color:rgba(255,255,255,.82);font-family:'Montserrat',sans-serif;font-weight:700;
-  font-size:.74rem;letter-spacing:.03em;text-transform:uppercase;padding:6px 13px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:background .2s,color .2s}
-.hero-view:hover{color:#fff;background:rgba(255,255,255,.12)}
-.hero-view.active{background:var(--ember);color:#101014}
-.hero-view:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
 @media(max-width:640px){
-  .hero-views{top:10px}
-  .hero-view{font-size:.68rem;padding:6px 10px}
   /* a card lifted to the top must clear the tabs */
   .hero-news-card.card-p-top{margin-top:54px}
 }
@@ -1030,9 +1018,36 @@ body.theme-dark .committee-item.active .t{color:var(--ember)}
 .cal-chip.social::before{background:var(--flame)}
 .cal-chip.training::before{background:var(--warn)}
 .cal-chip-label{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* chips that lead somewhere (an article, or the gala on Open Meets) */
+a.cal-chip{text-decoration:none;cursor:pointer}
+a.cal-chip:hover::before,a.cal-chip:focus-visible::before{filter:brightness(1.18)}
+a.cal-chip:hover .cal-chip-label{text-decoration:underline}
+/* a day with events opens its list when tapped; the date is the keyboard way in */
+.cal-day.has-items{cursor:pointer}
+.cal-day.has-items:hover{border-color:var(--muted)}
+.cal-day.selected{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink) inset}
+button.cal-daynum{all:unset;font-size:.78rem;font-weight:700;color:var(--muted);cursor:pointer;align-self:flex-start;padding:0 3px;margin:0 -3px;border-radius:4px}
+button.cal-daynum:focus-visible{outline:2px solid var(--flame);outline-offset:1px}
+.cal-day.selected button.cal-daynum{color:var(--ink)}
+.cal-daylist{margin-top:14px;border-top:1px solid var(--line);padding-top:12px;animation:pulse-in .18s ease-out}
+.cal-daylist-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.cal-daylist-head h4{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1rem;margin:0}
+.cal-daylist-close{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--line);background:transparent;color:inherit;font-size:1.2rem;line-height:1;cursor:pointer;flex:0 0 auto}
+.cal-daylist-close:hover{border-color:var(--flame);color:var(--flame-dark)}
+.cal-daylist-item{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:inherit;text-decoration:none}
+.cal-daylist-item+.cal-daylist-item{margin-top:8px}
+a.cal-daylist-item:hover{border-color:var(--flame)}
+.cal-daylist-cat{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;color:var(--muted)}
+.cal-daylist-sub{font-size:.88rem;color:var(--muted)}
+.cal-daylist-go{font-size:.84rem;font-weight:700;color:var(--flame-dark);margin-top:2px}
+@media(prefers-reduced-motion:reduce){.cal-daylist{animation:none}}
 @media(max-width:760px){.cal-day{min-height:60px}.cal-chip{font-size:.6rem}.cal-legend{font-size:.72rem;gap:10px}}
-/* phones: day cells are ~45px wide, so events show as coloured bars (details are in the rows below) */
-@media(max-width:560px){.cal-card{padding:14px 10px}.cal-dow{font-size:.62rem;letter-spacing:0}.cal-grid,.cal-dow{gap:3px}.cal-day{min-height:46px;padding:4px 3px;border-radius:6px}.cal-daynum{font-size:.68rem}.cal-chip{font-size:0;height:5px;padding:0}.cal-chip::before{transform:none;border-radius:3px}.cal-head{gap:10px}.cal-head h3{min-width:0;font-size:1rem}}
+/* phones: day cells are ~45px wide, so events show as coloured bars -- too small to aim at, so a
+   tap anywhere on the day opens its list rather than following whichever bar was nearest */
+@media(max-width:560px){.cal-card{padding:14px 10px}.cal-dow{font-size:.62rem;letter-spacing:0}.cal-grid,.cal-dow{gap:3px}.cal-day{min-height:46px;padding:4px 3px;border-radius:6px}.cal-daynum,button.cal-daynum{font-size:.68rem}.cal-chip{font-size:0;height:5px;padding:0}.cal-chip::before{transform:none;border-radius:3px}a.cal-chip{pointer-events:none}.cal-head{gap:10px}.cal-head h3{min-width:0;font-size:1rem}}
+/* Open Meets: the gala the calendar linked to gets a brief highlight when the page lands on it */
+.card.meet.flash{animation:row-flash 2.4s ease-out}
+@media(prefers-reduced-motion:reduce){.card.meet.flash{animation:none}}
 
 /* club calendar category rows */
 .cat-row-wrap{margin-top:34px}
@@ -1390,6 +1405,19 @@ footer.site a:hover{color:var(--ember)}
 .home-slide-link:hover,.home-slide-link:focus-visible{text-decoration-color:var(--flame)}
 .home-slide-meta{display:block;font-size:.8rem;color:var(--muted)}
 @media(min-width:640px){.home-slide-meta{display:inline;margin-left:8px}}
+/* Arranging the slideshow: pin and up/down on each row; the slides past the homepage's count are
+   the next in line, dimmed under a divider */
+.home-slides-hint{margin:0 0 10px;font-size:.84rem;color:var(--muted)}
+.home-slide-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.home-slide-acts{display:flex;align-items:center;gap:6px}
+.home-slide-acts .doclink-move button{height:32px;width:30px}
+.home-slide-pin{background:none;border:1.5px solid var(--line);color:var(--muted);border-radius:8px;height:32px;padding:0 10px;cursor:pointer;font:inherit;font-size:.78rem;font-weight:700}
+.home-slide-pin:hover{border-color:var(--flame);color:var(--text)}
+.home-slide-pin.on{border-color:var(--flame);color:var(--text)}
+.home-slide-acts button:disabled{opacity:.35;cursor:default}
+.home-slide-title{font-weight:700}
+.home-slides li.is-next{opacity:.7}
+.home-slides li.home-slides-break{display:block;list-style:none;margin:6px 0 0 -22px;padding-top:8px;border-top:1px dashed var(--line);font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 /* Instagram section: the one-off setup guide folds away once a feed is connected, and each
    post row is a thumbnail + caption with its "Show on website" tick. An unticked post fades
    so hidden ones stand out when scanning the list. */
@@ -1422,6 +1450,13 @@ footer.site a:hover{color:var(--ember)}
 .role-pick button.sel{border-color:var(--flame);background:rgba(242,107,33,.12)}
 .role-pick .desc{font-size:.78rem;color:var(--muted);font-weight:400}
 #admin form.squad-form{max-width:none}
+/* Squads > Squad details: one box per squad, edged in its pathway colour */
+.sqd-squad{border:1.5px solid var(--line);border-left:5px solid var(--c);border-radius:10px;padding:12px 14px 14px;margin:0 0 12px;display:grid;gap:12px;background:var(--card)}
+.sqd-squad legend{font-weight:800;padding:0 6px;font-size:.98rem}
+.sqd-squad legend span{font-weight:600;font-size:.78rem;color:var(--muted);margin-left:4px}
+.sqd-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:12px}
+@media (max-width:600px){.sqd-row{grid-template-columns:1fr}}
+.sqd-save{position:sticky;bottom:0;padding:12px 0;background:var(--paper)}
 .sess-title{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px}
 .sess-rows{display:grid;gap:8px;margin-bottom:10px}
 .sess-row{display:grid;grid-template-columns:1fr .8fr .8fr 44px 2.6fr .8fr 38px;gap:8px;align-items:center}
@@ -1478,6 +1513,9 @@ body.theme-dark{--paper:#0d0d11;--card:#1e1e26;--line:#3a3a44;--muted:#a5a3a0;--
 body.theme-dark header.site{background:#111116;color:#fff;box-shadow:0 1px 0 #282830}
 body.theme-dark .brand{color:#fff}
 body.theme-dark .brand .name .line-two{color:var(--ember)}
+body.theme-dark .cal-day.selected{border-color:var(--text);box-shadow:0 0 0 1px var(--text) inset}
+body.theme-dark .cal-day.selected button.cal-daynum{color:var(--text)}
+body.theme-dark .cal-daylist-go{color:var(--flame)}
 /* dark desktop nav: the flame fill reads fine on the dark bar unchanged -- only the
    plain (non-active) text colors need to shift for the dark background */
 @media(min-width:1024px){

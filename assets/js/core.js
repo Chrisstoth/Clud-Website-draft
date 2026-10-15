@@ -13,7 +13,7 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const TT_LOC={lc:"BSV Long Course",deep:"BSV Short Course – Deep End",shallow:"BSV Short Course – Shallow End",bill:"Billericay Pool",land:"BSV Meeting Room"};
 
 /* In-memory copy of what is published, filled by loadContent() on every page load. */
-const DB={feed:[],bin:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfare:[],committee:[],partners:null,guides:null,enquiries:[]};
+const DB={feed:[],bin:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfare:[],committee:[],partners:null,guides:null,squadDetails:null,enquiries:[]};
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
@@ -38,6 +38,9 @@ function feedFromRow(row){
   if(row.approved_by)it.approvedBy=row.approved_by;
   /* Read-only recycle bin (migration 025) */
   if(row.deleted_at){it.deletedAt=row.deleted_at;it.deletedBy=row.deleted_by||"";}
+  /* Read-only slideshow place (migration 027): changed only by set_slide_pin / reorder_slides. */
+  if(row.hero_at)it.heroAt=row.hero_at;
+  if(typeof row.pinned==="boolean")it.pinned=row.pinned;
   return it;
 }
 function feedToRow(it){
@@ -67,20 +70,28 @@ let feedLateColsReady=false;
 let feedStreamColReady=false;
 /* "Bump to the top" for an edited news story (migration 026), checked on its own likewise. */
 let feedBumpColReady=false;
+/* The arranged homepage slideshow (migration 027): until it's there the members' area shows the
+   slideshow without the pin and up/down buttons. */
+let feedSlideColsReady=false;
 async function checkFeedLateCols(){
-  const [late,stream,bump]=await Promise.all([
+  const [late,stream,bump,slide]=await Promise.all([
     sb.from("feed").select(Object.values(FEED_LATE_COLS).join(",")).limit(1),
     sb.from("feed").select("stream_url").limit(1),
-    sb.from("feed").select("bumped_at").limit(1)]);
+    sb.from("feed").select("bumped_at").limit(1),
+    sb.from("feed").select("hero_at,pinned").limit(1)]);
   feedLateColsReady=!late.error;
   feedStreamColReady=!stream.error;
   feedBumpColReady=!bump.error;
+  feedSlideColsReady=!slide.error;
   return feedLateColsReady;
 }
 const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads:r.squads||[],photo:r.photo||"",bio:r.bio||"",sortOrder:r.sort_order??0});
 const coachToRow=c=>({name:c.name,role:c.role,quals:c.quals||null,squads:c.squads||[],photo:c.photo||null,bio:c.bio||null});
 const squadFromRow=r=>({id:r.id,name:r.name,lead:r.lead||"",sessions:r.sessions||[]});
 const squadToRow=s=>({name:s.name,lead:s.lead||null,sessions:s.sessions||[]});
+/* The words on the Coaches & Squads page's Squads tab, one row per squad by name (migration 028). */
+const squadDetailFromRow=r=>({key:r.key,age:r.age_label||"",level:r.level||"",blurb:r.blurb||"",competitive:!!r.competitive});
+const squadDetailToRow=d=>({key:d.key,age_label:d.age||null,level:d.level||null,blurb:d.blurb||null,competitive:!!d.competitive});
 const topicFromRow=r=>({id:r.id,name:r.name});
 const topicToRow=t=>({name:t.name});
 const roleFromRow=r=>({id:r.id,title:r.title,category:r.category||"volunteering",commitment:r.commitment||"",training:r.training||"",blurb:r.blurb});
@@ -119,7 +130,9 @@ const SECTIONS={
      the pages keep the partner list written into their HTML, instead of the whole load failing */
   partners:{table:"partners",from:partnerFromRow,to:partnerToRow,order:"sort_order",optional:true},
   /* optional for the same reason (migration 020): the guides page keeps its HTML copy */
-  guides:{table:"member_guides",from:guideFromRow,to:guideToRow,order:"sort_order",optional:true}
+  guides:{table:"member_guides",from:guideFromRow,to:guideToRow,order:"sort_order",optional:true},
+  /* optional (migration 028): until it's run the Squads tab keeps the wording in pathway.js */
+  squadDetails:{table:"squad_details",from:squadDetailFromRow,to:squadDetailToRow,order:"key",optional:true}
 };
 
 /* Feed items awaiting peer review (migration 024). The database already hides them from the
@@ -280,43 +293,33 @@ const storyTopicLabel=it=>storyTags(it).filter(t=>!t.squad).map(t=>t.name).join(
 /* Who it's for: its squads, e.g. "Gold 1, Silver 2" -- empty when it's for the whole club. */
 const storySquadLabel=it=>storyTags(it).filter(t=>t.squad).map(t=>t.name).join(", ");
 
-/* Hero carousel: the club's latest articles. Anything pinned (feed.pin_until, still in date --
-   a news story, a social, a gala) leads, then the newest news stories by publish date fill the
-   rest of the slides, each staying until newer ones push it off. What's coming up on the calendar
-   is the Club Pulse strip's job on the homepage, and the "This Week" view's below.
+/* Hero carousel: a list the club arranges in the members' area (migration 027). Every new post,
+   of any kind, goes to the top (hero_at = when it was posted); the up/down arrows reorder it;
+   pinned posts lead until someone unpins them. The first HERO_SLOTS are on the homepage. Galas,
+   socials and training changes leave the list by themselves once they're over.
    Lives here rather than in site.js so the members' area can show which items are on the
    homepage right now; pass it only the items the public can see. */
-/* When an item went up: the day it was posted -- or its own date, if that's earlier (a story
-   back-dated to when something happened, or older items typed in after the fact). An item about
-   something still to come (camp in a fortnight, a training change next week) is therefore filed
-   under the day it was announced, not the day it's about. A story bumped to the top after an edit
-   (migration 026) counts as posted the day it was bumped. */
+/* Club News order. When an item went up: the day it was posted -- or its own date, if that's
+   earlier (a story back-dated to when something happened, or older items typed in after the
+   fact). An item about something still to come (camp in a fortnight, a training change next week)
+   is therefore filed under the day it was announced, not the day it's about. A story bumped to the
+   top after an edit (migration 026) counts as posted the day it was bumped. */
 const publishedOn=it=>it.bumpedAt?isoDay(new Date(it.bumpedAt)):[it.start,it.created].filter(Boolean).sort()[0]||"";
 /* Newest first by publish date; two on the same day go most recently added (or bumped) first. */
 const newestFirst=(a,b)=>publishedOn(b).localeCompare(publishedOn(a))||(b.bumpedAt||b.createdAt||"").localeCompare(a.bumpedAt||a.createdAt||"");
 const HERO_SLOTS=6;
-const heroIsEvent=it=>it.type!=="news"||it.start>(it.created||isoToday());
-const heroPinned=it=>!!(it.start&&it.pinUntil&&it.pinUntil>=isoToday());
-/* Visitors can narrow the slideshow (the chips over it; remembered per browser):
-   - "all" (the default, and what the members' area reports on): pinned, then the latest stories;
-   - "week": what's on in the next 7 days (soonest first), then news from the past 7 days.
-   Pinned items lead every view they belong in. */
-const HERO_VIEWS=[{key:"all",label:"Latest"},{key:"week",label:"This Week"}];
-const isoShift=(iso,days)=>{const d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+days);return isoDay(d);};
-const pinnedFirst=list=>list.filter(heroPinned).concat(list.filter(it=>!heroPinned(it)));
-function heroFeedItems(feed,view){
-  const today=isoToday();
-  if(view==="week"){
-    const weekEnd=isoShift(today,6),weekAgo=isoShift(today,-6);
-    const on=feed.filter(it=>it.start&&heroIsEvent(it)&&it.start<=weekEnd&&(it.end||it.start)>=today)
-      .sort((a,b)=>a.start<b.start?-1:1);
-    const fresh=feed.filter(it=>it.start&&!heroIsEvent(it)&&it.start>=weekAgo&&it.start<=today).sort(newestFirst);
-    return pinnedFirst(on.concat(fresh)).slice(0,HERO_SLOTS);
-  }
-  const pinned=feed.filter(heroPinned).sort(newestFirst);
-  const latest=feed.filter(it=>it.type==="news"&&it.start&&!pinned.includes(it)).sort(newestFirst);
-  return pinned.concat(latest).slice(0,HERO_SLOTS);
+/* Before migration 027 there's no pinned column: the old "pin until" date still counts. */
+const heroPinned=it=>it.pinned!==undefined?!!it.pinned:!!(it.start&&it.pinUntil&&it.pinUntil>=isoToday());
+const slideTime=it=>Date.parse(it.heroAt||it.bumpedAt||it.createdAt||"")||0;
+const slideOver=it=>it.type!=="news"&&!!(it.end||it.start)&&(it.end||it.start)<isoToday();
+/* The whole arranged list, pinned first, each part top-down. */
+function heroSlideOrder(feed){
+  const live=feed.filter(it=>!slideOver(it)).sort((a,b)=>slideTime(b)-slideTime(a));
+  return live.filter(heroPinned).concat(live.filter(it=>!heroPinned(it)));
 }
+const heroFeedItems=feed=>heroSlideOrder(feed).slice(0,HERO_SLOTS);
+const isoShift=(iso,days)=>{const d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+days);return isoDay(d);};
+
 /* Homepage hero card text for any feed item. Lives here rather than in site.js so the framing
    editor in the members' area can put the real card over its homepage previews. */
 function heroFeedContent(it){

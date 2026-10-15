@@ -7,7 +7,7 @@ const ALL_FEED_TYPES=["meet","externalMeet","teamMeet","social","news","training
 const ROLES = {
   poster:     {label:"Club Poster",          desc:"Post news, socials, training changes & galas — another member approves before it goes live", sections:["feed","guides"], feedTypes:ALL_FEED_TYPES},
   meets:      {label:"Open Meets Secretary", desc:"Add club, external & team meets, entry packs & results", sections:["feed","guides"], feedTypes:["meet","externalMeet","teamMeet"]},
-  coaching:   {label:"Coaching Lead",        desc:"Edit coach profiles & squad timetables", sections:["coaches","squads","guides"]},
+  coaching:   {label:"Coaching Lead",        desc:"Edit coach profiles, squad timetables & squad details", sections:["coaches","squads","guides"]},
   volunteers: {label:"Volunteer Coordinator",desc:"Edit volunteer role explainers",   sections:["roles","guides"]},
   socials:    {label:"Socials Team",         desc:"Add events, links & graphics",     sections:["feed","instagram","guides"], feedTypes:["social"]},
   comms:      {label:"Comms / Club News",    desc:"Post club news & announcements",   sections:["feed","topics","instagram","guides"], feedTypes:["news"]},
@@ -21,7 +21,7 @@ const SECTION_META = {
   feed:{name:"Club Feed", empty:"Nothing published yet — add the first item."},
   access:{name:"Posting Access", empty:""},
   coaches:{name:"Coaches & Squads", empty:"No coaches listed yet."},
-  squads:{name:"Squad Timetables", empty:"No squads yet — add the first one."},
+  squads:{name:"Squads", empty:"No squads yet — add the first one."},
   topics:{name:"News Tags", empty:"The club hasn't added any tags of its own yet. Squads are tags already — add others (Trips, Open Water, Officials…) here."},
   roles:{name:"Volunteer Roles", empty:"No roles yet."},
   enquiries:{name:"Trial Enquiries (inbox)", empty:"No enquiries yet — the public Join Us form feeds this inbox."},
@@ -149,7 +149,6 @@ const SCHEMAS = {
     {k:"img",label:"Picture (optional, replaces card graphic)",type:"imagepicker"},
     {k:"photos",label:"Photo gallery (shown as a slideshow on the article page)",type:"gallery"},
     {k:"heroPhotos",label:"Homepage pictures",type:"heropics"},
-    {k:"pinUntil",label:"Pin to front of homepage until (optional — leave blank for the normal order)",type:"date"},
     {k:"body",label:"Full write-up (shown on the article page)",type:"richtext"}
   ],
   news:[
@@ -160,7 +159,6 @@ const SCHEMAS = {
     {k:"img",label:"Picture (thumbnail; used as the cover if there's no gallery yet)",type:"imagepicker"},
     {k:"photos",label:"Photo gallery (shown as a slideshow on the article page)",type:"gallery"},
     {k:"heroPhotos",label:"Homepage pictures",type:"heropics"},
-    {k:"pinUntil",label:"Pin to front of homepage until (optional — leave blank for the normal order)",type:"date"},
     {k:"body",label:"Article content",type:"richtext"}
   ],
   training:[
@@ -195,6 +193,8 @@ const SCHEMAS = {
    tampered page still cannot write anything this account isn't allowed to. */
 let session=null;
 let adminSection=null, editingId=null;
+/* Squads has two tabs: the timetables list, and the squad details shown on the Coaches & Squads page. */
+let squadsTab="timetables";
 /* Club Feed list filter: item type and (for Club News) category tag; "" means all. Kept across
    saves so the list doesn't jump back to everything after each edit. */
 let feedFilter={type:"",tag:""};
@@ -333,10 +333,10 @@ function itemSummary(sec,it){
 function feedItemsForRole(role){return DB.feed.filter(it=>role.feedTypes.includes(it.type));}
 
 /* Where a Club Feed item stands on the homepage slideshow today. Worked out with the same
-   heroFeedItems() the homepage runs (core.js), so these badges can't drift from what visitors
-   actually see. Pinned items count down to their pin date; the rest are the latest stories,
-   which have no end date -- newer stories push them off. */
-const homepageSlides=()=>heroFeedItems(DB.feed.filter(it=>it.visible!==false&&it.review!=="pending"));
+   heroSlideOrder() the homepage runs (core.js), so these badges can't drift from what visitors
+   actually see. Pinned items stay until unpinned; the rest are moved down by newer posts. */
+const publicFeed=()=>DB.feed.filter(it=>it.visible!==false&&it.review!=="pending");
+const homepageSlides=()=>heroFeedItems(publicFeed());
 /* Peer review (migration 024): a non-webmaster's save waits until someone else approves it. */
 const isWebmaster=()=>session.role.key==="webmaster";
 const isPending=it=>it.review==="pending";
@@ -355,37 +355,66 @@ async function approveItem(id){
   renderAdminShell();
   toast("Approved — now live on the public site");
 }
-const daysUntil=iso=>Math.round((new Date(iso+"T12:00:00")-new Date(isoToday()+"T12:00:00"))/86400000);
-const daysLeftLabel=n=>n<=0?"last day today":n===1?"1 day left":`${n} days left`;
 function homeStatus(it,slides){
   const slot=slides.indexOf(it),pinned=heroPinned(it);
-  let until="";
-  if(pinned)until=`pinned until ${fmtDate(it.pinUntil)} · ${daysLeftLabel(daysUntil(it.pinUntil))}`;
-  else if(slot>=0)until="until newer stories push it off";
-  return {slot,pinned,until};
+  return {slot,pinned,until:pinned?"pinned until someone unpins it":slot>=0?"until newer posts push it off":""};
 }
 function homeBadges(it,slides){
   if(isPending(it))return reviewBadge(it);
   if(it.visible===false)return `<span class="feed-badge off">Hidden from site</span>`;
   const h=homeStatus(it,slides),b=[];
   if(h.slot>=0)b.push(`<span class="feed-badge home">On homepage · slide ${h.slot+1} of ${slides.length}</span>`);
-  if(h.pinned)b.push(`<span class="feed-badge pin">📌 Pinned to the front · ${esc(daysLeftLabel(daysUntil(it.pinUntil)))}</span>`);
+  if(h.pinned)b.push(`<span class="feed-badge pin">📌 Pinned to the front</span>`);
   if(h.pinned&&h.slot<0)b.push(`<span class="feed-badge off">Not showing — the slideshow is full of other pinned items</span>`);
   if(!h.pinned&&h.slot>=0)b.push(`<span class="feed-badge note">${esc(h.until)}</span>`);
-  if(!h.pinned&&it.pinUntil&&daysUntil(it.pinUntil)>=-14)b.push(`<span class="feed-badge note">Pin ended ${esc(fmtDate(it.pinUntil))}</span>`);
   return b.length?`<div class="feed-badges">${b.join("")}</div>`:"";
 }
-/* The slideshow as it stands today, in order, at the top of the Club Feed. Items this role can
-   edit link down to their row; the rest (another team's) are listed for context only. */
+/* The slideshow at the top of the Club Feed: the slides on the homepage now, in order, then the
+   next few in line. Every new post goes to the top; 📌 keeps one at the front until it's unpinned;
+   the arrows move one within its part of the list (pinned or not), so a post from further down
+   can be brought onto the homepage. Arranging applies straight away (migration 027). Titles this
+   role can edit link down to their row; the rest (another team's) are listed for context. */
+const SLIDES_NEXT=6;
 function homepagePanelHtml(slides,role){
-  if(!slides.length)return `<div class="home-panel"><h3 class="admin-sub">On the homepage now</h3><p style="color:var(--muted)">Nothing on the homepage slideshow at the moment.</p></div>`;
-  return `<div class="home-panel"><h3 class="admin-sub">On the homepage now</h3><ol class="home-slides">${slides.map(it=>{
+  const order=heroSlideOrder(publicFeed()),list=order.slice(0,HERO_SLOTS+SLIDES_NEXT);
+  const head=`<h3 class="admin-sub">Homepage slideshow</h3>`;
+  if(!list.length)return `<div class="home-panel">${head}<p style="color:var(--muted)">Nothing on the homepage slideshow at the moment.</p></div>`;
+  const arrange=feedSlideColsReady&&role.feedTypes.length>0;
+  const row=(it,i)=>{
     const h=homeStatus(it,slides),mine=role.feedTypes.includes(it.type);
-    const title=mine?`<button type="button" class="home-slide-link" data-jump="${it.id}">${esc(it.title)}</button>`:`<span>${esc(it.title)}</span>`;
-    return `<li class="${h.pinned?"is-pinned":""}">${title}
-      <span class="home-slide-meta">${esc(heroFeedContent(it).tag)} · ${h.pinned?"📌 ":""}${esc(h.until)}</span></li>`;
-  }).join("")}</ol></div>`;
+    const group=order.filter(x=>heroPinned(x)===h.pinned),g=group.indexOf(it);
+    const title=mine?`<button type="button" class="home-slide-link" data-jump="${it.id}">${esc(it.title)}</button>`:`<span class="home-slide-title">${esc(it.title)}</span>`;
+    const acts=arrange?`<span class="home-slide-acts">
+        <button type="button" class="home-slide-pin${h.pinned?" on":""}" data-slide-pin="${it.id}" aria-pressed="${h.pinned}" title="${h.pinned?"Unpin":"Keep at the front until unpinned"}">📌 ${h.pinned?"Unpin":"Pin"}</button>
+        <span class="doclink-move">
+          <button type="button" data-slide-move="${it.id}" data-dir="-1" ${g===0?"disabled":""} title="Move up" aria-label="Move ${esc(it.title)} up">↑</button>
+          <button type="button" data-slide-move="${it.id}" data-dir="1" ${g===group.length-1?"disabled":""} title="Move down" aria-label="Move ${esc(it.title)} down">↓</button>
+        </span></span>`:"";
+    return `${i===HERO_SLOTS?`<li class="home-slides-break" aria-hidden="true">Next in line — move one up to put it on the homepage</li>`:""}
+      <li class="${h.pinned?"is-pinned":""}${i>=HERO_SLOTS?" is-next":""}"><div class="home-slide-row"><div>${title}
+      <span class="home-slide-meta">${esc(heroFeedContent(it).tag)}${h.pinned?" · 📌 pinned":""}</span></div>${acts}</div></li>`;
+  };
+  const hint=arrange?`<p class="home-slides-hint">The first ${HERO_SLOTS} are on the homepage. New posts go to the top. 📌 Pin keeps a post at the front until it's unpinned; the arrows change the order. Galas, socials and training changes drop off once they're over.</p>`:"";
+  return `<div class="home-panel">${head}${hint}<ol class="home-slides">${list.map(row).join("")}</ol></div>`;
 }
+/* Arranging the slideshow is done by the database (migration 027), straight away and without
+   approval, since it doesn't change what any post says. */
+async function arrangeSlides(call,args,done){
+  const {error}=await sb.rpc(call,args);
+  if(error)return toast(error.code==="42501"?error.message:saveErrorMessage(error));
+  await loadContent();
+  renderAdminShell();
+  toast(done);
+}
+function moveSlide(id,dir){
+  const order=heroSlideOrder(publicFeed()),it=order.find(x=>x.id===id);
+  if(!it)return;
+  const group=order.filter(x=>heroPinned(x)===heroPinned(it)),i=group.indexOf(it),other=group[i+dir];
+  if(!other)return;
+  /* the pair in their new order, top first; the database gives them the two places they held */
+  arrangeSlides("reorder_slides",{ids:dir<0?[it.id,other.id]:[other.id,it.id]},"Slideshow order saved");
+}
+
 function renderAdminSection(){
   const main=$("#adminMain"),sec=adminSection,role=session.role;
   if(sec==="enquiries"){
@@ -414,6 +443,10 @@ function renderAdminSection(){
     showImagesSection();
     return;
   }
+  if(sec==="squads"&&squadsTab==="details"){
+    showSquadDetailsSection();
+    return;
+  }
   if(sec==="partners"&&!DB.partners){
     main.innerHTML=`<h2>${SECTION_META.partners.name}</h2>
       <div class="admin-note">The partners list hasn't been set up in the database yet. The webmaster needs to run <code>supabase/migrations/019_partners.sql</code> in the Supabase SQL Editor. Until then every page keeps showing the partners written into its HTML.</div>`;
@@ -429,8 +462,10 @@ function renderAdminSection(){
     ?"Each guide is a tab on the <a href=\"member-guides\" target=\"_blank\" rel=\"noopener\">Member Guides</a> page, in this order — use the arrows to move one. Open a guide to edit it: the editor shows it exactly as it will look. Changes show on the public site straight away."
     :sec==="partners"
     ?"The Proud Partners strip under the header on every page. Each partner's name links to the web address given (opening in a new tab); leave the link blank to show the name without one. Use the arrows to change the order. Changes show on the public site straight away."
+    :sec==="squads"
+    ?"Each squad's weekly sessions, shown on the <a href=\"timetables\" target=\"_blank\" rel=\"noopener\">Squad Timetables</a> page and in the squad details on the <a href=\"coaches#squads\" target=\"_blank\" rel=\"noopener\">Coaches &amp; Squads</a> page. Changes here publish straight to the public page."
     :sec==="topics"
-    ?"These are the club's own tags for news stories. Every squad in Squad Timetables is a tag automatically, so there's no need to add squads here. Visitors can follow any tag on the News page and get a count of new stories for it. Renaming a tag updates every story that has it; deleting one just takes it off those stories."
+    ?"These are the club's own tags for news stories. Every squad in Squads › Squad timetables is a tag automatically, so there's no need to add squads here. Visitors can follow any tag on the News page and get a count of new stories for it. Renaming a tag updates every story that has it; deleting one just takes it off those stories."
     :sec==="feed"&&!isWebmaster()
     ?"New posts, and edits to live ones, go on the public site once another club member approves them. Approve other people's posts from <strong>Waiting for approval</strong> below."
     :sec==="feed"
@@ -485,6 +520,7 @@ function renderAdminSection(){
   else if(sec==="feed")listHtml=feedListHtml();
   else listHtml=items.map(rowHtml).join("");
   main.innerHTML=`<h2>${SECTION_META[sec].name}</h2>
+    ${sec==="squads"?squadsTabsHtml():""}
     <div class="admin-note">${note}</div>
     ${sec==="feed"?homepagePanelHtml(slides,role):""}
     <div style="margin-bottom:18px"><button class="btn small" id="addNew">+ Add new</button></div>
@@ -501,6 +537,7 @@ function renderAdminSection(){
     /* The edit form opens inside this list, so its own buttons bubble up to here -- they must
        never be mistaken for the list's Edit/Delete buttons. */
     if(e.target.closest("#adminForm"))return;
+    if(squadsTabClick(e))return;
     /* Filter chips redraw just the list, closing any edit form open inside it */
     const fchip=e.target.closest("[data-ftype],[data-ftag]");
     if(fchip){
@@ -520,6 +557,15 @@ function renderAdminSection(){
         block.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
         block.classList.remove("flash");void block.offsetWidth;block.classList.add("flash");
       }
+      return;
+    }
+    const sm=e.target.closest("[data-slide-move]");
+    if(sm){if(!sm.disabled){sm.disabled=true;moveSlide(+sm.dataset.slideMove,+sm.dataset.dir);}return;}
+    const sp=e.target.closest("[data-slide-pin]");
+    if(sp){
+      const pin=sp.getAttribute("aria-pressed")!=="true";
+      sp.disabled=true;
+      arrangeSlides("set_slide_pin",{item_id:+sp.dataset.slidePin,pin},pin?"Pinned to the front of the homepage":"Unpinned");
       return;
     }
     const up=e.target.closest("[data-move-up]"),down=e.target.closest("[data-move-down]");
@@ -714,6 +760,65 @@ function showSquadForm(id){
   });
 }
 
+/* Squads > Squad details: the words on the Squads tab of the Coaches & Squads page -- the intro,
+   each squad's age guide, level and who-it's-for text, and the note under the diagram. The squads
+   themselves (and their colours and places in the diagram) are fixed in PATHWAY (pathway.js);
+   anything not saved here yet shows the wording written there. One Save publishes the lot. */
+const squadsTabsHtml=()=>`<div class="tt-views" role="tablist" aria-label="Squads">
+    ${[["timetables","Squad timetables"],["details","Squad details"]].map(([k,l])=>
+      `<button type="button" role="tab" data-sqtab="${k}" class="${squadsTab===k?"active":""}" aria-selected="${squadsTab===k}">${l}</button>`).join("")}
+  </div>`;
+function squadsTabClick(e){
+  const b=e.target.closest("[data-sqtab]");
+  if(!b)return false;
+  if(b.dataset.sqtab!==squadsTab){squadsTab=b.dataset.sqtab;editingId=null;renderAdminShell();}
+  return true;
+}
+function showSquadDetailsSection(){
+  const main=$("#adminMain"),name=SECTION_META.squads.name;
+  if(!DB.squadDetails){
+    main.innerHTML=`<h2>${name}</h2>${squadsTabsHtml()}
+      <div class="admin-note">Squad details haven't been set up in the database yet. The webmaster needs to run <code>supabase/migrations/028_squad_details.sql</code> in the Supabase SQL Editor. Until then the Coaches &amp; Squads page keeps its current wording.</div>`;
+    main.addEventListener("click",squadsTabClick);
+    return;
+  }
+  const squadHtml=p=>{const t=pwText(p),b=PW_BRANCHES[p.branch],k=esc(p.name);
+    return `<fieldset class="sqd-squad" data-sqd="${k}" style="--c:${p.fill||b.color}">
+      <legend>${k} <span>${esc(b.label)}</span></legend>
+      <div class="sqd-row">
+        <label class="f">Age guide<input type="text" data-k="age" value="${esc(t.ageLabel)}" required placeholder="e.g. 12–14"></label>
+        <label class="f">Level<input type="text" data-k="level" value="${esc(t.level||"")}" placeholder="e.g. Working towards county times"></label>
+      </div>
+      <label class="f">Who it's for<textarea data-k="blurb" rows="3" required>${esc(t.blurb)}</textarea></label>
+      <label class="f checkbox-f"><input type="checkbox" data-k="competitive"${t.competitive?" checked":""}> Highly competitive · minimum attendance</label>
+    </fieldset>`;};
+  const groups=["academy","jp",...PW_LANES,"masters"];
+  main.innerHTML=`<h2>${name}</h2>${squadsTabsHtml()}
+    <div class="admin-note">The words on the Squads tab of the <a href="coaches#squads" target="_blank" rel="noopener">Coaches &amp; Squads</a> page. Each squad's coaches and weekly training come in by themselves from the coach profiles and squad timetables, so only the wording is here. Changes publish straight to the public page when you save.</div>
+    <form class="stack" id="squadDetailsForm" style="margin-top:10px">
+      <label class="f">Introduction (above the squads diagram)<textarea name="intro" rows="4" required>${esc(pwIntro())}</textarea></label>
+      ${groups.map(g=>`<h3 class="admin-sub">${esc(PW_BRANCHES[g].label)}</h3>${pwIn(g).map(squadHtml).join("")}`).join("")}
+      <label class="f">Note (under the squads diagram)<textarea name="note" rows="3" required>${esc(pwNote())}</textarea></label>
+      <p class="hint" style="margin-top:-8px">The note's first sentence shows in bold.</p>
+      <div class="sqd-save"><button class="btn" type="submit">Save &amp; publish</button></div>
+    </form>`;
+  main.addEventListener("click",squadsTabClick);
+  $("#squadDetailsForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const f=e.target,val=(el,k)=>el.querySelector(`[data-k="${k}"]`);
+    const rows=[...f.querySelectorAll("[data-sqd]")].map(el=>({key:el.dataset.sqd,age:val(el,"age").value.trim(),
+      level:val(el,"level").value.trim(),blurb:val(el,"blurb").value.trim(),competitive:val(el,"competitive").checked}));
+    rows.push({key:"_intro",blurb:f.intro.value.trim()},{key:"_note",blurb:f.note.value.trim()});
+    const btn=f.querySelector('button[type="submit"]');
+    btn.disabled=true;
+    const {error}=await sb.from("squad_details").upsert(rows.map(squadDetailToRow));
+    if(error){btn.disabled=false;return toast(saveErrorMessage(error));}
+    await loadContent();
+    renderAdminShell();
+    toast("Saved — live on the Coaches & Squads page");
+  });
+}
+
 /* Meet documents & links editor: one row per link, in the order they show on the card. */
 function docLinkRowHtml(l={}){
   const hlOpts=LINK_HIGHLIGHTS.map(([k,name])=>`<option value="${k}" ${(l.hl||"")===k?"selected":""}>${name}</option>`).join("");
@@ -769,7 +874,7 @@ function showForm(sec,id,forcedType){
         ${canAdd?`<div class="tag-add"><input type="text" id="newTagName" placeholder="New tag, e.g. Trips" maxlength="40" aria-label="New tag name">
           <button type="button" class="btn small ghost" id="addTagBtn">+ Add tag</button></div>`:""}
         <p class="tag-group-label">Squads</p>
-        <div class="squad-picks">${all.filter(t=>t.squad).map(t=>tagPickHtml(t,picked.includes(t.ref))).join("")||`<span class="hint">No squads set up yet — they come from Squad Timetables.</span>`}</div>
+        <div class="squad-picks">${all.filter(t=>t.squad).map(t=>tagPickHtml(t,picked.includes(t.ref))).join("")||`<span class="hint">No squads set up yet — they come from Squads › Squad timetables.</span>`}</div>
       </div>`;
     }
     if(f.type==="select"){
@@ -1247,12 +1352,13 @@ function showForm(sec,id,forcedType){
       data.bg=NEW_DEFAULT_GRADIENTS[DB.newsDefaults.length%NEW_DEFAULT_GRADIENTS.length];
     }
     if(isFeed&&id){
-      /* bumped_at isn't on the form, so carry an earlier bump over rather than wipe it. Editing a
-         story that isn't already today's offers to bump it to the top of Club News (migration 026);
-         it keeps its id, so links to it still work. */
+      /* bumped_at and the old pin date aren't on the form, so carry them over rather than wipe
+         them. Editing a story that isn't already today's offers to bump it to the top of Club News
+         (migration 026) and of the homepage slideshow (027); it keeps its id, so links still work. */
       data.bumpedAt=it.bumpedAt;
+      data.pinUntil=it.pinUntil;
       if(feedBumpColReady&&(type==="news"||type==="training")&&publishedOn(it)<isoToday()
-        &&confirm(`You've edited "${data.title||it.title}".\n\nBump it to the top of Club News, like a fresh article? Links to it will still work.\n\nOK = bump it to the top\nCancel = leave it where it is`))
+        &&confirm(`You've edited "${data.title||it.title}".\n\nBump it to the top, like a fresh post? It goes to the top of Club News and of the homepage slideshow. Links to it will still work.\n\nOK = bump it to the top\nCancel = leave it where it is`))
         data.bumpedAt=new Date().toISOString();
     }
     const submit=e.target.querySelector('button[type="submit"]');

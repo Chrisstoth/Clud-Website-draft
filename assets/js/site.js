@@ -23,6 +23,19 @@ function completedByYear(completed,card){
       <div class="year-body">${cards}</div></details>`;
   }).join("");
 }
+/* The Club Calendar links a gala as open-meets#meet-<id>. The cards are drawn after the browser
+   has already looked for that anchor, so scroll to it here -- once, opening its season if it's
+   folded away under an older year. */
+let meetHashJumped=false;
+function jumpToMeetFromHash(){
+  if(meetHashJumped||!/^#meet-/.test(location.hash))return;
+  const el=document.getElementById(decodeURIComponent(location.hash.slice(1)));
+  if(!el)return;
+  meetHashJumped=true;
+  const yr=el.closest("details");
+  if(yr)yr.open=true;
+  el.scrollIntoView({block:"center",behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});
+}
 function renderMeets(){
   const all=DB.feed.filter(isMeet).sort((a,b)=>a.start<b.start?-1:1);
   const upcoming=all.filter(m=>!meetDone(m)),completed=all.filter(meetDone).reverse();
@@ -64,7 +77,7 @@ function renderMeets(){
     }).join("");
     const r=resolveNewsImage(m.img);
     const thumb=r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
-    return `<article class="card meet${meetLive(m)||meetStreaming(m)?" live":""}${done?" done":""}${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
+    return `<article class="card meet${meetLive(m)||meetStreaming(m)?" live":""}${done?" done":""}${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}${location.hash===`#meet-${m.id}`?" flash":""}" id="meet-${esc(m.id)}">
       ${thumb}
       <div class="datebox"><div class="d">${dp.d}</div><div class="m">${dp.m}</div></div>
       <div class="meet-main">
@@ -84,6 +97,7 @@ function renderMeets(){
     $("#otherMeetsList").innerHTML=upcomingOthers.length?upcomingOthers.map(meetCard).join(""):`<p style="color:var(--muted)">No other open meets listed yet.</p>`;
     $("#teamMeetsList").innerHTML=upcomingTeam.length?upcomingTeam.map(meetCard).join(""):`<p style="color:var(--muted)">No team meets scheduled yet.</p>`;
     $("#completedMeetsList").innerHTML=completedByYear(completed,meetCard);
+    jumpToMeetFromHash();
   }
   /* The hero's red LIVE pill only shows while a gala with a live-results link is actually running.
      A button that pulses permanently and goes nowhere just trains people to ignore it. */
@@ -329,14 +343,36 @@ function calCatInfo(it){
   if(it.type==="social")return{cls:"social",label:"Social"};
   return isLeagueGala(it)?{cls:"league",label:"League gala"}:{cls:"comp",label:"Competition"};
 }
-let calViewDate=(()=>{const n=new Date();return new Date(n.getFullYear(),n.getMonth(),1);})();
+/* Where a calendar entry leads: socials and training changes with something to read open their own
+   page; a gala jumps to its card on Open Meets, unless it's too far ahead to be listed there yet.
+   "" means nowhere -- the day list under the calendar is then the whole story. */
+function calItemHref(it){
+  if(isMeet(it))return meetTooFarAhead(it)?"":`open-meets#meet-${it.id}`;
+  if(it.type==="social"||(it.type==="training"&&trainingHasDetails(it)))return `article?id=${it.id}`;
+  return "";
+}
+/* The month on show and the picked day live in the address (?d=2026-11-14, or ?m=2026-11), so
+   coming Back from an event lands on the same month with the same day open. */
+const calParams=new URLSearchParams(location.search);
+let calSelected=/^\d{4}-\d{2}-\d{2}$/.test(calParams.get("d")||"")?calParams.get("d"):"";
+let calViewDate=(()=>{
+  const q=(calSelected||calParams.get("m")||"").match(/^(\d{4})-(\d{2})/);
+  if(q)return new Date(+q[1],+q[2]-1,1);
+  const n=new Date();return new Date(n.getFullYear(),n.getMonth(),1);
+})();
+function calRemember(){
+  const ym=`${calViewDate.getFullYear()}-${String(calViewDate.getMonth()+1).padStart(2,"0")}`;
+  try{history.replaceState(history.state,"",location.pathname+(calSelected?`?d=${calSelected}`:`?m=${ym}`));}catch(e){}
+}
+const calItems=()=>DB.feed.filter(it=>(isMeet(it)||it.type==="social"||it.type==="training")&&it.start);
+const calOnDay=(items,iso)=>items.filter(it=>it.start===iso||(it.end&&it.start<=iso&&iso<=it.end));
 function renderCalendarGrid(){
   const y=calViewDate.getFullYear(),m=calViewDate.getMonth();
   $("#calMonthLabel").textContent=calViewDate.toLocaleDateString("en-GB",{month:"long",year:"numeric"});
   const startOffset=(new Date(y,m,1).getDay()+6)%7; // Monday-first
   const daysInMonth=new Date(y,m+1,0).getDate();
   const totalCells=Math.ceil((startOffset+daysInMonth)/7)*7;
-  const items=DB.feed.filter(it=>(isMeet(it)||it.type==="social"||it.type==="training")&&it.start);
+  const items=calItems();
   const now=new Date(),todayIso=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
   let html="";
   for(let i=0;i<totalCells;i++){
@@ -345,12 +381,49 @@ function renderCalendarGrid(){
     let iso="",dayItems=[];
     if(inMonth){
       iso=`${y}-${String(m+1).padStart(2,"0")}-${String(dayNum).padStart(2,"0")}`;
-      dayItems=items.filter(it=>it.start===iso||(it.end&&it.start<=iso&&iso<=it.end));
+      dayItems=calOnDay(items,iso);
     }
-    const chips=dayItems.map(it=>{const c=calCatInfo(it);return `<div class="cal-chip ${c.cls}" title="${esc(c.label)}: ${esc(it.title)}"><span class="cal-chip-label">${esc(it.title)}</span></div>`;}).join("");
-    html+=`<div class="cal-day${inMonth?"":" out"}${iso&&iso===todayIso?" today":""}"><div class="cal-daynum">${inMonth?dayNum:""}</div>${chips}</div>`;
+    const chips=dayItems.map(it=>{
+      const c=calCatInfo(it),href=calItemHref(it),tip=`${esc(c.label)}: ${esc(it.title)}`;
+      return href?`<a class="cal-chip ${c.cls}" href="${href}" title="${tip}"><span class="cal-chip-label">${esc(it.title)}</span></a>`
+        :`<div class="cal-chip ${c.cls}" title="${tip}"><span class="cal-chip-label">${esc(it.title)}</span></div>`;
+    }).join("");
+    const label=iso?new Date(iso+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"}):"";
+    const num=!inMonth?"":dayItems.length
+      ?`<button type="button" class="cal-daynum" data-day="${iso}" aria-label="${label}: ${dayItems.length} event${dayItems.length===1?"":"s"}" aria-expanded="${iso===calSelected}" aria-controls="calDayList">${dayNum}</button>`
+      :`<div class="cal-daynum">${dayNum}</div>`;
+    html+=`<div class="cal-day${inMonth?"":" out"}${iso&&iso===todayIso?" today":""}${dayItems.length?" has-items":""}${iso&&iso===calSelected?" selected":""}"${dayItems.length?` data-day="${iso}"`:""}>${num}${chips}</div>`;
   }
   $("#calGrid").innerHTML=html;
+  renderCalDayList(items);
+}
+/* Tapping a day opens its events in a short list under the calendar -- on a phone the chips are
+   only coloured bars, so this is the way in there; on a computer the chips link straight through. */
+function renderCalDayList(items){
+  const box=$("#calDayList");
+  if(!box)return;
+  const its=calSelected?calOnDay(items||calItems(),calSelected):[];
+  if(!its.length){box.hidden=true;box.innerHTML="";return;}
+  const when=it=>it.end&&it.end!==it.start?`${fmtDate(it.start)} – ${fmtDate(it.end)}`:fmtDate(it.start);
+  const sub=it=>isMeet(it)?[it.venue||"Venue TBC",it.poolType||""].filter(Boolean).join(" · ")
+    :it.type==="training"?trainingSummary(it):it.blurb||"";
+  box.innerHTML=`<div class="cal-daylist-head"><h4>${esc(new Date(calSelected+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"}))}</h4>
+    <button type="button" class="cal-daylist-close" aria-label="Close">×</button></div>
+    ${its.map(it=>{
+      const c=calCatInfo(it),href=calItemHref(it),s=sub(it);
+      const go=isMeet(it)?"Gala details →":"Read more →";
+      const inner=`<span class="cal-daylist-cat"><i class="cal-dot ${c.cls}"></i>${esc(c.label)} · ${esc(when(it))}</span>
+        <strong>${esc(it.title)}</strong>${s?`<span class="cal-daylist-sub">${esc(s)}</span>`:""}${href?`<span class="cal-daylist-go">${go}</span>`:""}`;
+      return href?`<a class="cal-daylist-item" href="${href}">${inner}</a>`:`<div class="cal-daylist-item">${inner}</div>`;
+    }).join("")}`;
+  box.hidden=false;
+}
+function calSelectDay(iso){
+  calSelected=calSelected===iso?"":iso;
+  calRemember();
+  renderCalendarGrid();
+  const box=$("#calDayList");
+  if(calSelected&&box&&!box.hidden)box.scrollIntoView({block:"nearest",behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});
 }
 /* Compact calendar card: date + title share the top line; open entries get a pulsing orange edge instead of a pill. */
 function meetRowCard(m){
@@ -394,8 +467,22 @@ function renderSocials(){
   ["socialsList","compList","leagueList"].forEach(updateCatArrows);
 }
 if($("#calGrid")){
-  $("#calPrev").addEventListener("click",()=>{calViewDate.setMonth(calViewDate.getMonth()-1);renderCalendarGrid();});
-  $("#calNext").addEventListener("click",()=>{calViewDate.setMonth(calViewDate.getMonth()+1);renderCalendarGrid();});
+  const calMonth=step=>{calViewDate.setMonth(calViewDate.getMonth()+step);calSelected="";calRemember();renderCalendarGrid();};
+  $("#calPrev").addEventListener("click",()=>calMonth(-1));
+  $("#calNext").addEventListener("click",()=>calMonth(1));
+  /* a chip that links goes where it links; anywhere else on a day with events opens that day */
+  $("#calGrid").addEventListener("click",e=>{
+    if(e.target.closest("a[href]"))return;
+    const day=e.target.closest(".cal-day[data-day]");
+    if(day)calSelectDay(day.dataset.day);
+  });
+  $("#calDayList").addEventListener("click",e=>{
+    if(!e.target.closest(".cal-daylist-close"))return;
+    const iso=calSelected;
+    calSelectDay(iso);
+    const btn=$(`.cal-daynum[data-day="${iso}"]`);
+    if(btn)btn.focus();
+  });
 }
 
 /* Swipeable category rows: translucent prev/next arrows scroll the row by ~one card-width's worth,
@@ -750,32 +837,12 @@ document.addEventListener("click",e=>{
   if(next>=0&&next<newsEraKeys.length)newsScrollToEra(newsEraKeys[next]);
 });
 
-/* Which view of the slideshow this visitor picked (HERO_VIEWS in core.js), kept in this browser. */
-const HERO_VIEW_KEY="bpsc_hero_view";
-let heroView="all";
-try{const v=localStorage.getItem(HERO_VIEW_KEY);if(HERO_VIEWS.some(x=>x.key===v))heroView=v;}catch(e){}
-function renderHeroViews(){
-  if(!$("#heroViews"))return;
-  $("#heroViews").innerHTML=HERO_VIEWS.map(v=>
-    `<button type="button" class="hero-view${v.key===heroView?" active":""}" data-view="${v.key}" aria-pressed="${v.key===heroView}">${esc(v.label)}</button>`).join("");
-}
-document.addEventListener("click",e=>{
-  const b=e.target.closest("#heroViews .hero-view");
-  if(!b||b.dataset.view===heroView)return;
-  heroView=b.dataset.view;
-  try{localStorage.setItem(HERO_VIEW_KEY,heroView);}catch(err){}
-  renderHeroFeed();
-});
-/* A narrowed view can come up empty (a quiet week) -- say so in a slide rather than show nothing. */
-const HERO_EMPTY={
-  week:{tag:"This Week",title:"A quiet week",blurb:"Nothing on the calendar and no new stories in the past 7 days.",linkAttrs:'href="club-calendar"',more:"See the calendar →"},
-  all:{tag:"Club News",title:"No news yet",blurb:"Stories will show here as soon as they're posted.",linkAttrs:'href="news"',more:"Club News →"}
-};
+/* An empty slideshow says so in a slide rather than showing nothing. */
+const HERO_EMPTY={tag:"Club News",title:"No news yet",blurb:"Stories will show here as soon as they're posted.",linkAttrs:'href="news"',more:"Club News →"};
 function renderHeroFeed(){
   if(!$("#heroSlides"))return;
-  renderHeroViews();
-  const items=heroFeedItems(DB.feed,heroView);
-  const empty=!items.length&&HERO_EMPTY[heroView];
+  const items=heroFeedItems(DB.feed);
+  const empty=!items.length&&HERO_EMPTY;
   if(empty){
     $("#heroSlides").innerHTML=`<div class="hero-slide" style="background:${HERO_SLIDE_BG[0]}">
       <div class="hero-news-card tap-card"><p class="eyebrow">${esc(empty.tag)}</p><h3>${esc(empty.title)}</h3>
@@ -925,11 +992,14 @@ function renderArticle(){
   }
   document.title=`${it.title} — Basildon & Phoenix Swimming Club`;
   if(followedStory(it))markStoriesSeen([it]);
-  const back=it.type==="social"?{href:"club-calendar",label:"← Back to Club Calendar"}:{href:"news",label:"← Back to Club News"};
+  const fromCal=(()=>{try{const r=new URL(document.referrer);return r.origin===location.origin&&/\/club-calendar(\.html)?$/.test(r.pathname);}catch(e){return false;}})();
+  const back=fromCal||it.type==="social"?{href:"club-calendar",label:"← Back to Club Calendar"}:{href:"news",label:"← Back to Club News"};
   view.innerHTML=articleContentHtml(it)
     +(it.link?`<div style="margin-top:18px"><a class="btn small" href="${esc(it.link)}" target="_blank" rel="noopener">Details / tickets →</a></div>`:"")
     +(it.type==="training"?`<div style="margin-top:18px"><a class="btn small" href="timetables">Usual squad timetables →</a></div>`:"")
-    +`<div style="margin-top:28px"><a class="btn small ghost" href="${back.href}">${back.label}</a></div>`;
+    +`<div style="margin-top:28px"><a class="btn small ghost" id="articleBack" href="${back.href}">${back.label}</a></div>`;
+  /* history.back() rather than the plain link, so the calendar comes back on the month and day they left */
+  if(fromCal)$("#articleBack").addEventListener("click",e=>{e.preventDefault();history.back();});
   wireArticleGallery((it.photos||[]).length);
 }
 /* ================= PROUD PARTNERS =================
