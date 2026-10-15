@@ -30,7 +30,7 @@ function feedFromRow(row){
   /* The day it was first saved (read-only, never written back): tells the homepage whether a news
      story was written ahead of its date -- i.e. it's about something coming up (renderHeroFeed). */
   if(row.created_at){it.created=isoDay(new Date(row.created_at));it.createdAt=row.created_at;}
-  /* Read-only, like created: an "Entries open" story the database posted for this meet (migration 022). */
+  /* Read-only, like created: the gala this news article is about (migrations 022, 029). */
   if(row.source_meet_id)it.sourceMeetId=row.source_meet_id;
   /* Read-only peer review (migration 024): the database sets these on every save. */
   if(row.review)it.review=row.review;
@@ -41,6 +41,8 @@ function feedFromRow(row){
   /* Read-only slideshow place (migration 027): changed only by set_slide_pin / reorder_slides. */
   if(row.hero_at)it.heroAt=row.hero_at;
   if(typeof row.pinned==="boolean")it.pinned=row.pinned;
+  /* Read-only (migration 030): taken off the slideshow by the red cross, via set_slide_off. */
+  if(row.off_slideshow)it.offSlideshow=true;
   return it;
 }
 function feedToRow(it){
@@ -73,16 +75,20 @@ let feedBumpColReady=false;
 /* The arranged homepage slideshow (migration 027): until it's there the members' area shows the
    slideshow without the pin and up/down buttons. */
 let feedSlideColsReady=false;
+/* Taking a post off the slideshow (migration 030): until it's there, no red cross. */
+let feedSlideOffReady=false;
 async function checkFeedLateCols(){
-  const [late,stream,bump,slide]=await Promise.all([
+  const [late,stream,bump,slide,off]=await Promise.all([
     sb.from("feed").select(Object.values(FEED_LATE_COLS).join(",")).limit(1),
     sb.from("feed").select("stream_url").limit(1),
     sb.from("feed").select("bumped_at").limit(1),
-    sb.from("feed").select("hero_at,pinned").limit(1)]);
+    sb.from("feed").select("hero_at,pinned").limit(1),
+    sb.from("feed").select("off_slideshow").limit(1)]);
   feedLateColsReady=!late.error;
   feedStreamColReady=!stream.error;
   feedBumpColReady=!bump.error;
   feedSlideColsReady=!slide.error;
+  feedSlideOffReady=!off.error;
   return feedLateColsReady;
 }
 const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads:r.squads||[],photo:r.photo||"",bio:r.bio||"",sortOrder:r.sort_order??0});
@@ -293,10 +299,10 @@ const storyTopicLabel=it=>storyTags(it).filter(t=>!t.squad).map(t=>t.name).join(
 /* Who it's for: its squads, e.g. "Gold 1, Silver 2" -- empty when it's for the whole club. */
 const storySquadLabel=it=>storyTags(it).filter(t=>t.squad).map(t=>t.name).join(", ");
 
-/* Hero carousel: a list the club arranges in the members' area (migration 027). Every new post,
-   of any kind, goes to the top (hero_at = when it was posted); the up/down arrows reorder it;
-   pinned posts lead until someone unpins them. The first HERO_SLOTS are on the homepage. Galas,
-   socials and training changes leave the list by themselves once they're over.
+/* Hero carousel: a list the club arranges in the members' area (migration 027). Every new post
+   goes to the top (hero_at = when it was posted) -- for a gala, that's its news article; the
+   up/down arrows reorder it; pinned posts lead until someone unpins them. The first HERO_SLOTS
+   are on the homepage. Socials and training changes leave the list once they're over.
    Lives here rather than in site.js so the members' area can show which items are on the
    homepage right now; pass it only the items the public can see. */
 /* Club News order. When an item went up: the day it was posted -- or its own date, if that's
@@ -312,9 +318,11 @@ const HERO_SLOTS=6;
 const heroPinned=it=>it.pinned!==undefined?!!it.pinned:!!(it.start&&it.pinUntil&&it.pinUntil>=isoToday());
 const slideTime=it=>Date.parse(it.heroAt||it.bumpedAt||it.createdAt||"")||0;
 const slideOver=it=>it.type!=="news"&&!!(it.end||it.start)&&(it.end||it.start)<isoToday();
-/* The whole arranged list, pinned first, each part top-down. */
+/* The whole arranged list, pinned first, each part top-down. A gala isn't a slide of its own --
+   its news article (posted from the gala form, migration 029) is -- unless someone pins it.
+   A post taken off with the red cross (migration 030) isn't on the list at all. */
 function heroSlideOrder(feed){
-  const live=feed.filter(it=>!slideOver(it)).sort((a,b)=>slideTime(b)-slideTime(a));
+  const live=feed.filter(it=>!it.offSlideshow&&!slideOver(it)&&(!isMeet(it)||heroPinned(it))).sort((a,b)=>slideTime(b)-slideTime(a));
   return live.filter(heroPinned).concat(live.filter(it=>!heroPinned(it)));
 }
 const heroFeedItems=feed=>heroSlideOrder(feed).slice(0,HERO_SLOTS);

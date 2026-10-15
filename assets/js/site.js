@@ -404,18 +404,11 @@ function renderCalDayList(items){
   if(!box)return;
   const its=calSelected?calOnDay(items||calItems(),calSelected):[];
   if(!its.length){box.hidden=true;box.innerHTML="";return;}
-  const when=it=>it.end&&it.end!==it.start?`${fmtDate(it.start)} – ${fmtDate(it.end)}`:fmtDate(it.start);
-  const sub=it=>isMeet(it)?[it.venue||"Venue TBC",it.poolType||""].filter(Boolean).join(" · ")
-    :it.type==="training"?trainingSummary(it):it.blurb||"";
+  /* the same cards as the Socials / Competitions / League galas rows below, so a day reads like the rest of the page */
   box.innerHTML=`<div class="cal-daylist-head"><h4>${esc(new Date(calSelected+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"}))}</h4>
     <button type="button" class="cal-daylist-close" aria-label="Close">×</button></div>
-    ${its.map(it=>{
-      const c=calCatInfo(it),href=calItemHref(it),s=sub(it);
-      const go=isMeet(it)?"Gala details →":"Read more →";
-      const inner=`<span class="cal-daylist-cat"><i class="cal-dot ${c.cls}"></i>${esc(c.label)} · ${esc(when(it))}</span>
-        <strong>${esc(it.title)}</strong>${s?`<span class="cal-daylist-sub">${esc(s)}</span>`:""}${href?`<span class="cal-daylist-go">${go}</span>`:""}`;
-      return href?`<a class="cal-daylist-item" href="${href}">${inner}</a>`:`<div class="cal-daylist-item">${inner}</div>`;
-    }).join("")}`;
+    <div class="cal-daylist-cards">${its.map(it=>isMeet(it)?meetRowCard(it,calItemHref(it))
+      :it.type==="social"?socialCard(it):newsCard(it,false,true)).join("")}</div>`;
   box.hidden=false;
 }
 function calSelectDay(iso){
@@ -425,8 +418,9 @@ function calSelectDay(iso){
   const box=$("#calDayList");
   if(calSelected&&box&&!box.hidden)box.scrollIntoView({block:"nearest",behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});
 }
-/* Compact calendar card: date + title share the top line; open entries get a pulsing orange edge instead of a pill. */
-function meetRowCard(m){
+/* Compact calendar card: date + title share the top line; open entries get a pulsing orange edge instead of a pill.
+   href: where "Full details" goes -- the day list sends it to the gala's own card; "" (too far ahead) drops the button. */
+function meetRowCard(m,href="open-meets"){
   const dp=dateParts(m.start),open=m.status==="open",ours=m.type==="meet";
   return `<article class="card comp-card tap-card${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
     <div class="comp-top">
@@ -437,27 +431,28 @@ function meetRowCard(m){
     <div class="comp-meta">${esc(m.venue||"Venue TBC")}${m.poolType?` · ${esc(m.poolType)}`:""}</div>
     <div class="comp-foot">
       <span class="comp-status">${m.type==="teamMeet"?esc(m.league||"Team meet"):meetHasEntry(m)?"":open?"Entry pack soon":"Entries closed"}</span>
-      ${cardLink('href="open-meets"',"Full details →")}
+      ${href?cardLink(`href="${href}"`,"Full details →"):""}
     </div></article>`;
 }
-function renderSocials(){
-  if(!$("#calGrid"))return;
-  renderCalendarGrid();
-  const socials=DB.feed.filter(it=>it.type==="social").sort((a,b)=>a.start<b.start?-1:1);
-  $("#socialsList").innerHTML=socials.length?socials.map(it=>{
-    const r=resolveNewsImage(it.img);
-    /* the darkening keeps the title legible: over a photo it rides on the .photo layer (--shade),
-       over a default gradient or the chosen card colour it's just another background layer */
-    const shade="linear-gradient(160deg,rgba(16,16,20,.15),rgba(16,16,20,.65))";
-    const artStyle=!r?`background:${it.color}`:r.bg?`background:${shade},${r.bg}`:`${r.style};--shade:${shade}`;
-    return `
+function socialCard(it){
+  const r=resolveNewsImage(it.img);
+  /* the darkening keeps the title legible: over a photo it rides on the .photo layer (--shade),
+     over a default gradient or the chosen card colour it's just another background layer */
+  const shade="linear-gradient(160deg,rgba(16,16,20,.15),rgba(16,16,20,.65))";
+  const artStyle=!r?`background:${it.color}`:r.bg?`background:${shade},${r.bg}`:`${r.style};--shade:${shade}`;
+  return `
     <article class="card social-card tap-card">
       <div class="art ${r?r.cls:""}" style="${artStyle}">${esc(it.title)}</div>
       <div class="body"><div class="when">${esc(fmtDate(it.start))}</div><p>${esc(it.blurb)}</p>
       ${it.link?`<div class="card-extra"><a class="btn small" href="${esc(it.link)}">Details / tickets</a></div>`:""}
       <div>${cardLink(`href="article?id=${it.id}"`,'<span class="btn small ghost">Read more →</span>')}</div></div>
     </article>`;
-  }).join(""):`<p style="color:var(--muted)">No socials scheduled yet.</p>`;
+}
+function renderSocials(){
+  if(!$("#calGrid"))return;
+  renderCalendarGrid();
+  const socials=DB.feed.filter(it=>it.type==="social").sort((a,b)=>a.start<b.start?-1:1);
+  $("#socialsList").innerHTML=socials.length?socials.map(socialCard).join(""):`<p style="color:var(--muted)">No socials scheduled yet.</p>`;
 
   const meets=DB.feed.filter(it=>isMeet(it)&&!meetDone(it)).sort((a,b)=>a.start<b.start?-1:1);
   const comps=meets.filter(m=>!isLeagueGala(m));
@@ -689,7 +684,8 @@ function newsEraFor(iso,today){
   return {key:iso.slice(0,7),label:d.toLocaleDateString("en-GB",{month:"long",year:"numeric"}),
     chip:d.toLocaleDateString("en-GB",sameYear?{month:"short"}:{month:"short",year:"2-digit"}),recent:false};
 }
-function newsCard(n,featured){
+/* onCal: drawn in the Club Calendar's day list, where a "Club calendar →" button would just lead back to itself */
+function newsCard(n,featured,onCal){
   const r=resolveNewsImage(n.img);
   const thumb=r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
   const posted=publishedOn(n);
@@ -701,7 +697,7 @@ function newsCard(n,featured){
     <h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3>
     <p class="news-date"><time datetime="${esc(posted)}">${fmtDate(posted)}</time> · Applies ${esc(trainingWhen(n))}</p>
     ${summary?`<p class="training-summary">${esc(summary)}</p>`:""}
-    <div style="margin-top:14px">${cardLink(trainingLink(n),`<span class="btn small ghost">${more?"Read the details →":"Club calendar →"}</span>`)}</div></article>`;
+    ${onCal&&!more?"":`<div style="margin-top:14px">${cardLink(trainingLink(n),`<span class="btn small ghost">${more?"Read the details →":"Club calendar →"}</span>`)}</div>`}</article>`;
   }
   const forWho=storySquadLabel(n);
   const about=n.start>posted?` · About ${fmtDate(n.start)}`:"";
@@ -1294,24 +1290,26 @@ function pulseEventPanel(it,alsoToday,idx=0){
   </article>`;
 }
 
-/* A training change is the first thing a parent needs on the day -- visible, but not an alarm. */
-function pulseTrainingNotice(t){
+/* A training change is the first thing a parent needs on the day -- visible, but not an alarm. It's
+   the first box of the strip (a double-width one with a flame edge) rather than a block of its own,
+   so the whole "today" area stays one row. The summary line shows on computers only; on a phone the
+   box is just the title and when, and a tap opens the details. */
+function pulseTrainingCell(t){
   const when=!meetRunning(t)?"Tomorrow":t.end&&t.end!==t.start?`Today · until ${fmtDate(t.end)}`:"Today";
-  return `<article class="pulse-notice tap-card">
-    <p class="pulse-notice-k"><span class="pulse-notice-tag">Session update</span><span>${esc(when)}</span></p>
-    <h3>${esc(t.title)}</h3>
-    ${trainingSummary(t)?`<p class="pulse-notice-note">${esc(trainingSummary(t))}</p>`:""}
-    <div class="pulse-notice-foot">${cardLink(trainingLink(t),trainingHasDetails(t)?"Read the details →":"Club calendar →")}</div>
-  </article>`;
+  const sum=trainingSummary(t);
+  return `<a class="pulse-cell is-notice" ${trainingLink(t)}>
+      <span class="pulse-k">Session update</span><span class="pulse-v">${esc(t.title)}</span>
+      ${sum?`<span class="pulse-sum">${esc(sum)}</span>`:""}
+      <span class="pulse-s">${esc(when)}<span class="pulse-s-more"> · ${trainingHasDetails(t)?"Read the details →":"Club Calendar →"}</span></span></a>`;
 }
 
-/* Today / Next / Results / This week: only the cells that have something real to say. While the
-   event panel leads, "Today" is already said by it; on Club Home it's the one line that keeps
-   the event in view. */
+/* Session update / Today / Next / Results / This week: only the cells that have something real to
+   say. While the event panel leads, "Today" is already said by it; on Club Home it's the one line
+   that keeps the event in view. */
 function pulseStrip(p,lead){
   const cell=(k,v,s,attrs,ext)=>`<a class="pulse-cell" ${attrs}${ext?' target="_blank" rel="noopener"':""}>
       <span class="pulse-k">${k}</span><span class="pulse-v">${esc(v)}</span>${s?`<span class="pulse-s">${esc(s)}${ext?'<span class="sr-only"> (opens in a new tab)</span>':""}</span>`:""}</a>`;
-  const cells=[];
+  const cells=p.training.map(pulseTrainingCell);
   if(!lead&&p.focus){
     const f=p.focus;
     const more=p.today.slice(1);
@@ -1364,7 +1362,6 @@ function renderClubPulse(){
   el.innerHTML=`<div class="container">
     ${demoBar}
     <div class="pulse-head"><h2 class="pulse-title" id="pulseTitle">Today at BPSC <span class="pulse-date">${esc(date)}</span></h2>${switcher}</div>
-    ${p.training.map(pulseTrainingNotice).join("")}
     ${panels.map((it,i)=>pulseEventPanel(it,i===0?p.today.slice(panels.length):[],i)).join("")}
     ${pulseStrip(p,lead)}
   </div>`;

@@ -69,7 +69,8 @@ const SCHEMAS = {
     {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
     {k:"docLinks",label:"Meet documents & links",type:"links"},
     {k:"notes",label:"Notes for parents & swimmers",type:"textarea"},
-    {k:"img",label:"Picture",type:"imagepicker"}
+    {k:"img",label:"Picture",type:"imagepicker"},
+    {k:"article",label:"News article",type:"meetarticle"}
   ],
   coaches:[
     {k:"photo",label:"Coach photo",type:"imagepicker",swatches:false},
@@ -118,7 +119,8 @@ const SCHEMAS = {
     {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
     {k:"docLinks",label:"Meet documents & links",type:"links"},
     {k:"notes",label:"Notes for parents & swimmers",type:"textarea"},
-    {k:"img",label:"Picture",type:"imagepicker"}
+    {k:"img",label:"Picture",type:"imagepicker"},
+    {k:"article",label:"News article",type:"meetarticle"}
   ],
   teamMeet:[
     {k:"title",label:"Meet name (e.g. Arena League — Round 1)",type:"text",req:1},
@@ -135,7 +137,8 @@ const SCHEMAS = {
     {k:"streamUrl",label:"Live stream link (URL, e.g. YouTube — Watch live stream button shows only on the racing days)",type:"text",late:"stream"},
     {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
     {k:"docLinks",label:"Meet documents & links",type:"links"},
-    {k:"img",label:"Picture",type:"imagepicker"}
+    {k:"img",label:"Picture",type:"imagepicker"},
+    {k:"article",label:"News article",type:"meetarticle"}
   ],
   social:[
     {k:"title",label:"Event name",type:"text",req:1},
@@ -365,6 +368,7 @@ function homeBadges(it,slides){
   const h=homeStatus(it,slides),b=[];
   if(h.slot>=0)b.push(`<span class="feed-badge home">On homepage · slide ${h.slot+1} of ${slides.length}</span>`);
   if(h.pinned)b.push(`<span class="feed-badge pin">📌 Pinned to the front</span>`);
+  if(it.offSlideshow)b.push(`<span class="feed-badge off">Taken off the homepage slideshow</span>`);
   if(h.pinned&&h.slot<0)b.push(`<span class="feed-badge off">Not showing — the slideshow is full of other pinned items</span>`);
   if(!h.pinned&&h.slot>=0)b.push(`<span class="feed-badge note">${esc(h.until)}</span>`);
   return b.length?`<div class="feed-badges">${b.join("")}</div>`:"";
@@ -375,6 +379,11 @@ function homeBadges(it,slides){
    can be brought onto the homepage. Arranging applies straight away (migration 027). Titles this
    role can edit link down to their row; the rest (another team's) are listed for context. */
 const SLIDES_NEXT=6;
+/* When a post went up -- or was last bumped to the top -- so editors can see how old a slide is. */
+function slidePostedLabel(it){
+  const at=it.bumpedAt||it.createdAt;
+  return at?`${it.bumpedAt?"bumped":"posted"} ${fmtDate(isoDay(new Date(at)))}`:"";
+}
 function homepagePanelHtml(slides,role){
   const order=heroSlideOrder(publicFeed()),list=order.slice(0,HERO_SLOTS+SLIDES_NEXT);
   const head=`<h3 class="admin-sub">Homepage slideshow</h3>`;
@@ -389,13 +398,26 @@ function homepagePanelHtml(slides,role){
         <span class="doclink-move">
           <button type="button" data-slide-move="${it.id}" data-dir="-1" ${g===0?"disabled":""} title="Move up" aria-label="Move ${esc(it.title)} up">↑</button>
           <button type="button" data-slide-move="${it.id}" data-dir="1" ${g===group.length-1?"disabled":""} title="Move down" aria-label="Move ${esc(it.title)} down">↓</button>
-        </span></span>`:"";
+        </span>${feedSlideOffReady?`<button type="button" class="home-slide-off" data-slide-off="${it.id}" title="Take off the slideshow" aria-label="Take ${esc(it.title)} off the slideshow">✕</button>`:""}</span>`:"";
+    const posted=slidePostedLabel(it);
     return `${i===HERO_SLOTS?`<li class="home-slides-break" aria-hidden="true">Next in line — move one up to put it on the homepage</li>`:""}
       <li class="${h.pinned?"is-pinned":""}${i>=HERO_SLOTS?" is-next":""}"><div class="home-slide-row"><div>${title}
-      <span class="home-slide-meta">${esc(heroFeedContent(it).tag)}${h.pinned?" · 📌 pinned":""}</span></div>${acts}</div></li>`;
+      <span class="home-slide-meta">${esc(heroFeedContent(it).tag)}${posted?` · ${posted}`:""}${h.pinned?" · 📌 pinned":""}</span></div>${acts}</div></li>`;
   };
-  const hint=arrange?`<p class="home-slides-hint">The first ${HERO_SLOTS} are on the homepage. New posts go to the top. 📌 Pin keeps a post at the front until it's unpinned; the arrows change the order. Galas, socials and training changes drop off once they're over.</p>`:"";
-  return `<div class="home-panel">${head}${hint}<ol class="home-slides">${list.map(row).join("")}</ol></div>`;
+  const hint=arrange?`<p class="home-slides-hint">The first ${HERO_SLOTS} are on the homepage. New posts go to the top. 📌 Pin keeps a post at the front until it's unpinned; the arrows change the order; ✕ takes a post off the slideshow (it stays in Club News). Galas, socials and training changes drop off once they're over.</p>`:"";
+  return `<div class="home-panel">${head}${hint}<ol class="home-slides">${list.map(row).join("")}</ol>${arrange?slidesOffHtml():""}</div>`;
+}
+/* Posts taken off with the ✕ (migration 030), latest first, each with a button to put it back at
+   the top. Ones that are over (a past social) aren't worth listing. */
+function slidesOffHtml(){
+  const off=publicFeed().filter(it=>it.offSlideshow&&!slideOver(it)).sort((a,b)=>slideTime(b)-slideTime(a)).slice(0,SLIDES_NEXT);
+  if(!off.length)return "";
+  return `<h4 class="home-slides-off-head">Taken off the slideshow</h4><ul class="home-slides home-slides-off">${off.map(it=>{
+    const posted=slidePostedLabel(it);
+    return `<li><div class="home-slide-row"><div><span class="home-slide-title">${esc(it.title)}</span>
+      <span class="home-slide-meta">${esc(heroFeedContent(it).tag)}${posted?` · ${posted}`:""}</span></div>
+      <span class="home-slide-acts"><button type="button" class="home-slide-pin" data-slide-back="${it.id}" title="Put back at the top of the slideshow">↩ Put back</button></span></div></li>`;
+  }).join("")}</ul>`;
 }
 /* Arranging the slideshow is done by the database (migration 027), straight away and without
    approval, since it doesn't change what any post says. */
@@ -568,6 +590,13 @@ function renderAdminSection(){
       arrangeSlides("set_slide_pin",{item_id:+sp.dataset.slidePin,pin},pin?"Pinned to the front of the homepage":"Unpinned");
       return;
     }
+    const so=e.target.closest("[data-slide-off],[data-slide-back]");
+    if(so){
+      const off=!!so.dataset.slideOff;
+      so.disabled=true;
+      arrangeSlides("set_slide_off",{item_id:+(so.dataset.slideOff||so.dataset.slideBack),off},off?"Taken off the homepage slideshow":"Put back at the top of the slideshow");
+      return;
+    }
     const up=e.target.closest("[data-move-up]"),down=e.target.closest("[data-move-down]");
     if(up&&!up.disabled){moveItem(sec,+up.dataset.moveUp,-1);return;}
     if(down&&!down.disabled){moveItem(sec,+down.dataset.moveDown,1);return;}
@@ -591,15 +620,19 @@ function renderAdminSection(){
 
 /* Every write goes to the database, then the local copy is reloaded so the list on screen
    matches what was actually stored (ids, defaults, anything a policy refused). */
-async function publishItem(sec,id,data){
+/* afterSave (optional) runs once the item is stored, with its id, before the reload -- e.g. to
+   post a gala's article -- and returns the message to show instead of the usual one. */
+async function publishItem(sec,id,data,afterSave){
   const s=SECTIONS[sec];
   const row=s.to(data);
-  const {error}=id?await sb.from(s.table).update(row).eq("id",id):await sb.from(s.table).insert(row);
-  if(error){toast(saveErrorMessage(error));return false;}
+  const insert=()=>{const q=sb.from(s.table).insert(row);return sec==="feed"?q.select("id").single():q;};
+  const res=id?await sb.from(s.table).update(row).eq("id",id):await insert();
+  if(res.error){toast(saveErrorMessage(res.error));return false;}
+  const said=afterSave?await afterSave(id||res.data.id):"";
   await loadContent();
   renderAdminShell();
   const held=sec==="feed"&&!isWebmaster()&&reviewReady();
-  toast(held?"Saved — it goes live once another member approves it":id?"Saved — live on the public site":"Published to the public site");
+  toast(said||(held?"Saved — it goes live once another member approves it":id?"Saved — live on the public site":"Published to the public site"));
   return true;
 }
 /* Swaps an item with its neighbour and renumbers the whole list 0..n-1 in the new order, so
@@ -839,6 +872,20 @@ function rteLinkTarget(s){
   if(/^www\./i.test(s))return "https://"+s;
   return s;
 }
+/* A gala's news article, drafted from what's on the gala form so far (g = its form values). */
+function meetArticleDraft(g){
+  const t=(g.title||"").trim()||"the gala",venue=(g.venue||"").trim();
+  const when=g.start?fmtDate(g.start)+(g.end&&g.end!==g.start?" – "+fmtDate(g.end):""):"";
+  const open=!!(g.entryUrl||"").trim()&&g.status!=="closed";
+  const blurb=open
+    ?`Entries are now open for ${t}${when?` (${when})`:""}${venue?` at ${venue}`:""}.${g.closing?` Entries close ${fmtDate(g.closing)}.`:""}`
+    :`${t}${when?` is on ${when}`:""}${venue?` at ${venue}`:""}.`;
+  const notes=(g.notes||"").trim();
+  return {title:open?`Entries open: ${t}`:t,blurb,body:blurb+(notes?"\n\n"+notes:"")};
+}
+/* The write-up box is plain text: a blank line starts a paragraph, a single one is a line break. */
+const meetArticleHtml=text=>String(text||"").split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean)
+  .map(p=>`<p>${esc(p).replace(/\n/g,"<br>")}</p>`).join("");
 const tagPickHtml=(t,on)=>`<label class="checkbox-f squad-pick"><input type="checkbox" data-tagpick value="${esc(t.ref)}" ${on?"checked":""}> ${esc(t.name)}</label>`;
 function showForm(sec,id,forcedType){
   editingId=id;
@@ -937,6 +984,22 @@ function showForm(sec,id,forcedType){
         <div class="squad-picks" id="raceDayPicks" role="group" aria-label="Racing days"></div>
         <p class="hint" style="margin:0">Only needed when the dates above include days with no racing, like a championship over three weekends. Tick the racing days and the homepage panel and live results button show only on those days. Leave them all unticked if every day is a racing day.</p>
       </div>`;
+    }
+    if(f.type==="meetarticle"){
+      /* One news article per gala (migration 029): it's the gala's post in Club News and on the
+         homepage slideshow. Once posted it's an ordinary story, edited from Club News. */
+      const story=id&&DB.feed.find(x=>x.sourceMeetId===id);
+      if(story)return `<div class="f meet-article"><p class="tag-group-label">${f.label}</p>
+        <p class="hint" style="margin:0">This gala's article is <b>${esc(story.title)}</b>${isPending(story)?" (waiting for approval)":""}. It's what shows in Club News and on the homepage slideshow — edit it from Club News.</p></div>`;
+      return `<div class="f meet-article"><p class="tag-group-label">${f.label}</p>
+        <label class="checkbox-f"><input type="checkbox" id="meetArticleOn"> Also post a news article about this gala</label>
+        <p class="hint" style="margin:0">The article is what goes in Club News and on the homepage slideshow — the gala doesn't get a slide of its own.</p>
+        <div class="stack" id="meetArticleFields" hidden>
+          <label class="f">Headline<input type="text" id="meetArticleTitle"></label>
+          <label class="f">Summary (shown in the news list and on the homepage)<textarea id="meetArticleBlurb" rows="2"></textarea></label>
+          <label class="f">Write-up (a blank line starts a new paragraph)<textarea id="meetArticleBody" rows="5"></textarea></label>
+          <p class="hint" style="margin:0">Filled in from the gala above, and kept up to date as you change it until you edit these boxes yourself. Links to this gala on the Open Meets page and to its entry pack are added at the end automatically.</p>
+        </div></div>`;
     }
     if(f.type==="links"){
       return `<div class="f">${f.label}
@@ -1229,6 +1292,22 @@ function showForm(sec,id,forcedType){
     formTarget.querySelectorAll('[name="start"],[name="end"]').forEach(i=>i.addEventListener("change",renderRaceDayPicks));
     raceDayPicks.addEventListener("change",e=>{const d=e.target.dataset.raceday;if(d){e.target.checked?raceDaysTicked.add(d):raceDaysTicked.delete(d);}});
   }
+  /* The gala's news article: drafted from the gala's own fields, and redrafted as they change,
+     until someone types in the article boxes -- from then on their words are kept. */
+  const articleOn=$("#meetArticleOn");
+  let articleTyped=false;
+  const draftArticle=()=>{
+    if(articleTyped||!articleOn.checked)return;
+    const g=Object.fromEntries(new FormData(formTarget.querySelector("#adminForm")).entries());
+    const d=meetArticleDraft(g);
+    $("#meetArticleTitle").value=d.title;$("#meetArticleBlurb").value=d.blurb;$("#meetArticleBody").value=d.body;
+  };
+  if(articleOn){
+    articleOn.addEventListener("change",()=>{$("#meetArticleFields").hidden=!articleOn.checked;draftArticle();});
+    $("#meetArticleFields").addEventListener("input",()=>{articleTyped=true;});
+    formTarget.querySelector("#adminForm").addEventListener("input",e=>{if(!e.target.closest("#meetArticleFields"))draftArticle();});
+    formTarget.querySelector("#adminForm").addEventListener("change",e=>{if(!e.target.closest(".meet-article"))draftArticle();});
+  }
   if(docLinkRows){
     docLinkRows.addEventListener("change",e=>{
       if(e.target.dataset.k!=="hl")return;
@@ -1351,6 +1430,11 @@ function showForm(sec,id,forcedType){
       data.key=uniq;
       data.bg=NEW_DEFAULT_GRADIENTS[DB.newsDefaults.length%NEW_DEFAULT_GRADIENTS.length];
     }
+    let article=null;
+    if(isFeed&&$("#meetArticleOn")?.checked){
+      article={title:$("#meetArticleTitle").value.trim(),blurb:$("#meetArticleBlurb").value.trim(),body:meetArticleHtml($("#meetArticleBody").value)};
+      if(!article.title||!article.blurb){toast("The news article needs a headline and a summary");$(article.title?"#meetArticleBlurb":"#meetArticleTitle").focus();return;}
+    }
     if(isFeed&&id){
       /* bumped_at and the old pin date aren't on the form, so carry them over rather than wipe
          them. Editing a story that isn't already today's offers to bump it to the top of Club News
@@ -1363,15 +1447,16 @@ function showForm(sec,id,forcedType){
     }
     const submit=e.target.querySelector('button[type="submit"]');
     submit.disabled=true;
-    const storyBefore=isFeed&&DB.feed.some(x=>x.sourceMeetId&&x.sourceMeetId===id);
-    const saved=await publishItem(sec,id,data);
+    await publishItem(sec,id,data,article&&(async meetId=>{
+      /* posted by the database (migration 029), since a Meets Secretary may write galas but not news */
+      const {error}=await sb.rpc("post_meet_article",{meet_id:meetId,...article});
+      if(error)return /function|schema cache/i.test(error.message||"")
+        ?"Gala saved — but its article needs a one-off database update first (migration 029)"
+        :`Gala saved — but the article couldn't be posted: ${error.code==="P0001"||error.code==="42501"?error.message:saveErrorMessage(error)}`;
+      return !isWebmaster()&&reviewReady()?"Saved — the gala and its article go live once another member approves them"
+        :"Published — with its news article in Club News and on the homepage";
+    }));
     submit.disabled=false;
-    /* The database posts an "Entries open" story the first time a gala gets its entry pack link
-       (migration 022); say so, since the Meets Secretary can't see Club News in their list. */
-    if(saved&&isFeed&&(type==="meet"||type==="externalMeet")&&!storyBefore){
-      const meet=id?{id}:DB.feed.filter(x=>x.type===type&&x.title===data.title).sort((a,b)=>b.id-a.id)[0];
-      if(meet&&DB.feed.some(x=>x.sourceMeetId===meet.id))toast("Published — and an “Entries open” story has gone up on Club News");
-    }
   });
 }
 

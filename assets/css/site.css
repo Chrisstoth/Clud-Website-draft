@@ -1034,12 +1034,9 @@ button.cal-daynum:focus-visible{outline:2px solid var(--flame);outline-offset:1p
 .cal-daylist-head h4{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1rem;margin:0}
 .cal-daylist-close{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--line);background:transparent;color:inherit;font-size:1.2rem;line-height:1;cursor:pointer;flex:0 0 auto}
 .cal-daylist-close:hover{border-color:var(--flame);color:var(--flame-dark)}
-.cal-daylist-item{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:inherit;text-decoration:none}
-.cal-daylist-item+.cal-daylist-item{margin-top:8px}
-a.cal-daylist-item:hover{border-color:var(--flame)}
-.cal-daylist-cat{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;color:var(--muted)}
-.cal-daylist-sub{font-size:.88rem;color:var(--muted)}
-.cal-daylist-go{font-size:.84rem;font-weight:700;color:var(--flame-dark);margin-top:2px}
+/* the day's events as the same cards the Socials / Competitions rows use, at the same width */
+.cal-daylist-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,300px));gap:16px;padding-top:6px}
+@media(max-width:640px){.cal-daylist-cards{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.cal-daylist{animation:none}}
 @media(max-width:760px){.cal-day{min-height:60px}.cal-chip{font-size:.6rem}.cal-legend{font-size:.72rem;gap:10px}}
 /* phones: day cells are ~45px wide, so events show as coloured bars -- too small to aim at, so a
@@ -1301,6 +1298,8 @@ label.f.checkbox-f input{all:revert;width:18px;height:18px;accent-color:var(--fl
 .squad-pick{display:flex;align-items:center;gap:8px;color:var(--text);font-weight:600;text-transform:none;letter-spacing:0;cursor:pointer}
 .squad-pick input{width:18px;height:18px;accent-color:var(--flame)}
 .tag-group-label{margin:10px 0 0;font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+/* A gala's news article (meetarticle field): set apart at the foot of the gala form */
+.meet-article{border-top:1px solid var(--line);padding-top:6px}
 .tag-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:4px}
 .tag-add input{font:inherit;font-size:.95rem;color:var(--text);padding:8px 11px;border:1.5px solid var(--line);border-radius:10px;background:var(--field);min-width:0;flex:1 1 180px;max-width:280px}
 .tag-add input:focus{border-color:var(--flame);outline:none}
@@ -1416,6 +1415,12 @@ footer.site a:hover{color:var(--ember)}
 .home-slide-pin.on{border-color:var(--flame);color:var(--text)}
 .home-slide-acts button:disabled{opacity:.35;cursor:default}
 .home-slide-title{font-weight:700}
+.home-slide-off{background:none;border:1.5px solid var(--line);color:var(--warn);border-radius:8px;height:32px;width:32px;padding:0;cursor:pointer;font:inherit;font-size:.95rem;font-weight:700}
+.home-slide-off:hover,.home-slide-off:focus-visible{border-color:var(--warn);background:var(--warn);color:#fff}
+body.theme-dark .home-slide-off{color:#ff7a70}
+.home-slides-off-head{margin:14px 0 6px;font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.home-slides-off{list-style:none;padding-left:0}
+.home-slides-off li{opacity:.7}
 .home-slides li.is-next{opacity:.7}
 .home-slides li.home-slides-break{display:block;list-style:none;margin:6px 0 0 -22px;padding-top:8px;border-top:1px dashed var(--line);font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 /* Instagram section: the one-off setup guide folds away once a feed is connected, and each
@@ -1515,7 +1520,6 @@ body.theme-dark .brand{color:#fff}
 body.theme-dark .brand .name .line-two{color:var(--ember)}
 body.theme-dark .cal-day.selected{border-color:var(--text);box-shadow:0 0 0 1px var(--text) inset}
 body.theme-dark .cal-day.selected button.cal-daynum{color:var(--text)}
-body.theme-dark .cal-daylist-go{color:var(--flame)}
 /* dark desktop nav: the flame fill reads fine on the dark bar unchanged -- only the
    plain (non-active) text colors need to shift for the dark background */
 @media(min-width:1024px){
@@ -2116,22 +2120,8 @@ body:not(.home-v2) .v2-only{display:none!important}
 .pulse-ctx-btn:focus-visible{outline:none}
 .pulse-ctx-btn:focus-visible::before{box-shadow:0 0 0 3px rgba(245,132,31,.55)}
 
-/* training change: first thing a parent needs, but not an alarm -- flame edge, no red */
-.pulse-notice{position:relative;margin-bottom:12px;padding:14px 18px;background:var(--card);border:1px solid var(--line);
-  border-left:4px solid var(--flame);box-shadow:var(--shadow)}
-.pulse-notice-k{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;font-size:.72rem;font-weight:700;letter-spacing:.1em;
-  text-transform:uppercase;color:var(--muted)}
-.pulse-notice-tag{position:relative;z-index:0;padding:3px 11px;color:#101014}
-.pulse-notice-tag::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--flame);transform:skewX(calc(-1 * var(--slant-deg)))}
-.pulse-notice h3{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.05rem;line-height:1.25;margin-top:8px}
-/* just the summary here, two lines at most -- the full details are a tap away on their own page */
-.pulse-notice-note{margin-top:4px;color:var(--body2);font-size:.92rem;
-  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .training-summary{color:var(--muted);font-size:.9rem;margin-top:8px;
   display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
-.pulse-notice-foot{margin-top:6px}
-.pulse-notice .card-link{font-weight:700;font-size:.85rem}
-.pulse-notice.tap-card:hover .card-link{text-decoration:underline}
 
 /* the event panel: a broadcast-style ink block in both themes, never full-screen */
 .pulse-event{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:18px 36px;
@@ -2166,10 +2156,14 @@ body .pulse-event .btn.ghost:hover::before{background:rgba(255,255,255,.1)}
 body .pulse-event .btn.live{color:#fff}
 .pulse-event .btn:focus-visible::before{box-shadow:0 0 0 3px var(--ember)}
 
-/* Today / Next / Results / This week */
-.pulse-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow)}
-.pulse-cell,body.theme-dark .pulse-cell{position:relative;display:flex;flex-direction:column;gap:2px;min-width:0;padding:12px 18px 12px 24px;
+/* Session update / Today / Next / Results / This week -- always one row: on a computer the boxes
+   share the width (the session update takes a double share), on a phone it's a row you swipe */
+.pulse-strip{display:flex;background:var(--card);border:1px solid var(--line);box-shadow:var(--shadow)}
+.pulse-cell,body.theme-dark .pulse-cell{position:relative;flex:1 1 0;display:flex;flex-direction:column;gap:2px;min-width:0;padding:12px 18px 12px 24px;
   color:var(--text);text-decoration:none;transition:background .15s}
+/* training change: first thing a parent needs, but not an alarm -- flame edge, no red */
+.pulse-cell.is-notice{flex-grow:2;box-shadow:inset 4px 0 0 var(--flame)}
+.pulse-sum{font-size:.85rem;color:var(--body2);line-height:1.35;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .pulse-cell+.pulse-cell::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:2px;background:var(--line);transform:skewX(calc(-1 * var(--slant-deg)))}
 .pulse-cell:hover{background:rgba(245,132,31,.08)}
 .pulse-cell:hover .pulse-s{text-decoration:underline}
@@ -2214,8 +2208,6 @@ body.home-v2.content-failed .hero-photo-strip,body.home-v2.content-failed #nextM
   .pulse-head{margin-bottom:10px}
   .pulse-ctx{width:100%}
   .pulse-ctx-btn{flex:1 1 0;min-height:36px}
-  .pulse-notice{padding:12px 14px}
-  .pulse-notice-foot{display:flex;justify-content:flex-end;margin-top:2px}
   .pulse-event{padding:18px 16px 18px 20px;gap:14px}
   .pulse-event::before{width:4px}
   .pulse-event-title{font-size:1.45rem;margin-top:10px}
@@ -2225,10 +2217,12 @@ body.home-v2.content-failed .hero-photo-strip,body.home-v2.content-failed #nextM
   .pulse-actions{gap:10px 12px}
   /* one row, like on a computer: two boxes fill the width, and a third or fourth sits off to the
      right with its edge peeking in, a swipe away -- rather than wrapping onto a second row */
-  .pulse-strip{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(46%,1fr);
+  .pulse-strip{display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(46%,1fr);
     overflow-x:auto;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;scrollbar-width:none}
   .pulse-strip::-webkit-scrollbar{display:none}
   .pulse-cell{padding:10px 12px 10px 16px;scroll-snap-align:start}
+  /* the session update on a phone: title and when only -- the summary is a tap away */
+  .pulse-sum,.pulse-s-more{display:none}
   /* "there's more this way": a fade over the edge with a flame arrow, at whichever end has more
      (classes from wirePulseStrip in site.js) */
   .pulse-strip-frame{position:relative}
