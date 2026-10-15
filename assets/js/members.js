@@ -207,7 +207,8 @@ function renderLogin(message){
     ${message?`<div class="admin-note" style="margin-top:16px">${esc(message)}</div>`:""}
     <form class="stack" id="loginForm" style="margin-top:18px">
       <label class="f">Club email address<input type="email" name="email" required autocomplete="email" placeholder="you@phoenixbasildonsc.org"></label>
-      <label class="f" id="passwordField" hidden>Password<input type="password" name="password" autocomplete="current-password"></label>
+      <label class="f" id="passwordField" hidden>Password<input type="password" name="password" autocomplete="current-password">
+        <span class="hint">Forgotten it? Choose <strong>Email me a link instead</strong>, then use <strong>change password</strong> (top right) once you're in.</span></label>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn" type="submit" id="loginSubmit">Email me a sign-in link</button>
         <button class="btn ghost" type="button" id="loginMode">Use a password instead</button>
@@ -283,7 +284,9 @@ function loginErrorMessage(error){
 
 function renderAdminShell(){
   const role=session.role;
-  $("#whoAmI").innerHTML=`Signed in as <strong>${esc(role.label)}</strong> · <a href="#" id="logout" style="color:var(--muted)">sign out</a>`;
+  $("#whoAmI").innerHTML=`Signed in as <strong>${esc(role.label)}</strong> · <a href="#" id="changePw" style="color:var(--muted)">change password</a> · <a href="#" id="logout" style="color:var(--muted)">sign out</a>`;
+  $("#changePw").addEventListener("click",e=>{e.preventDefault();adminSection=null;
+    document.querySelectorAll(".admin-side button").forEach(b=>b.classList.remove("active"));showPasswordForm();});
   $("#logout").addEventListener("click",async e=>{e.preventDefault();await sb.auth.signOut();session=null;renderLogin("You've been signed out.");});
   $("#adminBody").innerHTML=`<div class="admin-shell">
     <div class="admin-side">${role.sections.map(s=>`<button data-sec="${s}" class="${s===adminSection?"active":""}">${SECTION_META[s].name}</button>`).join("")}</div>
@@ -1644,6 +1647,30 @@ async function showImagesSection(){
     photos.splice(photos.indexOf(photo),1);
     render();
     toast("Photo deleted");
+  });
+}
+
+/* Set or change your own password. Someone who has forgotten theirs signs in with an emailed link
+   first, so no separate "forgotten password" email is needed. */
+const PW_MIN=12;
+function showPasswordForm(){
+  $("#adminMain").innerHTML=`<h2>Change password</h2>
+    <div class="admin-note">Choose a new password of at least ${PW_MIN} characters. You can still sign in with an emailed link whenever you like.</div>
+    <form class="stack" id="pwForm" style="max-width:420px">
+      <label class="f">New password<input type="password" name="pw" required minlength="${PW_MIN}" autocomplete="new-password"></label>
+      <label class="f">Type it again<input type="password" name="pw2" required minlength="${PW_MIN}" autocomplete="new-password"></label>
+      <div><button class="btn" type="submit">Save new password</button></div>
+    </form>`;
+  $("#pwForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const f=new FormData(e.target),pw=f.get("pw");
+    if(pw!==f.get("pw2"))return toast("The two passwords don't match");
+    const btn=e.target.querySelector("button");btn.disabled=true;
+    const {error}=await sb.auth.updateUser({password:pw});
+    btn.disabled=false;
+    if(error)return toast(/reauthentic|recent/i.test(error.message||"")?"For safety, sign out and back in with an emailed link, then change it straight away.":/same|different/i.test(error.message||"")?"That's your current password. Choose a different one.":`Couldn't change it: ${error.message}`);
+    e.target.reset();
+    toast("Password changed");
   });
 }
 
