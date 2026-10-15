@@ -3,6 +3,7 @@
 
 Options -MultiViews
 RewriteEngine On
+RewriteBase /
 
 # Always use HTTPS on www.basildonswimming.co.uk (bare domain -> www)
 RewriteCond %{HTTP_HOST} ^basildonswimming\.co\.uk$ [NC]
@@ -23,11 +24,10 @@ RewriteRule ^ /%1 [L,R=301]
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.+)/$ /$1 [L,R=301]
 
-# Clean URLs: /join serves join.html
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_FILENAME}.html -f
-RewriteRule ^([^.]+?)/?$ $1.html [L]
+# Clean URLs: /join serves join.html. No "does join.html exist" check: IONOS doesn't
+# give rewrite rules the real folder path, so that check always failed there.
+# Unknown names still end up on the 404 page.
+RewriteRule ^([a-z0-9-]+)$ $1.html [L]
 
 ErrorDocument 404 /404.html
 
