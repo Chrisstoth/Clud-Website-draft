@@ -13,7 +13,7 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const TT_LOC={lc:"BSV Long Course",deep:"BSV Short Course – Deep End",shallow:"BSV Short Course – Shallow End",bill:"Billericay Pool",land:"BSV Meeting Room"};
 
 /* In-memory copy of what is published, filled by loadContent() on every page load. */
-const DB={feed:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfare:[],committee:[],partners:null,guides:null,enquiries:[]};
+const DB={feed:[],bin:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfare:[],committee:[],partners:null,guides:null,enquiries:[]};
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
@@ -36,6 +36,8 @@ function feedFromRow(row){
   if(row.review)it.review=row.review;
   if(row.submitted_by)it.submittedBy=row.submitted_by;
   if(row.approved_by)it.approvedBy=row.approved_by;
+  /* Read-only recycle bin (migration 025) */
+  if(row.deleted_at){it.deletedAt=row.deleted_at;it.deletedBy=row.deleted_by||"";}
   return it;
 }
 function feedToRow(it){
@@ -128,7 +130,9 @@ async function loadContent(){
     if(results[i].error){console.warn(`Couldn't load ${SECTIONS[k].table}`,results[i].error);DB[k]=null;return;}
     DB[k]=results[i].data.map(SECTIONS[k].from);
   });
-  if(!showPendingFeed)DB.feed=DB.feed.filter(it=>it.review!=="pending");
+  /* Binned items (migration 025) only ever appear in the members' area recycle bin. */
+  DB.bin=DB.feed.filter(it=>it.deletedAt);
+  DB.feed=DB.feed.filter(it=>!it.deletedAt&&(showPendingFeed||it.review!=="pending"));
 }
 
 /* Trial enquiries carry children's names and dates of birth, so they are deliberately kept

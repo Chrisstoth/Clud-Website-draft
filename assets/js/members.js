@@ -485,7 +485,8 @@ function renderAdminSection(){
     ${sec==="feed"?homepagePanelHtml(slides,role):""}
     <div style="margin-bottom:18px"><button class="btn small" id="addNew">+ Add new</button></div>
     <div id="itemList">${listHtml}</div>
-    <div id="formSlot"></div>`;
+    <div id="formSlot"></div>
+    ${sec==="feed"?recycleBinHtml():""}`;
   $("#addNew").addEventListener("click",()=>{
     document.querySelectorAll(".edit-slot").forEach(s=>s.innerHTML="");
     editingId=null;
@@ -522,6 +523,10 @@ function renderAdminSection(){
     if(down&&!down.disabled){moveItem(sec,+down.dataset.moveDown,1);return;}
     const ap=e.target.closest("[data-approve]");
     if(ap){ap.disabled=true;approveItem(+ap.dataset.approve);return;}
+    const rs=e.target.closest("[data-restore]");
+    if(rs){rs.disabled=true;restoreItem(+rs.dataset.restore);return;}
+    const pg=e.target.closest("[data-purge]");
+    if(pg){purgeItem(+pg.dataset.purge);return;}
     const ed=e.target.closest("[data-edit]"),del=e.target.closest("[data-del]");
     if(ed){
       const clickedId=+ed.dataset.edit,wasOpen=editingId===clickedId;
@@ -561,7 +566,57 @@ async function moveItem(sec,id,dir){
   await loadContent();
   renderAdminShell();
 }
+/* Club Feed deletes go to the recycle bin (migration 025) for 7 days. Until that migration is
+   run the RPC is missing, and the old permanent delete is used, behind a warning. */
+const BIN_DAYS=7;
+const binDaysLeft=it=>Math.max(0,BIN_DAYS-Math.floor((Date.now()-Date.parse(it.deletedAt))/86400000));
+async function binItem(id){
+  const {error}=await sb.rpc("bin_feed_item",{item_id:id});
+  if(error&&/function|schema cache/i.test(error.message||"")){
+    const it=DB.feed.find(x=>x.id===id);
+    if(!confirm(`Delete "${it?it.title:"this item"}" permanently? The recycle bin isn't set up yet, so it can't be rescued afterwards.`))return;
+    const {error:delError}=await sb.from("feed").delete().eq("id",id);
+    if(delError)return toast(saveErrorMessage(delError));
+    await loadContent();renderAdminShell();
+    return toast("Deleted and unpublished");
+  }
+  if(error)return toast(error.code==="42501"?error.message:saveErrorMessage(error));
+  await loadContent();
+  renderAdminShell();
+  toast(`Moved to the recycle bin — it can be restored for ${BIN_DAYS} days`);
+}
+async function restoreItem(id){
+  const {error}=await sb.rpc("restore_feed_item",{item_id:id});
+  if(error)return toast(error.code==="42501"?error.message:saveErrorMessage(error));
+  await loadContent();
+  renderAdminShell();
+  toast(isWebmaster()?"Restored":"Restored — it goes live again once another member approves it");
+}
+async function purgeItem(id){
+  const it=DB.bin.find(x=>x.id===id);
+  if(!it)return;
+  if(!confirm(`Are you sure you want to delete "${it.title}" permanently?\n\nIt can't be rescued after you press OK.`))return;
+  const {data:gone,error}=await sb.from("feed").delete().eq("id",id).select("id");
+  if(error)return toast(saveErrorMessage(error));
+  if(!gone.length)return toast("Only a webmaster can delete permanently");
+  await loadContent();
+  renderAdminShell();
+  toast("Deleted permanently");
+}
+function recycleBinHtml(){
+  const bin=[...(DB.bin||[])].sort((a,b)=>b.deletedAt.localeCompare(a.deletedAt));
+  if(!bin.length)return "";
+  return `<details class="ig-setup" style="margin-top:28px"><summary>Recycle bin (${bin.length})</summary>
+    <p class="hint" style="margin:10px 0">Deleted items stay here for ${BIN_DAYS} days, off the public site, and are then removed for good.${isWebmaster()?"":" Only a webmaster can delete permanently."}</p>
+    ${bin.map(it=>{const n=binDaysLeft(it);
+      return `<div class="item-row"><div><div class="t">${esc(it.title)}</div>
+        <div class="s">${esc(FEED_TYPE_META[it.type]?FEED_TYPE_META[it.type].short:"")} · deleted ${esc(fmtDate(isoDay(new Date(it.deletedAt))))}${it.deletedBy?` by ${esc(it.deletedBy)}`:""} · ${n===0?"removed today":n===1?"1 day left":`${n} days left`}</div></div>
+        <div class="acts"><button class="btn small ghost" data-restore="${it.id}">Restore</button>
+        ${isWebmaster()?`<button class="btn small dangerous" data-purge="${it.id}">Delete permanently</button>`:""}</div></div>`;}).join("")}
+  </details>`;
+}
 async function deleteItem(sec,id){
+  if(sec==="feed")return binItem(id);
   if(sec==="guides"){
     const g=DB.guides.find(x=>x.id===id);
     if(g&&!confirm(`Delete the whole "${g.title}" guide? Its tab disappears from the Member Guides page straight away, and this can't be undone.`))return;
@@ -1880,6 +1935,8 @@ async function start(){
   const defaults=ROLES[member.role];
   session={email:member.email,role:{...defaults,key:member.role,label:member.label||defaults.label,feedTypes:member.feed_types||defaults.feedTypes||[]}};
   adminSection=session.role.sections[0];
+  /* clear out anything binned over 7 days ago (migration 025; harmless if not run yet) */
+  await sb.rpc("purge_recycle_bin").then(()=>{},()=>{});
   try{await Promise.all([loadContent(),checkFeedLateCols()]);}
   catch(e){return renderLogin(`Couldn't load the club content: ${e.message}`);}
   renderAdminShell();
