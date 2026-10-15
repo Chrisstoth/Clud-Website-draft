@@ -32,6 +32,10 @@ function feedFromRow(row){
   if(row.created_at){it.created=isoDay(new Date(row.created_at));it.createdAt=row.created_at;}
   /* Read-only, like created: an "Entries open" story the database posted for this meet (migration 022). */
   if(row.source_meet_id)it.sourceMeetId=row.source_meet_id;
+  /* Read-only peer review (migration 024): the database sets these on every save. */
+  if(row.review)it.review=row.review;
+  if(row.submitted_by)it.submittedBy=row.submitted_by;
+  if(row.approved_by)it.approvedBy=row.approved_by;
   return it;
 }
 function feedToRow(it){
@@ -111,6 +115,10 @@ const SECTIONS={
   guides:{table:"member_guides",from:guideFromRow,to:guideToRow,order:"sort_order",optional:true}
 };
 
+/* Feed items awaiting peer review (migration 024). The database already hides them from the
+   public, but a signed-in club account can read them, and the public pages must still leave them
+   out for that person. Only the members' area turns this on. */
+let showPendingFeed=false;
 async function loadContent(){
   const keys=Object.keys(SECTIONS);
   const results=await Promise.all(keys.map(k=>sb.from(SECTIONS[k].table).select("*").order(SECTIONS[k].order,{ascending:true,nullsFirst:false})));
@@ -120,6 +128,7 @@ async function loadContent(){
     if(results[i].error){console.warn(`Couldn't load ${SECTIONS[k].table}`,results[i].error);DB[k]=null;return;}
     DB[k]=results[i].data.map(SECTIONS[k].from);
   });
+  if(!showPendingFeed)DB.feed=DB.feed.filter(it=>it.review!=="pending");
 }
 
 /* Trial enquiries carry children's names and dates of birth, so they are deliberately kept

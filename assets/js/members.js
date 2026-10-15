@@ -1,5 +1,11 @@
-/* ================= ROLES & PERMISSIONS ================= */
+/* ================= ROLES & PERMISSIONS =================
+   Club Poster and Webmaster are the two kinds of account the webmaster hands out (Posting
+   access). The specialist roles below them still work for accounts that already have them, but
+   aren't offered there. */
+showPendingFeed=true;
+const ALL_FEED_TYPES=["meet","externalMeet","teamMeet","social","news","training"];
 const ROLES = {
+  poster:     {label:"Club Poster",          desc:"Post news, socials, training changes & galas — another member approves before it goes live", sections:["feed","guides"], feedTypes:ALL_FEED_TYPES},
   meets:      {label:"Open Meets Secretary", desc:"Add club, external & team meets, entry packs & results", sections:["feed","guides"], feedTypes:["meet","externalMeet","teamMeet"]},
   coaching:   {label:"Coaching Lead",        desc:"Edit coach profiles & squad timetables", sections:["coaches","squads","guides"]},
   volunteers: {label:"Volunteer Coordinator",desc:"Edit volunteer role explainers",   sections:["roles","guides"]},
@@ -9,10 +15,11 @@ const ROLES = {
   membership: {label:"Membership Team",      desc:"View trial & squad enquiries",     sections:["enquiries","guides"]},
   welfare:    {label:"Welfare Officer",      desc:"Edit the Welfare & Safeguarding page", sections:["welfare","guides"]},
   secretary:  {label:"Club Secretary",       desc:"Edit the Club Committee page",     sections:["committee","guides"]},
-  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","topics","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","partners","instagram","images","guides"], feedTypes:["meet","externalMeet","teamMeet","social","news","training"]}
+  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","access","topics","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","partners","instagram","images","guides"], feedTypes:ALL_FEED_TYPES}
 };
 const SECTION_META = {
   feed:{name:"Club Feed", empty:"Nothing published yet — add the first item."},
+  access:{name:"Posting Access", empty:""},
   coaches:{name:"Coaches & Squads", empty:"No coaches listed yet."},
   squads:{name:"Squad Timetables", empty:"No squads yet — add the first one."},
   topics:{name:"News Tags", empty:"The club hasn't added any tags of its own yet. Squads are tags already — add others (Trips, Open Water, Officials…) here."},
@@ -325,7 +332,25 @@ function feedItemsForRole(role){return DB.feed.filter(it=>role.feedTypes.include
    heroFeedItems() the homepage runs (core.js), so these badges can't drift from what visitors
    actually see. Pinned items count down to their pin date; the rest are the latest stories,
    which have no end date -- newer stories push them off. */
-const homepageSlides=()=>heroFeedItems(DB.feed.filter(it=>it.visible!==false));
+const homepageSlides=()=>heroFeedItems(DB.feed.filter(it=>it.visible!==false&&it.review!=="pending"));
+/* Peer review (migration 024): a non-webmaster's save waits until someone else approves it. */
+const isWebmaster=()=>session.role.key==="webmaster";
+const isPending=it=>it.review==="pending";
+/* every row carries a review state once migration 024 has run */
+const reviewReady=()=>DB.feed.some(it=>it.review);
+const mySubmission=it=>(it.submittedBy||"").toLowerCase()===session.email.toLowerCase();
+function reviewBadge(it){
+  if(!isPending(it))return "";
+  const who=it.submittedBy?` · from ${it.submittedBy}`:"";
+  return `<div class="feed-badges"><span class="feed-badge pin">⏳ Awaiting approval${esc(who)}</span>${mySubmission(it)?`<span class="feed-badge note">Another member needs to approve this</span>`:""}</div>`;
+}
+async function approveItem(id){
+  const {error}=await sb.rpc("approve_feed_item",{item_id:id});
+  if(error)return toast(/function|schema cache/i.test(error.message||"")?"Approvals aren't set up yet: the webmaster needs to run supabase/migrations/024_peer_review.sql.":error.code==="P0001"||error.code==="42501"?error.message:saveErrorMessage(error));
+  await loadContent();
+  renderAdminShell();
+  toast("Approved — now live on the public site");
+}
 const daysUntil=iso=>Math.round((new Date(iso+"T12:00:00")-new Date(isoToday()+"T12:00:00"))/86400000);
 const daysLeftLabel=n=>n<=0?"last day today":n===1?"1 day left":`${n} days left`;
 function homeStatus(it,slides){
@@ -336,6 +361,7 @@ function homeStatus(it,slides){
   return {slot,pinned,until};
 }
 function homeBadges(it,slides){
+  if(isPending(it))return reviewBadge(it);
   if(it.visible===false)return `<span class="feed-badge off">Hidden from site</span>`;
   const h=homeStatus(it,slides),b=[];
   if(h.slot>=0)b.push(`<span class="feed-badge home">On homepage · slide ${h.slot+1} of ${slides.length}</span>`);
@@ -376,6 +402,10 @@ function renderAdminSection(){
     showInstagramSection();
     return;
   }
+  if(sec==="access"){
+    showAccessSection();
+    return;
+  }
   if(sec==="images"){
     showImagesSection();
     return;
@@ -397,8 +427,10 @@ function renderAdminSection(){
     ?"The Proud Partners strip under the header on every page. Each partner's name links to the web address given (opening in a new tab); leave the link blank to show the name without one. Use the arrows to change the order. Changes show on the public site straight away."
     :sec==="topics"
     ?"These are the club's own tags for news stories. Every squad in Squad Timetables is a tag automatically, so there's no need to add squads here. Visitors can follow any tag on the News page and get a count of new stories for it. Renaming a tag updates every story that has it; deleting one just takes it off those stories."
-    :sec==="feed"&&role.feedTypes.length>1
-    ?"Changes here publish straight to the public page — no webmaster needed. This feed is shared across several types of item; pick the type when you add something new."
+    :sec==="feed"&&!isWebmaster()
+    ?"New posts, and edits to live ones, go on the public site once another club member approves them. Approve other people's posts from <strong>Waiting for approval</strong> below."
+    :sec==="feed"
+    ?"Your changes publish straight to the public page. Posts from other members wait under <strong>Waiting for approval</strong> until someone other than the author approves them."
     :"Changes here publish straight to the public page — no webmaster needed.";
   const slides=sec==="feed"?homepageSlides():[];
   const REORDERABLE=["coaches","partners","guides"];
@@ -412,7 +444,7 @@ function renderAdminSection(){
     return `
       <div class="item-block" data-item-block="${it.id}">
       <div class="item-row${cls}"><div><div class="t">${esc(s.t)}</div><div class="s">${esc(s.s)}</div>${sec==="feed"?homeBadges(it,slides):""}</div>
-      <div class="acts">${move}<button class="btn small ghost" data-edit="${it.id}">Edit</button>
+      <div class="acts">${move}${sec==="feed"&&isPending(it)&&!mySubmission(it)?`<button class="btn small" data-approve="${it.id}">Approve</button>`:""}<button class="btn small ghost" data-edit="${it.id}">Edit</button>
       <button class="btn small dangerous" data-del="${it.id}">Delete</button></div></div>
       <div class="edit-slot" id="editSlot-${it.id}"></div>
       </div>`;};
@@ -436,8 +468,10 @@ function renderAdminSection(){
         ${tags.map(t=>chip("data-ftag",t.ref,t.name,newsItems.filter(it=>hasTag(it,t.ref)).length,feedFilter.tag===t.ref)).join("")}</div>`:"";
     const shown=items.filter(it=>(!feedFilter.type||it.type===feedFilter.type)&&(!feedFilter.tag||hasTag(it,feedFilter.tag)));
     const byDate=[...shown].sort((a,b)=>(a.start||"").localeCompare(b.start||""));
-    const upcoming=byDate.filter(it=>!it.start||!meetDone(it)),past=byDate.filter(it=>it.start&&meetDone(it)).reverse();
+    const pending=byDate.filter(isPending),live=byDate.filter(it=>!isPending(it));
+    const upcoming=live.filter(it=>!it.start||!meetDone(it)),past=live.filter(it=>it.start&&meetDone(it)).reverse();
     return `${typeChips}${tagChips}
+      ${pending.length?`<h3 class="admin-sub">Waiting for approval (${pending.length})</h3>${pending.map(rowHtml).join("")}`:""}
       <h3 class="admin-sub">${galasOnly?"Upcoming galas":"Upcoming"}</h3>
       ${upcoming.length?upcoming.map(rowHtml).join(""):`<p style="color:var(--muted)">Nothing upcoming${shown.length<items.length?" matching this filter":""}.</p>`}
       ${past.length?`<h3 class="admin-sub">${galasOnly?"Past galas":"Past items"}</h3>${past.map(rowHtml).join("")}`:""}`;
@@ -486,6 +520,8 @@ function renderAdminSection(){
     const up=e.target.closest("[data-move-up]"),down=e.target.closest("[data-move-down]");
     if(up&&!up.disabled){moveItem(sec,+up.dataset.moveUp,-1);return;}
     if(down&&!down.disabled){moveItem(sec,+down.dataset.moveDown,1);return;}
+    const ap=e.target.closest("[data-approve]");
+    if(ap){ap.disabled=true;approveItem(+ap.dataset.approve);return;}
     const ed=e.target.closest("[data-edit]"),del=e.target.closest("[data-del]");
     if(ed){
       const clickedId=+ed.dataset.edit,wasOpen=editingId===clickedId;
@@ -507,7 +543,8 @@ async function publishItem(sec,id,data){
   if(error){toast(saveErrorMessage(error));return false;}
   await loadContent();
   renderAdminShell();
-  toast(id?"Saved — live on the public site":"Published to the public site");
+  const held=sec==="feed"&&!isWebmaster()&&reviewReady();
+  toast(held?"Saved — it goes live once another member approves it":id?"Saved — live on the public site":"Published to the public site");
   return true;
 }
 /* Swaps an item with its neighbour and renumbers the whole list 0..n-1 in the new order, so
@@ -661,7 +698,7 @@ function showForm(sec,id,forcedType){
          so a tag or squad deleted since is simply no longer offered. */
       const picked=it[f.k]||[];
       const all=newsTagList();
-      const canAdd=session.role.sections.includes("topics");
+      const canAdd=session.role.sections.includes("topics")||session.role.key==="poster";
       return `<div class="f">${f.label}
         <p class="hint" style="margin:0">Tick whatever this story is about or who it's for. The club's tags show on the card; squads show as "For Gold 1". People following a ticked tag get the story marked for them and a count of new stories on the Club News link. Leave everything unticked for whole-club news.</p>
         <p class="tag-group-label">Topics</p>
@@ -1555,6 +1592,57 @@ async function showImagesSection(){
   });
 }
 
+/* ================= POSTING ACCESS (webmaster) =================
+   Who can sign in to the members' area. Removing a row takes effect at once: every save checks
+   the members table, and the next page load signs them out. The sign-in itself (Supabase
+   Authentication) can't be created from the browser, so adding someone is a two-step job. */
+const ACCESS_ROLES=["poster","webmaster"];
+async function showAccessSection(){
+  const main=$("#adminMain"),name=SECTION_META.access.name;
+  main.innerHTML=`<h2>${name}</h2><p style="color:var(--muted);margin-top:16px">Loading…</p>`;
+  const {data,error}=await sb.from("members").select("*").order("created_at",{ascending:true});
+  if(adminSection!=="access")return;
+  if(error){main.innerHTML=`<h2>${name}</h2><div class="admin-note">Couldn't load the list: ${esc(error.message)}</div>`;return;}
+  /* before migration 024 a webmaster can only read their own row */
+  const ready=data.some(m=>m.email.toLowerCase()!==session.email.toLowerCase());
+  const roleName=r=>ROLES[r]?ROLES[r].label:r;
+  main.innerHTML=`<h2>${name}</h2>
+    <div class="admin-note">Everyone who can sign in to the members' area. <strong>Club Posters</strong> can post and edit every kind of feed item, but nothing goes live until someone else approves it. <strong>Webmasters</strong> can change everything, publish straight away and manage this list. Removing someone stops them straight away.</div>
+    ${ready?"":`<div class="admin-note">Only your own account shows until the webmaster runs <code>supabase/migrations/024_peer_review.sql</code> in the Supabase SQL Editor.</div>`}
+    ${data.map(m=>{const me=m.email.toLowerCase()===session.email.toLowerCase();
+      return `<div class="item-row"><div><div class="t">${esc(m.label||roleName(m.role))}${me?" (you)":""}</div>
+        <div class="s">${esc(m.email)} · ${esc(roleName(m.role))}</div></div>
+        <div class="acts">${me?"":`<button class="btn small dangerous" data-remove="${esc(m.email)}">Remove</button>`}</div></div>`;}).join("")}
+    <h3 class="admin-sub">Add someone</h3>
+    <form class="stack" id="accessForm">
+      <label class="f">Their email address<input type="email" name="email" required autocomplete="off" placeholder="name@example.com"></label>
+      <label class="f">Their name (shown as "Signed in as …")<input name="label" required maxlength="60" placeholder="Jane Smith"></label>
+      <label class="f">Access<select name="role">${ACCESS_ROLES.map(r=>`<option value="${r}">${esc(ROLES[r].label)} — ${esc(ROLES[r].desc)}</option>`).join("")}</select></label>
+      <div><button class="btn" type="submit">Give access</button></div>
+    </form>
+    <div class="admin-note" style="margin-top:16px"><strong>Then create their sign-in:</strong> in Supabase, open Authentication → Users → Add user → Create new user, enter the same email and a password of 12+ characters, and tick <em>Auto Confirm User</em>. Send them the password separately from this site's address. They can sign in with that password or with an emailed link.</div>`;
+  $("#accessForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const f=new FormData(e.target),email=f.get("email").trim().toLowerCase(),role=f.get("role");
+    if(!ACCESS_ROLES.includes(role))return;
+    const btn=e.target.querySelector('button[type="submit"]');btn.disabled=true;
+    const {error}=await sb.from("members").upsert({email,role,label:f.get("label").trim(),feed_types:null});
+    btn.disabled=false;
+    if(error)return toast(saveErrorMessage(error));
+    toast(`${email} added — now create their sign-in in Supabase`);
+    showAccessSection();
+  });
+  main.querySelectorAll("[data-remove]").forEach(b=>b.addEventListener("click",async()=>{
+    const email=b.dataset.remove;
+    if(!confirm(`Remove ${email}? They won't be able to post or edit anything from now on. Their past posts stay on the site.`))return;
+    const {data:gone,error}=await sb.from("members").delete().eq("email",email).select();
+    if(error)return toast(saveErrorMessage(error));
+    if(!gone.length)return toast("Couldn't remove them: run migration 024 first");
+    toast(`${email} removed`);
+    showAccessSection();
+  }));
+}
+
 async function showInstagramSection(){
   const main=$("#adminMain"),name=SECTION_META.instagram.name;
   main.innerHTML=`<h2>${name}</h2><p style="color:var(--muted);margin-top:16px">Loading…</p>`;
@@ -1790,7 +1878,7 @@ async function start(){
     return renderLogin(`${auth.user.email} isn't set up as a club editor yet. Ask the webmaster to add you.`);
   }
   const defaults=ROLES[member.role];
-  session={email:member.email,role:{...defaults,label:member.label||defaults.label,feedTypes:member.feed_types||defaults.feedTypes||[]}};
+  session={email:member.email,role:{...defaults,key:member.role,label:member.label||defaults.label,feedTypes:member.feed_types||defaults.feedTypes||[]}};
   adminSection=session.role.sections[0];
   try{await Promise.all([loadContent(),checkFeedLateCols()]);}
   catch(e){return renderLogin(`Couldn't load the club content: ${e.message}`);}
