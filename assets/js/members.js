@@ -196,13 +196,13 @@ function renderLogin(message){
   $("#adminBody").innerHTML=`<div class="login-wrap"><div class="card">
     <p class="eyebrow" style="color:var(--ember)">Members' area</p>
     <h2 class="display" style="font-size:1.8rem;margin-top:6px">Sign in</h2>
-    <p style="color:var(--muted);font-size:.92rem;margin-top:10px">Enter your club email address and we'll send you a sign-in code. There's no password to remember.</p>
+    <p style="color:var(--muted);font-size:.92rem;margin-top:10px">Enter your club email address and we'll send you a sign-in link. There's no password to remember.</p>
     ${message?`<div class="admin-note" style="margin-top:16px">${esc(message)}</div>`:""}
     <form class="stack" id="loginForm" style="margin-top:18px">
       <label class="f">Club email address<input type="email" name="email" required autocomplete="email" placeholder="you@phoenixbasildonsc.org"></label>
       <label class="f" id="passwordField" hidden>Password<input type="password" name="password" autocomplete="current-password"></label>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn" type="submit" id="loginSubmit">Email me a sign-in code</button>
+        <button class="btn" type="submit" id="loginSubmit">Email me a sign-in link</button>
         <button class="btn ghost" type="button" id="loginMode">Use a password instead</button>
       </div>
     </form>
@@ -212,8 +212,8 @@ function renderLogin(message){
     usePassword=!usePassword;
     $("#passwordField").hidden=!usePassword;
     $("#passwordField").querySelector("input").required=usePassword;
-    $("#loginSubmit").textContent=usePassword?"Sign in":"Email me a sign-in code";
-    $("#loginMode").textContent=usePassword?"Email me a code instead":"Use a password instead";
+    $("#loginSubmit").textContent=usePassword?"Sign in":"Email me a sign-in link";
+    $("#loginMode").textContent=usePassword?"Email me a link instead":"Use a password instead";
     if(usePassword)$("#passwordField").querySelector("input").focus();
   });
   $("#loginForm").addEventListener("submit",async e=>{
@@ -231,29 +231,35 @@ function renderLogin(message){
     renderCodeEntry(email);
   });
 }
-/* The sign-in email carries a code as well as a link. Typing the code keeps the editor in
-   this tab (an email link always opens a new one) and works when the email is read on a
-   different device. */
+/* An email link always opens a new tab. supabase-js shares a sign-in with the browser's
+   other tabs, so this waiting tab signs itself in too and the new one can be closed. The
+   email only carries a code once custom SMTP lets the template include {{ .Token }}; the
+   code box is ready for that, and also covers reading the email on another device. */
+let awaitingSignIn=false;
+sb.auth.onAuthStateChange(event=>{
+  if(event==="SIGNED_IN"&&awaitingSignIn){awaitingSignIn=false;idleMarked=0;markActive();start();}
+});
 function renderCodeEntry(email){
+  awaitingSignIn=true;
   $("#adminBody").querySelector(".card").innerHTML=`
     <p class="eyebrow" style="color:var(--ember)">Check your inbox</p>
-    <h2 class="display" style="font-size:1.6rem;margin-top:6px">Enter your sign-in code</h2>
-    <p style="color:var(--muted);font-size:.92rem;margin-top:10px">We've emailed a code to <strong>${esc(email)}</strong>. Type it below to sign in here, or click the link in the email instead. Both expire after an hour.</p>
+    <h2 class="display" style="font-size:1.6rem;margin-top:6px">Sign-in link sent</h2>
+    <p style="color:var(--muted);font-size:.92rem;margin-top:10px">We've emailed a link to <strong>${esc(email)}</strong>. Click it and this page signs you in too, so you can close the tab the link opens. It expires after an hour.</p>
     <form class="stack" id="codeForm" style="margin-top:18px">
-      <label class="f">Sign-in code<input name="code" required inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,12}" maxlength="12" placeholder="123456"></label>
+      <label class="f">If your email shows a sign-in code, you can type it here instead<input name="code" required inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,12}" maxlength="12" placeholder="123456"></label>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn" type="submit" id="codeSubmit">Sign in</button>
         <button class="btn ghost" type="button" id="codeBack">Use a different email</button>
       </div>
     </form>`;
-  $("#codeForm").querySelector("input").focus();
-  $("#codeBack").addEventListener("click",()=>renderLogin());
+  $("#codeBack").addEventListener("click",()=>{awaitingSignIn=false;renderLogin();});
   $("#codeForm").addEventListener("submit",async e=>{
-    e.preventDefault();
+    e.preventDefault();awaitingSignIn=false;
     const token=new FormData(e.target).get("code").replace(/\s/g,""),btn=$("#codeSubmit");
     btn.disabled=true;btn.textContent="Signing in…";
     const {error}=await sb.auth.verifyOtp({email,token,type:"email"});
     btn.disabled=false;btn.textContent="Sign in";
+    if(error)awaitingSignIn=true;
     if(error)return toast(/expired|invalid/i.test(error.message||"")?"That code is wrong or has expired. Check the latest email, or go back and send a new one.":loginErrorMessage(error));
     idleMarked=0;markActive();start();
   });
@@ -264,7 +270,7 @@ function loginErrorMessage(error){
   const m=error.message||"";
   if(/signups not allowed/i.test(m))return "That address isn't set up as a club editor. Check the spelling, or ask the webmaster to add you.";
   if(/rate limit|too many/i.test(m))return "Too many sign-in emails in a short time. Wait an hour, or sign in with your password instead.";
-  if(/invalid login credentials/i.test(m))return "That email and password don't match. Try again, or email yourself a sign-in code.";
+  if(/invalid login credentials/i.test(m))return "That email and password don't match. Try again, or email yourself a sign-in link.";
   return m;
 }
 
