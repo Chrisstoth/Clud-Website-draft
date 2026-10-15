@@ -2051,26 +2051,11 @@ main{overflow-x:clip}
 }
 
 /* ================= HOMEPAGE V2: CLUB PULSE =================
-   (HOMEPAGE V1 / V2 in site.js.) V2 is the default homepage. Everything it adds is shown only while
-   the body has .home-v2, so Classic (V1) stays exactly as it was. Same visual language as the rest of the site: ink and flame, the
+   (HOMEPAGE V2 in site.js.) V2 is the homepage. Everything it adds is shown only while the body
+   has .home-v2 (set in index.html), so taking that class off brings back Classic (V1) as it was. Same visual language as the rest of the site: ink and flame, the
    one --slant-deg lean on tabs, ticks and buttons, square-edged blocks on phones. */
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 body:not(.home-v2) .v2-only{display:none!important}
-
-/* --- the Classic | V2 switch, sitting in the orange bar under the slideshow (fixed height, so
-   adding it moves nothing in V1) --- */
-.home-version-wrap{height:100%;display:flex;align-items:center;justify-content:flex-end}
-.home-version{display:flex;gap:6px;position:relative;z-index:2}
-.home-version button{position:relative;z-index:0;display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:3px 13px;
-  background:none;border:none;cursor:pointer;color:#101014;font-family:'Montserrat',sans-serif;font-weight:700;font-size:.68rem;
-  letter-spacing:.08em;text-transform:uppercase;line-height:1}
-.home-version button::before{content:"";position:absolute;inset:0;z-index:-1;border:1.5px solid rgba(16,16,20,.4);
-  transform:skewX(calc(-1 * var(--slant-deg)));transition:background .15s,border-color .15s}
-.home-version button:hover::before{border-color:#101014}
-.home-version button[aria-pressed="true"]{color:#fff;cursor:default}
-.home-version button[aria-pressed="true"]::before{background:#101014;border-color:#101014}
-.home-version button:focus-visible{outline:none}
-.home-version button:focus-visible::before{box-shadow:0 0 0 3px #fff}
 
 /* --- Club Pulse: the "today" area above the orange banner --- */
 .pulse{padding:6px 0 18px;animation:pulse-in .35s ease-out both}
@@ -2101,7 +2086,11 @@ body:not(.home-v2) .v2-only{display:none!important}
 .pulse-notice-tag{position:relative;z-index:0;padding:3px 11px;color:#101014}
 .pulse-notice-tag::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--flame);transform:skewX(calc(-1 * var(--slant-deg)))}
 .pulse-notice h3{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.05rem;line-height:1.25;margin-top:8px}
-.pulse-notice-note{margin-top:4px;color:var(--body2);font-size:.92rem}
+/* just the summary here, two lines at most -- the full details are a tap away on their own page */
+.pulse-notice-note{margin-top:4px;color:var(--body2);font-size:.92rem;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.training-summary{color:var(--muted);font-size:.9rem;margin-top:8px;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
 .pulse-notice-foot{margin-top:6px}
 .pulse-notice .card-link{font-weight:700;font-size:.85rem}
 .pulse-notice.tap-card:hover .card-link{text-decoration:underline}
@@ -2218,12 +2207,6 @@ body.home-v2.content-failed .hero-photo-strip,body.home-v2.content-failed #nextM
   /* the small grey line stays on one line, trimmed with "..." if it must be */
   .pulse-s{font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pulse-v{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;font-size:.88rem}
-  .home-version button{padding:3px 11px}
   .pulse-demo-exit{margin-left:0}
-}
-/* three buttons in the orange bar on the narrowest phones */
-@media(max-width:400px){
-  .home-version{gap:4px}
-  .home-version button{padding:3px 9px;letter-spacing:.05em}
 }
 @media(prefers-reduced-motion:reduce){.pulse,.pulse-live-flag .live-dot,.pulse-k .live-dot{animation:none}}

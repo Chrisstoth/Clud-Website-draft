@@ -13,12 +13,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=81">
+<link rel="stylesheet" href="assets/css/site.css?v=82">
 </head>
-<body class="theme-dark" data-home-default="v2">
+<body class="theme-dark home-v2">
 <script>(function(){var t=null;try{t=localStorage.getItem("bpsc_theme")}catch(e){}if(t?t==="light":window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches)document.body.classList.remove("theme-dark")})()</script>
 <!-- Homepage V1 / V2 (see HOMEPAGE V1 / V2 in site.js): set before anything is drawn, so V1 never flashes up first -->
-<script>(function(){var v=null;try{v=localStorage.getItem("bpsc_home_version")}catch(e){}if(v!=="v1"&&v!=="v2")v=document.body.dataset.homeDefault;if(/[?&]demo=(race-day|home-meet|two-galas)(&|$)/.test(location.search))v="v2";if(v==="v2")document.body.classList.add("home-v2")})()</script>
 <div class="proto-badge">Draft prototype &mdash; sample content for review. Edits made in the members&rsquo; area are saved and shared across devices.</div>
 <header class="site">
   <div class="nav-wrap">
@@ -133,15 +132,7 @@
       <div class="hero-dots" id="heroDots"></div>
     </div>
   </div>
-  <div class="hero-bottom-bar">
-    <div class="container home-version-wrap">
-      <div class="home-version" id="homeVersion" role="group" aria-label="Homepage version">
-        <button type="button" data-home-version="v1" aria-pressed="false">Classic</button>
-        <button type="button" data-home-version="v2" aria-pressed="true">V2</button>
-        <button type="button" data-home-version="demo" aria-pressed="false">Race Day demo</button>
-      </div>
-    </div>
-  </div>
+  <div class="hero-bottom-bar"></div>
 
   <div class="container" style="padding-top:56px">
     <div class="grid cols-3 pointed-grid">
@@ -202,7 +193,7 @@
 
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous"></script>
-<script src="assets/js/core.js?v=34"></script>
-<script src="assets/js/site.js?v=46"></script>
+<script src="assets/js/core.js?v=36"></script>
+<script src="assets/js/site.js?v=47"></script>
 </body>
 </html>

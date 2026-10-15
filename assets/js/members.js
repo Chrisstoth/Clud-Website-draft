@@ -164,11 +164,12 @@ const SCHEMAS = {
     {k:"body",label:"Article content",type:"richtext"}
   ],
   training:[
-    {k:"title",label:"What's changing",type:"text",req:1},
+    {k:"title",label:"What's changing (a short headline, e.g. Changes for Essex Winter Champs weekend)",type:"text",req:1},
     {k:"start",label:"Date",type:"date",req:1},
     {k:"end",label:"End date (optional, for a range)",type:"date"},
-    {k:"note",label:"Details for parents & swimmers",type:"textarea"},
-    {k:"img",label:"Picture",type:"imagepicker"}
+    {k:"blurb",label:"One-line summary (shown on the homepage and in Club News — leave blank to use the first line of the details)",type:"textarea"},
+    {k:"img",label:"Picture",type:"imagepicker"},
+    {k:"body",label:"Full details for parents & swimmers (shown on its own page) — tip: a heading for each session, e.g. Friday PM, then a bullet per squad",type:"richtext"}
   ],
   partners:[
     {k:"name",label:"Partner name (the text shown in the strip)",type:"text",req:1},
@@ -738,8 +739,12 @@ function showForm(sec,id,forcedType){
   editingId=id;
   if(sec==="squads")return showSquadForm(id);
   const isFeed=sec==="feed";
-  const it=id?(isFeed?DB.feed.find(x=>x.id===id):DB[sec].find(x=>x.id===id)):(isFeed?{type:forcedType}:{});
+  let it=id?(isFeed?DB.feed.find(x=>x.id===id):DB[sec].find(x=>x.id===id)):(isFeed?{type:forcedType}:{});
   const type=isFeed?(it.type||forcedType):null;
+  /* A training change from before the details editor kept its details as plain text ("note"):
+     bring them into the details box, line breaks intact, ready to tidy into headings and bullets.
+     Saving then keeps them there (note isn't on the form any more, so it's cleared). */
+  if(isFeed&&type==="training"&&it.note&&!it.body)it={...it,body:plainTextHtml(it.note)};
   const schemaKey=isFeed?type:sec;
   const guideDoc=SCHEMAS[schemaKey].some(f=>f.variant==="guide");
   if(sec==="coaches"&&it.squads)it.squadsRaw=it.squads.join(", ");
@@ -875,7 +880,7 @@ function showForm(sec,id,forcedType){
     return `<label class="f">${f.label}<input type="${f.type}" name="${f.k}" value="${val}" ${f.req?"required":""}></label>`;
   }).join("");
   const titleLabel=isFeed?FEED_TYPE_META[type].label:SECTION_META[sec].name;
-  const canPreview=isFeed&&(type==="news"||type==="social");
+  const canPreview=isFeed&&(type==="news"||type==="social"||type==="training");
   const formTarget=id?document.getElementById("editSlot-"+id):$("#formSlot");
   formTarget.innerHTML=`<form class="stack" id="adminForm" style="margin-top:10px">
     <div class="form-title">${id?"Edit item":"Add new"} — ${titleLabel}</div>

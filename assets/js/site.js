@@ -606,14 +606,15 @@ function newsCard(n,featured){
   const r=resolveNewsImage(n.img);
   const thumb=r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
   const posted=publishedOn(n);
-  /* A training change has no article of its own: the card says when it applies and points at the calendar. */
+  /* A training change: when it applies and a short summary; the full details have their own page
+     (TRAINING CHANGES in core.js). */
   if(n.type==="training"){
-    const when=fmtDate(n.start)+(n.end&&n.end!==n.start?" – "+fmtDate(n.end):"");
+    const summary=trainingSummary(n),more=trainingHasDetails(n);
     return `<article class="card news-card tap-card${featured?" is-latest":""}">${thumb}<p class="eyebrow">Training change</p>
     <h3 style="font-size:1.05rem;margin-top:6px">${esc(n.title)}</h3>
-    <p class="news-date"><time datetime="${esc(posted)}">${fmtDate(posted)}</time> · Applies ${esc(when)}</p>
-    ${n.note?`<p style="color:var(--muted);font-size:.9rem;margin-top:8px">${esc(n.note)}</p>`:""}
-    <div style="margin-top:14px">${cardLink('href="club-calendar"','<span class="btn small ghost">Club calendar →</span>')}</div></article>`;
+    <p class="news-date"><time datetime="${esc(posted)}">${fmtDate(posted)}</time> · Applies ${esc(trainingWhen(n))}</p>
+    ${summary?`<p class="training-summary">${esc(summary)}</p>`:""}
+    <div style="margin-top:14px">${cardLink(trainingLink(n),`<span class="btn small ghost">${more?"Read the details →":"Club calendar →"}</span>`)}</div></article>`;
   }
   const forWho=storySquadLabel(n);
   const about=n.start>posted?` · About ${fmtDate(n.start)}`:"";
@@ -912,7 +913,7 @@ function renderArticle(){
   const view=$("#articleView");
   if(!view)return;
   const id=+(new URLSearchParams(location.search).get("id"));
-  const it=DB.feed.find(x=>x.id===id&&(x.type==="news"||x.type==="social"));
+  const it=DB.feed.find(x=>x.id===id&&(x.type==="news"||x.type==="social"||x.type==="training"));
   if(!it){
     view.innerHTML=`<div class="page-head">
       <p class="eyebrow">Not found</p>
@@ -927,6 +928,7 @@ function renderArticle(){
   const back=it.type==="social"?{href:"club-calendar",label:"← Back to Club Calendar"}:{href:"news",label:"← Back to Club News"};
   view.innerHTML=articleContentHtml(it)
     +(it.link?`<div style="margin-top:18px"><a class="btn small" href="${esc(it.link)}" target="_blank" rel="noopener">Details / tickets →</a></div>`:"")
+    +(it.type==="training"?`<div style="margin-top:18px"><a class="btn small" href="timetables">Usual squad timetables →</a></div>`:"")
     +`<div style="margin-top:28px"><a class="btn small ghost" href="${back.href}">${back.label}</a></div>`;
   wireArticleGallery((it.photos||[]).length);
 }
@@ -1099,18 +1101,16 @@ if($("#roleCatTabs")){
   defaultTab.setAttribute("aria-pressed","true");
 }
 
-/* ================= HOMEPAGE V1 / V2 (CLUB PULSE) =================
-   V2 is the homepage that knows what's on at the club today, and is what every visitor gets
-   unless they pick Classic (V1, the homepage as it was) with the switch under the slideshow. It is
-   one page: the V2 parts sit in index.html all along and site.css only shows them while the body
-   has .home-v2, which a line at the top of index.html sets before anything is drawn (so the wrong
-   version never flashes up first). The visitor's pick is kept in this browser; with no pick,
-   data-home-default on index.html's <body> decides ("v2"). Remove #homeVersion to retire the
-   switch. The navigation and every other page are untouched either way. */
-const HOME_VERSION_KEY="bpsc_home_version",HOME_CONTEXT_KEY="bpsc_home_context";
+/* ================= HOMEPAGE V2 (CLUB PULSE) =================
+   The homepage that knows what's on at the club today. Its parts sit in index.html and site.css
+   only shows them while the body has .home-v2, which index.html's <body> carries -- take that
+   class off to bring back Classic (V1, the homepage as it was). The navigation and every other
+   page are untouched either way. */
+const HOME_CONTEXT_KEY="bpsc_home_context";
 const homePref=k=>{try{return localStorage.getItem(k);}catch(e){return null;}};
 const setHomePref=(k,v)=>{try{localStorage.setItem(k,v);}catch(e){}};
-const homeVersion=()=>{const v=homePref(HOME_VERSION_KEY);return v==="v1"||v==="v2"?v:document.body.dataset.homeDefault==="v2"?"v2":"v1";};
+/* the old Classic | V2 switch kept its pick here; it's gone, so tidy it away */
+try{localStorage.removeItem("bpsc_home_version");}catch(e){}
 /* On a day something's on, V2 leads with it ("auto"); the visitor can put the ordinary homepage
    first instead ("normal"). Only the order of the homepage changes -- nothing is hidden for good. */
 const homeContext=()=>homePref(HOME_CONTEXT_KEY)==="normal"?"normal":"auto";
@@ -1120,21 +1120,18 @@ let pulseState="loading",pulseDay=null;
 function safely(fn){try{fn();}catch(e){console.error(e);}}
 
 function syncHomeVersion(){
-  const demo=homeDemo(),v2=!!demo||homeVersion()==="v2";
-  document.body.classList.toggle("home-v2",v2);
-  document.body.classList.toggle("home-demo",!!demo);
-  const on=demo?"demo":v2?"v2":"v1";
-  document.querySelectorAll("[data-home-version]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.homeVersion===on)));
+  document.body.classList.toggle("home-demo",!!homeDemo());
   safely(renderClubPulse);
 }
 
 /* ---- Race Day demo ----
    For showing people what V2 does on a gala day, on any day. It lives in the address
-   (?demo=race-day, or ?demo=home-meet for one with live results), not in the browser, so a demo
+   (?demo=race-day, or ?demo=home-meet for one with live results) -- there's no button for it on
+   the page any more, so it's reached by link only -- not in the browser, so a demo
    link can be sent round, and nobody is left in demo mode by a refresh or a later visit. The sample
    gala is labelled as a sample; its outside links (live results, league, documents) don't go
    anywhere, and only Full meet details and the venue page are real. It changes nothing saved --
-   not the V1/V2 choice, not the Race Day / Club Home choice. */
+   not the Race Day / Club Home choice. */
 const HOME_DEMOS={"race-day":"Team gala, no live results","home-meet":"Home meet, live results","two-galas":"Two galas in one day"};
 const homeDemo=()=>{const d=new URLSearchParams(location.search).get("demo");return HOME_DEMOS[d]?d:null;};
 function setHomeDemo(d){
@@ -1233,8 +1230,8 @@ function pulseTrainingNotice(t){
   return `<article class="pulse-notice tap-card">
     <p class="pulse-notice-k"><span class="pulse-notice-tag">Session update</span><span>${esc(when)}</span></p>
     <h3>${esc(t.title)}</h3>
-    ${t.note?`<p class="pulse-notice-note">${esc(t.note)}</p>`:""}
-    <div class="pulse-notice-foot">${cardLink('href="club-calendar"',"View details →")}</div>
+    ${trainingSummary(t)?`<p class="pulse-notice-note">${esc(trainingSummary(t))}</p>`:""}
+    <div class="pulse-notice-foot">${cardLink(trainingLink(t),trainingHasDetails(t)?"Read the details →":"Club calendar →")}</div>
   </article>`;
 }
 
@@ -1360,17 +1357,6 @@ let pulseStripResize;
 window.addEventListener("resize",()=>{clearTimeout(pulseStripResize);pulseStripResize=setTimeout(()=>{if(pulseStripSync)pulseStripSync();},120);});
 
 document.addEventListener("click",e=>{
-  const v=e.target.closest("[data-home-version]");
-  if(v){
-    if(v.getAttribute("aria-pressed")==="true")return;
-    const pick=v.dataset.homeVersion;
-    if(pick==="demo"){startHomeDemo("race-day");return;}
-    setHomeDemo(null);
-    setHomePref(HOME_VERSION_KEY,pick);
-    syncHomeVersion();
-    toast(pick==="v2"?"The new homepage":"Classic homepage — switch back any time");
-    return;
-  }
   const d=e.target.closest("[data-home-demo]");
   if(d){
     if(d.getAttribute("aria-pressed")==="true")return;
@@ -1393,20 +1379,12 @@ document.addEventListener("click",e=>{
   }
 });
 function startHomeDemo(key){
-  const first=!homeDemo();
   setHomeDemo(key);demoCtx="auto";
   syncHomeVersion();
-  if(!first)return;
-  toast("Race Day demo — a sample gala");
-  /* the panel is at the top of the page, the button down by the slideshow -- bring it up to just
-     under the sticky header, so the "sample gala" note isn't hidden behind it */
-  const el=$("#clubPulse");
-  if(el)window.scrollTo({top:Math.max(0,el.getBoundingClientRect().top+scrollY-(document.querySelector("header.site")?.offsetHeight||0)-8),
-    behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});
 }
 /* A tab left open overnight (or a phone woken the next morning) shouldn't still show yesterday. */
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&pulseDay&&pulseDay!==isoToday())safely(renderClubPulse);});
-if($("#homeVersion"))syncHomeVersion();
+if($("#clubPulse"))syncHomeVersion();
 
 /* ================= INIT ================= */
 const CONTENT_SLOTS="#meetsList,#otherMeetsList,#teamMeetsList,#completedMeetsList,#coachesList,#academyCoachesList,#rolesList,#newsList,#ttBody,#socialsList,#compList,#leagueList,#committeeList,#committeeDetail";

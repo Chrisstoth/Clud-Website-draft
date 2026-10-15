@@ -322,7 +322,7 @@ function heroFeedItems(feed,view){
 function heroFeedContent(it){
   if(isMeet(it))return {tag:it.type==="teamMeet"?"Team Meet":"Open Meet",title:it.title,blurb:`${it.venue||"Venue TBC"} · ${fmtDate(it.start)}`,linkAttrs:'href="open-meets"',img:it.img||null};
   if(it.type==="social")return {tag:"Club Calendar",title:it.title,blurb:it.blurb||fmtDate(it.start),linkAttrs:`href="article?id=${it.id}"`,img:it.img||null};
-  if(it.type==="training")return {tag:"Training change",title:it.title,blurb:it.note||fmtDate(it.start),linkAttrs:'href="club-calendar"',img:it.img||null};
+  if(it.type==="training")return {tag:"Training change",title:it.title,blurb:trainingSummary(it)||fmtDate(it.start),linkAttrs:trainingLink(it),img:it.img||null};
   const about=storyTopicLabel(it);
   return {tag:about==="Club News"?about:`${about} · Club News`,title:it.title,blurb:it.blurb,linkAttrs:`href="article?id=${it.id}"`,img:it.img||null};
 }
@@ -456,15 +456,47 @@ function wireArticleGallery(n){
 /* Full article view: eyebrow/title/date, gallery (falls back to the single cover picture used
    elsewhere on the site when there's no gallery yet), then the rich body (or the summary, for an
    article that hasn't had a body written yet). */
+/* ================= TRAINING CHANGES =================
+   A change can be one line ("No Monday AM for Gold 1") or a whole weekend rearranged. The full
+   details are written like an article (body -- the same editor as news, so headings per session
+   and a bullet per squad) and get their own page; everywhere else (homepage, Club News, the
+   slideshow) shows only a short summary that links through to it. Older changes kept their
+   details as plain text in "note"; that's shown the same way until someone edits them, when the
+   members' area moves it into the details box. */
+/* the words in some article HTML, a line per paragraph/heading/bullet (DOMParser runs nothing) */
+function htmlText(html){
+  if(!html)return "";
+  const d=new DOMParser().parseFromString(String(html),"text/html");
+  d.body.querySelectorAll("p,h3,li,blockquote,br").forEach(el=>el.after("\n"));
+  return d.body.textContent||"";
+}
+/* Plain-text details as article HTML. Blocks are split at blank lines; a block that opens with a
+   short line with no full stop ("Friday PM changes", "Sunday AM:") followed by more lines is read
+   the way it was typed -- a heading with a bullet for each line under it. Anything else stays a
+   paragraph, line breaks kept. */
+const plainTextHtml=t=>String(t||"").split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean).map(p=>{
+  const lines=p.split("\n").map(l=>l.trim()).filter(Boolean);
+  if(lines.length>1&&lines[0].length<=40&&!/[.!?;,]$/.test(lines[0]))
+    return `<h3>${esc(lines[0].replace(/:$/,""))}</h3><ul>${lines.slice(1).map(l=>`<li>${esc(l)}</li>`).join("")}</ul>`;
+  return `<p>${lines.map(esc).join("<br>")}</p>`;
+}).join("");
+/* the line cards show: its own summary, or else the first line of its details */
+const trainingSummary=it=>it.blurb||(htmlText(it.body)||it.note||"").split("\n").map(s=>s.trim()).find(Boolean)||"";
+const trainingHasDetails=it=>!!(htmlText(it.body).trim()||(it.note||"").trim());
+const trainingLink=it=>trainingHasDetails(it)?`href="article?id=${it.id}"`:'href="club-calendar"';
+const trainingWhen=it=>fmtDate(it.start)+(it.end&&it.end!==it.start?" – "+fmtDate(it.end):"");
+
 function articleContentHtml(it){
   const photos=it.photos||[];
   const cover=!photos.length?resolveNewsImage(it.img,"article"):null;
   const forWho=it.type==="news"?storySquadLabel(it):"";
-  const dateLabel=[it.start?fmtDate(it.start):"",forWho?`For ${forWho}`:""].filter(Boolean).join(" · ");
-  const eyebrow=it.type==="news"?storyTopicLabel(it):"Club Calendar · Social";
+  const training=it.type==="training";
+  const dateLabel=training?(it.start?`Applies ${trainingWhen(it)}`:"")
+    :[it.start?fmtDate(it.start):"",forWho?`For ${forWho}`:""].filter(Boolean).join(" · ");
+  const eyebrow=it.type==="news"?storyTopicLabel(it):training?"Training change":"Club Calendar · Social";
   const media=photos.length?articleGalleryHtml(photos)
     :(cover?`<div class="article-cover ${cover.cls}" style="${cover.style}">${cover.icon?`<span class="news-thumb-icon">${cover.icon}</span>`:""}</div>`:"");
-  const bodyHtml=sanitizeArticleHtml(it.body||"")||`<p>${esc(it.blurb||"")}</p>`;
+  const bodyHtml=sanitizeArticleHtml(it.body||"")||(training?plainTextHtml(it.note):"")||`<p>${esc(it.blurb||"")}</p>`;
   return `<div class="page-head">
       <p class="eyebrow">${esc(eyebrow)}</p>
       <h2 class="display">${esc(it.title||"Untitled")}</h2>
