@@ -17,7 +17,7 @@ const DB={feed:[],bin:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[]
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",streamUrl:"stream_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",topics:"topics",raceDays:"race_days",homepageMode:"homepage_mode"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",streamUrl:"stream_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",topics:"topics",raceDays:"race_days",homepageMode:"homepage_mode",bumpedAt:"bumped_at"};
 /* Highlight colours a meet's documents & links line can be given, so one that matters (a changed
    warm-up time, a late programme) stands out. The key is stored on the link; "" is no highlight. */
 const LINK_HIGHLIGHTS=[["","No highlight"],["orange","Orange"],["yellow","Yellow"],["green","Green"],["blue","Blue"],["red","Red"]];
@@ -55,6 +55,7 @@ function feedToRow(it){
      every save fail with "column not found" (see checkFeedLateCols) */
   if(!feedLateColsReady)Object.values(FEED_LATE_COLS).forEach(c=>delete row[c]);
   if(!feedStreamColReady)delete row.stream_url;
+  if(!feedBumpColReady)delete row.bumped_at;
   return row;
 }
 /* Galas' racing days and homepage style (migration 021). The members' area asks once, at sign-in,
@@ -64,12 +65,16 @@ let feedLateColsReady=false;
 /* A gala's live stream link (migration 023), checked on its own so a site that has run 021 but not
    023 can still save racing days. */
 let feedStreamColReady=false;
+/* "Bump to the top" for an edited news story (migration 026), checked on its own likewise. */
+let feedBumpColReady=false;
 async function checkFeedLateCols(){
-  const [late,stream]=await Promise.all([
+  const [late,stream,bump]=await Promise.all([
     sb.from("feed").select(Object.values(FEED_LATE_COLS).join(",")).limit(1),
-    sb.from("feed").select("stream_url").limit(1)]);
+    sb.from("feed").select("stream_url").limit(1),
+    sb.from("feed").select("bumped_at").limit(1)]);
   feedLateColsReady=!late.error;
   feedStreamColReady=!stream.error;
+  feedBumpColReady=!bump.error;
   return feedLateColsReady;
 }
 const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads:r.squads||[],photo:r.photo||"",bio:r.bio||"",sortOrder:r.sort_order??0});
@@ -284,10 +289,11 @@ const storySquadLabel=it=>storyTags(it).filter(t=>t.squad).map(t=>t.name).join("
 /* When an item went up: the day it was posted -- or its own date, if that's earlier (a story
    back-dated to when something happened, or older items typed in after the fact). An item about
    something still to come (camp in a fortnight, a training change next week) is therefore filed
-   under the day it was announced, not the day it's about. */
-const publishedOn=it=>[it.start,it.created].filter(Boolean).sort()[0]||"";
-/* Newest first by publish date; two on the same day go most recently added first. */
-const newestFirst=(a,b)=>publishedOn(b).localeCompare(publishedOn(a))||(b.createdAt||"").localeCompare(a.createdAt||"");
+   under the day it was announced, not the day it's about. A story bumped to the top after an edit
+   (migration 026) counts as posted the day it was bumped. */
+const publishedOn=it=>it.bumpedAt?isoDay(new Date(it.bumpedAt)):[it.start,it.created].filter(Boolean).sort()[0]||"";
+/* Newest first by publish date; two on the same day go most recently added (or bumped) first. */
+const newestFirst=(a,b)=>publishedOn(b).localeCompare(publishedOn(a))||(b.bumpedAt||b.createdAt||"").localeCompare(a.bumpedAt||a.createdAt||"");
 const HERO_SLOTS=6;
 const heroIsEvent=it=>it.type!=="news"||it.start>(it.created||isoToday());
 const heroPinned=it=>!!(it.start&&it.pinUntil&&it.pinUntil>=isoToday());

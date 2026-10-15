@@ -1241,6 +1241,15 @@ function showForm(sec,id,forcedType){
       data.key=uniq;
       data.bg=NEW_DEFAULT_GRADIENTS[DB.newsDefaults.length%NEW_DEFAULT_GRADIENTS.length];
     }
+    if(isFeed&&id){
+      /* bumped_at isn't on the form, so carry an earlier bump over rather than wipe it. Editing a
+         story that isn't already today's offers to bump it to the top of Club News (migration 026);
+         it keeps its id, so links to it still work. */
+      data.bumpedAt=it.bumpedAt;
+      if(feedBumpColReady&&(type==="news"||type==="training")&&publishedOn(it)<isoToday()
+        &&confirm(`You've edited "${data.title||it.title}".\n\nBump it to the top of Club News, like a fresh article? Links to it will still work.\n\nOK = bump it to the top\nCancel = leave it where it is`))
+        data.bumpedAt=new Date().toISOString();
+    }
     const submit=e.target.querySelector('button[type="submit"]');
     submit.disabled=true;
     const storyBefore=isFeed&&DB.feed.some(x=>x.sourceMeetId&&x.sourceMeetId===id);
