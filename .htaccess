@@ -26,7 +26,7 @@ RewriteRule ^(.+)/$ /$1 [L,R=301]
 # Clean URLs: /join serves join.html
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+RewriteCond %{REQUEST_FILENAME}.html -f
 RewriteRule ^([^.]+?)/?$ $1.html [L]
 
 ErrorDocument 404 /404.html
