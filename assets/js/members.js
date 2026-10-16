@@ -874,14 +874,24 @@ function rteLinkTarget(s){
   if(/^www\./i.test(s))return "https://"+s;
   return s;
 }
-/* A gala's news article, drafted from what's on the gala form so far (g = its form values). */
+/* A gala's dates as said in a sentence: "28 Nov 2026", "28–29 Nov 2026", "30 Nov – 1 Dec 2026". */
+function meetDatesText(start,end){
+  if(!start)return "";
+  if(!end||end<=start)return fmtDate(start);
+  const s=fmtDate(start).split(" "),e=fmtDate(end),[,em,ey]=e.split(" ");
+  return s[2]!==ey?`${s.join(" ")} – ${e}`:s[1]!==em?`${s[0]} ${s[1]} – ${e}`:`${s[0]}–${e}`;
+}
+/* A gala's news article, drafted from what's on the gala form so far (g = its form values), e.g.
+   "Entries are now open for X at Basildon Sporting Village on 28–29 Nov 2026. Entries close on 21 Nov 2026." */
 function meetArticleDraft(g){
   const t=(g.title||"").trim()||"the gala",venue=(g.venue||"").trim();
-  const when=g.start?fmtDate(g.start)+(g.end&&g.end!==g.start?" – "+fmtDate(g.end):""):"";
-  const open=!!(g.entryUrl||"").trim()&&g.status!=="closed";
+  const where=(venue?` at ${venue}`:"")+(g.start?` on ${meetDatesText(g.start,g.end)}`:"");
+  const last=g.end||g.start,past=!!last&&last<isoToday();
+  const open=!!(g.entryUrl||"").trim()&&g.status!=="closed"&&!past;
+  const T=t[0].toUpperCase()+t.slice(1);
   const blurb=open
-    ?`Entries are now open for ${t}${when?` (${when})`:""}${venue?` at ${venue}`:""}.${g.closing?` Entries close ${fmtDate(g.closing)}.`:""}`
-    :`${t}${when?` is on ${when}`:""}${venue?` at ${venue}`:""}.`;
+    ?`Entries are now open for ${t}${where}.${g.closing?` Entries close on ${fmtDate(g.closing)}.`:""}`
+    :where?`${T} ${past?"took":"takes"} place${where}.`:`${T}.`;
   const notes=(g.notes||"").trim();
   return {title:open?`Entries open: ${t}`:t,blurb,body:blurb+(notes?"\n\n"+notes:"")};
 }
