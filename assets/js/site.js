@@ -422,7 +422,9 @@ function calSelectDay(iso){
    href: where "Full details" goes -- the day list sends it to the gala's own card; "" (too far ahead) drops the button. */
 function meetRowCard(m,href="open-meets"){
   const dp=dateParts(m.start),open=m.status==="open",ours=m.type==="meet";
+  const r=resolveNewsImage(m.img);
   return `<article class="card comp-card tap-card${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}">
+    ${r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:""}
     <div class="comp-top">
       <div class="comp-date"><span class="d">${dp.d}</span><span class="m">${dp.m}</span></div>
       <h3>${esc(m.title)}</h3>
@@ -802,8 +804,15 @@ function newsJumpSpy(){
   const newer=bar.querySelector('.news-jump-arrow[data-dir="newer"]'),older=bar.querySelector('.news-jump-arrow[data-dir="older"]');
   if(newer)newer.disabled=i<=0;
   if(older)older.disabled=i>=newsEraKeys.length-1;
-  const active=$("#newsJumpChips .news-jump-chip.active");
-  if(active)active.scrollIntoView({block:"nearest",inline:"nearest"});
+  /* Slide the chip strip sideways to show the active chip. Only the strip: scrollIntoView would
+     also scroll the page to the bar, which on phones dragged readers back up to it on every
+     scroll (e.g. while the follow panel was open). */
+  const active=$("#newsJumpChips .news-jump-chip.active"),strip=$("#newsJumpChips");
+  if(active&&strip){
+    const s=strip.getBoundingClientRect(),a=active.getBoundingClientRect();
+    if(a.left<s.left)strip.scrollLeft-=s.left-a.left;
+    else if(a.right>s.right)strip.scrollLeft+=a.right-s.right;
+  }
 }
 window.addEventListener("scroll",()=>{
   if(newsSpyQueued)return;

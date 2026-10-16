@@ -66,7 +66,7 @@ const SCHEMAS = {
     {k:"volunteerUrl",label:"Volunteer here link (URL — leave blank to use the Volunteering page)",type:"text"},
     {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
     {k:"streamUrl",label:"Live stream link (URL, e.g. YouTube — Watch live stream button shows only on the racing days)",type:"text",late:"stream"},
-    {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
+    {k:"resultsUrl",label:"Results (upload the PDF, or paste a link — shown once the gala is completed)",type:"pdfurl"},
     {k:"docLinks",label:"Meet documents & links",type:"links"},
     {k:"notes",label:"Notes for parents & swimmers",type:"textarea"},
     {k:"img",label:"Picture",type:"imagepicker"},
@@ -116,7 +116,7 @@ const SCHEMAS = {
     {k:"volunteerUrl",label:"Volunteer link (URL — button hidden if blank)",type:"text"},
     {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
     {k:"streamUrl",label:"Live stream link (URL, e.g. YouTube — Watch live stream button shows only on the racing days)",type:"text",late:"stream"},
-    {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
+    {k:"resultsUrl",label:"Results (upload the PDF, or paste a link — shown once the gala is completed)",type:"pdfurl"},
     {k:"docLinks",label:"Meet documents & links",type:"links"},
     {k:"notes",label:"Notes for parents & swimmers",type:"textarea"},
     {k:"img",label:"Picture",type:"imagepicker"},
@@ -135,7 +135,7 @@ const SCHEMAS = {
     {k:"leagueUrl",label:"League info link (URL — optional)",type:"text"},
     {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
     {k:"streamUrl",label:"Live stream link (URL, e.g. YouTube — Watch live stream button shows only on the racing days)",type:"text",late:"stream"},
-    {k:"resultsUrl",label:"Results link (URL — shown once the gala is completed)",type:"text"},
+    {k:"resultsUrl",label:"Results (upload the PDF, or paste a link — shown once the gala is completed)",type:"pdfurl"},
     {k:"docLinks",label:"Meet documents & links",type:"links"},
     {k:"img",label:"Picture",type:"imagepicker"},
     {k:"article",label:"News article",type:"meetarticle"}
@@ -281,6 +281,8 @@ function renderCodeEntry(email){
 function loginErrorMessage(error){
   const m=error.message||"";
   if(/signups not allowed/i.test(m))return "That address isn't set up as a club editor. Check the spelling, or ask the webmaster to add you.";
+  const wait=m.match(/after (\d+) seconds?/i);
+  if(wait)return `A link was sent to that address moments ago, so check your inbox first. You can ask for another in ${wait[1]} seconds.`;
   if(/rate limit|too many/i.test(m))return "Too many sign-in emails in a short time. Wait an hour, or sign in with your password instead.";
   if(/invalid login credentials/i.test(m))return "That email and password don't match. Try again, or email yourself a sign-in link.";
   return m;
@@ -1042,6 +1044,9 @@ function showForm(sec,id,forcedType){
         <p class="hint" style="margin-top:6px">This box shows exactly how the article text will look on the page.</p>
       </div>`;
     }
+    if(f.type==="pdfurl")return `<div style="display:grid;gap:8px"><label class="f">${f.label}<input type="text" name="${f.k}" value="${val}"></label>
+      <div class="img-add-row"><label class="img-upload-btn">Upload results PDF<input type="file" accept="application/pdf,.pdf" data-pdf-for="${f.k}" style="display:none"></label>
+        <a class="img-clear-btn" data-pdf-view="${f.k}" href="${val}" target="_blank" rel="noopener" ${val?"":"hidden"}>Open current file</a></div></div>`;
     /* a field whose column comes from a migration that may not have been run yet */
     if(f.late==="stream"&&!feedStreamColReady)return `<label class="f">${f.label}<input type="text" name="${f.k}" value="${val}" disabled>
       <span class="hint" style="color:var(--warn)">Needs a one-off database update (migration 023) before it can be saved. Everything else on this form saves as normal.</span></label>`;
@@ -1105,6 +1110,27 @@ function showForm(sec,id,forcedType){
   };
   /* With a gallery, its first photo IS the picture (it overwrites "img" on save), so the picture
      field follows the gallery rather than offering choices that would be thrown away. */
+  formTarget.querySelectorAll("[data-pdf-for]").forEach(input=>{
+    const k=input.dataset.pdfFor,box=formTarget.querySelector(`[name="${k}"]`),view=formTarget.querySelector(`[data-pdf-view="${k}"]`);
+    const syncView=()=>{view.href=box.value.trim();view.hidden=!box.value.trim();};
+    box.addEventListener("input",syncView);
+    input.addEventListener("change",async e=>{
+      const file=e.target.files[0];
+      if(!file)return;
+      const labelText=e.target.closest(".img-upload-btn").firstChild,original=labelText.nodeValue;
+      labelText.nodeValue="Uploading…";
+      try{
+        box.value=await uploadPdf(file);
+        syncView();
+        toast("PDF uploaded — save the gala to publish it");
+      }catch(err){
+        toast(err.message||"Couldn't upload that PDF");
+      }finally{
+        labelText.nodeValue=original;
+        e.target.value="";
+      }
+    });
+  });
   const galleryField=SCHEMAS[schemaKey].find(f=>f.type==="gallery");
   let galleryPhotos=galleryField?[...(it.photos||[])]:null;
   /* A homepage screen ("hd" computer, "hp" phone) can have its own pictures instead of the
@@ -2020,6 +2046,21 @@ async function uploadImage(file){
   const {error}=await sb.storage.from("site-images").upload(name,blob,{contentType:"image/jpeg",cacheControl:"31536000"});
   if(error)throw new Error(saveErrorMessage(error));
   return sb.storage.from("site-images").getPublicUrl(name).data.publicUrl;
+}
+
+/* Results PDFs go to their own store ("documents", migration 031), kept under the file's own
+   name (tidied) so the link and the download still read as e.g. "2026-Autumn-Meet-Results.pdf". */
+async function uploadPdf(file){
+  if(file.type!=="application/pdf"&&!/\.pdf$/i.test(file.name))throw new Error("That isn't a PDF — please choose a .pdf file");
+  if(file.size>25*1024*1024)throw new Error("That PDF is over 25 MB — too big to upload");
+  const base=file.name.replace(/\.pdf$/i,"").replace(/[^\w.-]+/g,"-").replace(/^-+|-+$/g,"").slice(0,80)||"results";
+  const name=`results/${Date.now()}-${base}.pdf`;
+  const {error}=await sb.storage.from("documents").upload(name,file,{contentType:"application/pdf",cacheControl:"31536000"});
+  if(error){
+    if(/bucket not found/i.test(error.message||""))throw new Error("PDF uploads need a one-off database update (migration 031) first");
+    throw new Error(saveErrorMessage(error));
+  }
+  return sb.storage.from("documents").getPublicUrl(name).data.publicUrl;
 }
 
 /* The photo library: every photo already in the image store, newest first, so a picture can be

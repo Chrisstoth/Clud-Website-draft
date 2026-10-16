@@ -1071,10 +1071,10 @@ button.cal-daynum:focus-visible{outline:2px solid var(--flame);outline-offset:1p
 }
 /* Same bled-to-edge treatment as .social-card .art -- the thumb has to bleed past the card's own
    padding to reach the bevelled edges, or the clip-path cuts a visible notch out of the picture. */
-.news-card .news-thumb{position:relative;margin:-22px -38px 14px -34px;border-radius:0;overflow:hidden}
+.news-card .news-thumb,.comp-card .news-thumb{position:relative;margin:-22px -38px 14px -34px;border-radius:0;overflow:hidden}
 /* Fades the picture into the card body instead of ending on a hard line -- the gradient matches
    --card, so it reads as the image dissolving into the card rather than a visible band. */
-.news-card .news-thumb::after{content:"";position:absolute;inset:auto 0 0 0;height:26px;
+.news-card .news-thumb::after,.comp-card .news-thumb::after{content:"";position:absolute;inset:auto 0 0 0;height:26px;
   background:linear-gradient(180deg,transparent,var(--card));pointer-events:none}
 /* The same bevel family, extended to the rest of the site's content cards.
    Which of the two bevels a card takes is decided by how tall it actually gets: the full --rise
@@ -1126,7 +1126,7 @@ body.theme-dark .comp-card.ours.entries-open{background:linear-gradient(150deg,r
 @media(max-width:640px){
   .cat-row>*{flex:0 0 260px}
   .comp-card,.social-card,.news-card{padding:18px 20px;min-height:0;clip-path:none;border-radius:var(--radius)}
-  .social-card .art,.news-card .news-thumb{margin:-18px -20px 14px -20px;border-radius:var(--radius) var(--radius) 0 0}
+  .social-card .art,.news-card .news-thumb,.comp-card .news-thumb{margin:-18px -20px 14px -20px;border-radius:var(--radius) var(--radius) 0 0}
   .card.slanted,.card.coach,.card.role-card,.card.path-card{position:relative;padding:22px;min-height:0;clip-path:none;border-radius:var(--radius)}
   .card.coach .coach-photo{margin:-22px -22px 14px;border-radius:var(--radius) var(--radius) 0 0}
   /* Below the bevel breakpoint there's no room for the bio beside the card -- stack it under
@@ -1407,8 +1407,11 @@ footer.site a:hover{color:var(--ember)}
 /* Arranging the slideshow: pin and up/down on each row; the slides past the homepage's count are
    the next in line, dimmed under a divider */
 .home-slides-hint{margin:0 0 10px;font-size:.84rem;color:var(--muted)}
-.home-slide-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.home-slide-acts{display:flex;align-items:center;gap:6px}
+/* the buttons stay on the right of every row; a long title wraps beside them, not over them */
+.home-slide-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.home-slide-row>div:first-child{flex:1;min-width:0}
+.home-slide-acts{display:flex;align-items:center;gap:6px;flex-shrink:0}
+@media(max-width:560px){.home-slide-row{flex-wrap:wrap}}
 .home-slide-acts .doclink-move button{height:32px;width:30px}
 .home-slide-pin{background:none;border:1.5px solid var(--line);color:var(--muted);border-radius:8px;height:32px;padding:0 10px;cursor:pointer;font:inherit;font-size:.78rem;font-weight:700}
 .home-slide-pin:hover{border-color:var(--flame);color:var(--text)}
@@ -1811,7 +1814,6 @@ button.img-upload-btn{background:none;font-family:inherit}
 /* toast + badges */
 #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:12px 22px;border-radius:999px;border:1.5px solid var(--flame);font-weight:600;font-size:.92rem;opacity:0;pointer-events:none;transition:all .25s;z-index:400}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-.proto-badge{background:var(--ember);color:var(--ink);font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;text-align:center;padding:6px 12px}
 .inbox-msg{white-space:pre-wrap}
 
 /* ---------- mission & club history ----------
@@ -1961,7 +1963,6 @@ main{overflow-x:clip}
   .theme-toggle{width:36px;height:36px}
   .burger{padding:7px 9px}
   .container{padding:0 14px}
-  .proto-badge{font-size:.66rem;padding:6px 10px}
   .page-head{margin-bottom:26px}
   section.page{padding:36px 0 54px}
   .meets-heading{font-size:1.2rem}
