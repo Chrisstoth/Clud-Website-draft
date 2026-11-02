@@ -62,7 +62,8 @@ const SCHEMAS = {
     {k:"venue",label:"Venue & pool",type:"text",req:1},
     {k:"closing",label:"Entries close",type:"date"},
     {k:"status",label:"Entry status (moves to Completed galas automatically after the last day)",type:"select",opts:["open","closed"]},
-    {k:"entryUrl",label:"Entry link — where the “Enter here” button goes (paste the entry system link, or upload the entry pack PDF)",type:"pdfurl",btn:"Upload entry pack PDF instead",folder:"meet-docs"},
+    {k:"entryUrl",label:"Entry link (URL of the online entry system — the green “Enter here” button)",type:"text"},
+    {k:"entryPackUrl",label:"Entry pack (upload the PDF, or paste a link — its own “Entry pack” button)",type:"pdfurl",btn:"Upload entry pack PDF",folder:"meet-docs",late:"pack"},
     {k:"officialsUrl",label:"Officials sign-up link (URL — button hidden if blank)",type:"text"},
     {k:"volunteerUrl",label:"Volunteer here link (URL — leave blank to use the Volunteering page)",type:"text"},
     {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
@@ -112,7 +113,8 @@ const SCHEMAS = {
     {k:"venue",label:"Venue & pool",type:"text",req:1},
     {k:"closing",label:"Entries close",type:"date"},
     {k:"status",label:"Entry status (moves to Completed galas automatically after the last day)",type:"select",opts:["open","closed"]},
-    {k:"entryUrl",label:"Entry link — where the “Enter here” button goes (paste the entry system link, or upload the entry pack PDF)",type:"pdfurl",btn:"Upload entry pack PDF instead",folder:"meet-docs"},
+    {k:"entryUrl",label:"Entry link (URL of the online entry system — the green “Enter here” button)",type:"text"},
+    {k:"entryPackUrl",label:"Entry pack (upload the PDF, or paste a link — its own “Entry pack” button)",type:"pdfurl",btn:"Upload entry pack PDF",folder:"meet-docs",late:"pack"},
     {k:"officialsUrl",label:"Officials sign-up link (URL — button hidden if blank)",type:"text"},
     {k:"volunteerUrl",label:"Volunteer link (URL — button hidden if blank)",type:"text"},
     {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
@@ -925,7 +927,7 @@ function meetArticleDraft(g){
   const t=(g.title||"").trim()||"the gala",venue=(g.venue||"").trim();
   const where=(venue?` at ${venue}`:"")+(g.start?` on ${meetDatesText(g.start,g.end)}`:"");
   const last=g.end||g.start,past=!!last&&last<isoToday();
-  const open=!!(g.entryUrl||"").trim()&&g.status!=="closed"&&!past;
+  const open=[g.entryUrl,g.entryPackUrl].some(u=>(u||"").trim())&&g.status!=="closed"&&!past;
   const T=t[0].toUpperCase()+t.slice(1);
   const blurb=open
     ?`Entries are now open for ${t}${where}.${g.closing?` Entries close on ${fmtDate(g.closing)}.`:""}`
@@ -1108,6 +1110,8 @@ function showForm(sec,id,forcedType){
         <p class="hint" style="margin-top:6px">This box shows exactly how the article text will look on the page.</p>
       </div>`;
     }
+    if(f.late==="pack"&&!feedPackColReady)return `<label class="f">${f.label}<input type="text" name="${f.k}" value="${val}" disabled>
+      <span class="hint" style="color:var(--warn)">Needs a one-off database update (migration 034) before it can be saved. Everything else on this form saves as normal.</span></label>`;
     if(f.type==="pdfurl")return `<div style="display:grid;gap:8px"><label class="f">${f.label}<input type="text" name="${f.k}" value="${val}"></label>
       <div class="img-add-row"><label class="img-upload-btn">${f.btn||"Upload results PDF"}<input type="file" accept="application/pdf,.pdf" data-pdf-for="${f.k}" data-pdf-folder="${f.folder||"results"}" style="display:none"></label>
         <a class="img-clear-btn" data-pdf-view="${f.k}" href="${val}" target="_blank" rel="noopener" ${val?"":"hidden"}>Open current file</a></div></div>`;

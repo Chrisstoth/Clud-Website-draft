@@ -84,6 +84,8 @@ alter table public.feed add constraint feed_homepage_mode_check
   check (homepage_mode is null or homepage_mode in ('off','race','home_meet','championship'));
 -- Galas: live video stream of the racing (YouTube etc.), shown only on racing days (migration 023).
 alter table public.feed add column if not exists stream_url text;
+-- Galas: entry pack (PDF or link), its own button beside the entry link's "Enter here" (migration 034).
+alter table public.feed add column if not exists entry_pack_url text;
 
 create table if not exists public.coaches (
   id          bigint generated always as identity primary key,

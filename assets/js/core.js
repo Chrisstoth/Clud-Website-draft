@@ -17,7 +17,7 @@ const DB={feed:[],bin:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[]
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",streamUrl:"stream_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",topics:"topics",raceDays:"race_days",homepageMode:"homepage_mode",bumpedAt:"bumped_at"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",entryPackUrl:"entry_pack_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",streamUrl:"stream_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",topics:"topics",raceDays:"race_days",homepageMode:"homepage_mode",bumpedAt:"bumped_at"};
 /* Highlight colours a meet's documents & links line can be given, so one that matters (a changed
    warm-up time, a late programme) stands out. The key is stored on the link; "" is no highlight. */
 const LINK_HIGHLIGHTS=[["","No highlight"],["orange","Orange"],["yellow","Yellow"],["green","Green"],["blue","Blue"],["red","Red"]];
@@ -60,6 +60,7 @@ function feedToRow(it){
      every save fail with "column not found" (see checkFeedLateCols) */
   if(!feedLateColsReady)Object.values(FEED_LATE_COLS).forEach(c=>delete row[c]);
   if(!feedStreamColReady)delete row.stream_url;
+  if(!feedPackColReady)delete row.entry_pack_url;
   if(!feedBumpColReady)delete row.bumped_at;
   return row;
 }
@@ -70,6 +71,8 @@ let feedLateColsReady=false;
 /* A gala's live stream link (migration 023), checked on its own so a site that has run 021 but not
    023 can still save racing days. */
 let feedStreamColReady=false;
+/* A gala's entry pack, kept apart from its entry link (migration 034), checked on its own likewise. */
+let feedPackColReady=false;
 /* "Bump to the top" for an edited news story (migration 026), checked on its own likewise. */
 let feedBumpColReady=false;
 /* The arranged homepage slideshow (migration 027): until it's there the members' area shows the
@@ -78,14 +81,16 @@ let feedSlideColsReady=false;
 /* Taking a post off the slideshow (migration 030): until it's there, no red cross. */
 let feedSlideOffReady=false;
 async function checkFeedLateCols(){
-  const [late,stream,bump,slide,off]=await Promise.all([
+  const [late,stream,pack,bump,slide,off]=await Promise.all([
     sb.from("feed").select(Object.values(FEED_LATE_COLS).join(",")).limit(1),
     sb.from("feed").select("stream_url").limit(1),
+    sb.from("feed").select("entry_pack_url").limit(1),
     sb.from("feed").select("bumped_at").limit(1),
     sb.from("feed").select("hero_at,pinned").limit(1),
     sb.from("feed").select("off_slideshow").limit(1)]);
   feedLateColsReady=!late.error;
   feedStreamColReady=!stream.error;
+  feedPackColReady=!pack.error;
   feedBumpColReady=!bump.error;
   feedSlideColsReady=!slide.error;
   feedSlideOffReady=!off.error;
@@ -554,16 +559,16 @@ const stripMeetLinks=html=>String(html||"")
 function articleMeetBoxHtml(m){
   const done=meetDone(m),team=m.type==="teamMeet";
   const dates=m.end&&m.end!==m.start?`${fmtDate(m.start)} – ${fmtDate(m.end)}`:fmtDate(m.start);
-  const open=!team&&!done&&m.status==="open"&&!!m.entryUrl;
+  const open=!team&&!done&&m.status==="open"&&!!(m.entryUrl||m.entryPackUrl);
   const state=done?"Completed":team?"":open?(m.closing?`Entries close <strong>${fmtDate(m.closing)}</strong>`:"Entries open")
-    :m.entryUrl?"Entries closed":"";
+    :m.entryUrl||m.entryPackUrl?"Entries closed":"";
   const ext=(url,label,cls)=>`<a class="btn small${cls?" "+cls:""}" href="${esc(url)}" target="_blank" rel="noopener">${label}</a>`;
   return `<aside class="article-meet">
     <p class="eyebrow">The gala</p>
     <h3>${esc(m.title)}</h3>
     <div class="venue">${esc(m.venue||"Venue TBC")} · ${dates}</div>
     ${state?`<div class="state">${state}</div>`:""}
-    <div class="actions"><a class="btn small" href="open-meets#meet-${esc(m.id)}">Gala details &amp; documents →</a>${open?ext(m.entryUrl,"Entry pack","ghost"):""}${done&&m.resultsUrl?ext(m.resultsUrl,"Results","ghost"):""}</div>
+    <div class="actions"><a class="btn small" href="open-meets#meet-${esc(m.id)}">Gala details &amp; documents →</a>${open&&m.entryUrl?ext(m.entryUrl,"Enter here","ghost"):""}${!team&&!done&&m.entryPackUrl?ext(m.entryPackUrl,"Entry pack","ghost"):""}${done&&m.resultsUrl?ext(m.resultsUrl,"Results","ghost"):""}</div>
   </aside>`;
 }
 function articleContentHtml(it){

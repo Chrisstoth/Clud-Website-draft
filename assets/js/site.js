@@ -1,11 +1,11 @@
-/* Orange edge only when entries can actually be made: an open meet, upcoming, status open, and an entry pack link set. */
+/* Orange edge only when entries can actually be made: an open meet, upcoming, status open, and an entry link or entry pack set. */
 /* A card with one destination is a link as a whole: this anchor's ::after is stretched over the
    nearest positioned ancestor (the card), so a tap anywhere on it follows the link. On phones the
    label gives way to an arrow badge (see .tap-card in site.css). */
 /* iOS Safari only applies :active (the tap-card press state) once the page listens for touches */
 document.addEventListener("touchstart",()=>{},{passive:true});
 const cardLink=(attrs,label)=>`<a class="card-link" ${attrs}><span class="cl-label">${label}</span></a>`;
-const meetHasEntry=m=>m.type!=="teamMeet"&&!meetDone(m)&&m.status==="open"&&!!m.entryUrl;
+const meetHasEntry=m=>m.type!=="teamMeet"&&!meetDone(m)&&m.status==="open"&&!!(m.entryUrl||m.entryPackUrl);
 /* The results archive runs back to 2024 and only grows, so showing every completed gala as a
    card leaves a wall of them between the reader and the one they came for. Only the latest gala
    WE hosted stays on show as a card (its results are what people come looking for); everything
@@ -57,15 +57,16 @@ function renderMeets(){
     const pills=[
       meetLive(m)||meetStreaming(m)?'<span class="pill live"><span class="live-dot"></span>Live now</span>':"",
       /* "open" with no entry pack yet can't actually be entered, so it doesn't claim to be */
-      done?'<span class="pill closed">Completed</span>':team?"":m.status==="open"?(m.entryUrl?'<span class="pill open">Entries open</span>':'<span class="pill closed">Entry pack soon</span>'):'<span class="pill closed">Entries closed</span>',
+      done?'<span class="pill closed">Completed</span>':team?"":m.status==="open"?(m.entryUrl||m.entryPackUrl?'<span class="pill open">Entries open</span>':'<span class="pill closed">Entry pack soon</span>'):'<span class="pill closed">Entries closed</span>',
       team?`<span class="pill results">${esc(m.league||"Team meet")}</span>`:ours?'<span class="pill hosted">BPSC hosted</span>':"",
       m.level&&!team?`<span class="pill level">${esc(m.level)}</span>`:""
     ].join("");
     let actions;
     if(done)actions=m.resultsUrl?extLink(m.resultsUrl,"Results","big"):`<span class="btn big disabled" aria-disabled="true">Results coming soon</span>`;
     else if(team)actions=m.leagueUrl?extLink(m.leagueUrl,"League info"):"";
-    else actions=(meetHasEntry(m)?extLink(m.entryUrl,"Enter here","big enter")
-        :m.entryUrl&&m.status!=="open"?`<span class="btn big entries-closed" aria-disabled="true">Entries CLOSED</span>`:"")
+    else actions=(meetHasEntry(m)&&m.entryUrl?extLink(m.entryUrl,"Enter here","big enter")
+        :(m.entryUrl||m.entryPackUrl)&&m.status!=="open"?`<span class="btn big entries-closed" aria-disabled="true">Entries CLOSED</span>`:"")
+      +(m.entryPackUrl?extLink(m.entryPackUrl,"Entry pack"):"")
       +(m.officialsUrl?extLink(m.officialsUrl,"Officials sign-up"):"")
       +(m.volunteerUrl?extLink(m.volunteerUrl,"Volunteer here"):"");
     /* A gala in progress leads with its live-results button, whatever else the card offers. */
