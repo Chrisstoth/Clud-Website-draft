@@ -62,7 +62,7 @@ const SCHEMAS = {
     {k:"venue",label:"Venue & pool",type:"text",req:1},
     {k:"closing",label:"Entries close",type:"date"},
     {k:"status",label:"Entry status (moves to Completed galas automatically after the last day)",type:"select",opts:["open","closed"]},
-    {k:"entryUrl",label:"Entry pack link (URL)",type:"text"},
+    {k:"entryUrl",label:"Entry pack (upload the PDF, or paste a link)",type:"pdfurl",btn:"Upload entry pack PDF",folder:"meet-docs"},
     {k:"officialsUrl",label:"Officials sign-up link (URL — button hidden if blank)",type:"text"},
     {k:"volunteerUrl",label:"Volunteer here link (URL — leave blank to use the Volunteering page)",type:"text"},
     {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
@@ -112,7 +112,7 @@ const SCHEMAS = {
     {k:"venue",label:"Venue & pool",type:"text",req:1},
     {k:"closing",label:"Entries close",type:"date"},
     {k:"status",label:"Entry status (moves to Completed galas automatically after the last day)",type:"select",opts:["open","closed"]},
-    {k:"entryUrl",label:"Entry pack link (URL)",type:"text"},
+    {k:"entryUrl",label:"Entry pack (upload the PDF, or paste a link)",type:"pdfurl",btn:"Upload entry pack PDF",folder:"meet-docs"},
     {k:"officialsUrl",label:"Officials sign-up link (URL — button hidden if blank)",type:"text"},
     {k:"volunteerUrl",label:"Volunteer link (URL — button hidden if blank)",type:"text"},
     {k:"liveUrl",label:"Live results link (URL — red LIVE button shows only on the days of the gala)",type:"text"},
@@ -898,7 +898,7 @@ function docLinkRowHtml(l={}){
   return `<div class="doclink-row${l.hl?" hl-"+esc(l.hl):""}" data-doclink>
     <input type="text" data-k="label" value="${esc(l.label||"")}" placeholder="Name, e.g. Meet conditions & details" aria-label="Name">
     <input type="text" data-k="text" value="${esc(l.text||"")}" placeholder="Link text, e.g. View conditions" aria-label="Link text">
-    <input type="text" data-k="url" value="${esc(l.url||"")}" placeholder="Link (https://…)" aria-label="Link (URL)" inputmode="url">
+    <span class="doclink-url"><input type="text" data-k="url" value="${esc(l.url||"")}" placeholder="Link (https://…), or upload →" aria-label="Link (URL)" inputmode="url"><label class="doclink-pdf" title="Upload a PDF for this line (replaces the link)">PDF<input type="file" accept="application/pdf,.pdf" data-doclink-pdf style="display:none"></label></span>
     <select data-k="hl" aria-label="Highlight colour">${hlOpts}</select>
     <span class="doclink-move"><button type="button" data-doclink-up aria-label="Move up">↑</button><button type="button" data-doclink-down aria-label="Move down">↓</button></span>
     <button type="button" class="sess-del" data-doclink-del aria-label="Remove link">×</button>
@@ -1039,8 +1039,20 @@ function showForm(sec,id,forcedType){
       /* One news article per gala (migration 029): it's the gala's post in Club News and on the
          homepage slideshow. Once posted it's an ordinary story, edited from Club News. */
       const story=id&&DB.feed.find(x=>x.sourceMeetId===id);
+      /* With an article already: the gala form can update it and bump it back to the top
+         (migration 033), so news about a change isn't lost down the list. */
       if(story)return `<div class="f meet-article"><p class="tag-group-label">${f.label}</p>
-        <p class="hint" style="margin:0">This gala's article is <b>${esc(story.title)}</b>${isPending(story)?" (waiting for approval)":""}. It's what shows in Club News and on the homepage slideshow — edit it from Club News.</p></div>`;
+        <p class="hint" style="margin:0">This gala's article is <b>${esc(story.title)}</b> (${slidePostedLabel(story)}${isPending(story)?", waiting for approval":""}). It ends with a box showing this gala's details as they are now, linking to its card on Open Meets, and the card links back to it.</p>
+        <label class="checkbox-f"><input type="checkbox" id="meetArticleUpd"> Update the article and move it back to the top of Club News and the homepage slideshow</label>
+        <div class="stack" id="meetArticleFields" hidden>
+          <label class="f">Headline<input type="text" id="meetArticleTitle" value="${esc(story.title)}"></label>
+          <label class="f">Summary (shown in the news list and on the homepage)<textarea id="meetArticleBlurb" rows="2">${esc(story.blurb||"")}</textarea></label>
+          <label class="f">What's changed (optional — added at the top of the article as "Update, ${fmtDate(isoToday())}: …")<textarea id="meetArticleNote" rows="3" placeholder="e.g. The warm-up times and programme are now out — see the meet documents."></textarea></label>
+          <button type="button" class="btn small ghost" id="meetArticleRedraft" style="justify-self:start">Redraft the headline and summary from the gala</button>
+          <p class="hint" style="margin:0">The rest of the article stays as it is — to rewrite it, edit it in Club News.</p>
+        </div></div>`;
+      /* Stories in Club News not yet tied to a gala, newest first, for "link an article". */
+      const loose=DB.feed.filter(x=>x.type==="news"&&!x.sourceMeetId).sort((a,b)=>(b.bumpedAt||b.createdAt||"")<(a.bumpedAt||a.createdAt||"")?-1:1).slice(0,40);
       return `<div class="f meet-article"><p class="tag-group-label">${f.label}</p>
         <label class="checkbox-f"><input type="checkbox" id="meetArticleOn"> Also post a news article about this gala</label>
         <p class="hint" style="margin:0">The article is what goes in Club News and on the homepage slideshow — the gala doesn't get a slide of its own.</p>
@@ -1048,14 +1060,18 @@ function showForm(sec,id,forcedType){
           <label class="f">Headline<input type="text" id="meetArticleTitle"></label>
           <label class="f">Summary (shown in the news list and on the homepage)<textarea id="meetArticleBlurb" rows="2"></textarea></label>
           <label class="f">Write-up (a blank line starts a new paragraph)<textarea id="meetArticleBody" rows="5"></textarea></label>
-          <p class="hint" style="margin:0">Filled in from the gala above, and kept up to date as you change it until you edit these boxes yourself. Links to this gala on the Open Meets page and to its entry pack are added at the end automatically.</p>
-        </div></div>`;
+          <p class="hint" style="margin:0">Filled in from the gala above, and kept up to date as you change it until you edit these boxes yourself. The article ends with a box showing this gala's details, linking to its card on Open Meets — so there's no need to paste links in.</p>
+        </div>
+        ${loose.length?`<label class="f">Or, if it's already written in Club News, link that article to this gala
+          <select id="meetArticleLink"><option value="">— No, not linked —</option>${loose.map(x=>`<option value="${x.id}">${esc(x.title)} (${slidePostedLabel(x)})</option>`).join("")}</select></label>`:""}
+      </div>`;
     }
     if(f.type==="links"){
       return `<div class="f">${f.label}
         <div class="doclink-rows" id="docLinkRows">${(it[f.k]||[]).map(docLinkRowHtml).join("")}</div>
-        <button type="button" class="btn small ghost" id="addDocLink" style="justify-self:start">+ Add link</button>
-        <p class="hint" style="margin:0">Shown in the card's "Meet documents &amp; links" panel, in this order, as <b>Name: link text</b> — e.g. conditions, entry file, results file, warm-up times. Link text is optional. Pick a highlight colour to make a line stand out.</p>
+        <div class="img-add-row"><button type="button" class="btn small ghost" id="addDocLink">+ Add link</button>
+          <label class="img-upload-btn" id="addDocPdfBtn">+ Upload PDFs<input type="file" accept="application/pdf,.pdf" multiple id="addDocPdf" style="display:none"></label></div>
+        <p class="hint" style="margin:0">Shown in the card's "Meet documents &amp; links" panel, in this order, as <b>Name: link text</b> — e.g. conditions, entry file, results file, warm-up times. Link text is optional. Pick a highlight colour to make a line stand out. <b>Upload PDFs</b> adds a line for each file (named after it — change the name if you like); a line's <b>PDF</b> button swaps in a new version of its file. Uploads are kept on this site, so they don't need hosting anywhere else.</p>
       </div>`;
     }
     if(f.type==="richtext"&&f.variant==="guide"){
@@ -1093,7 +1109,7 @@ function showForm(sec,id,forcedType){
       </div>`;
     }
     if(f.type==="pdfurl")return `<div style="display:grid;gap:8px"><label class="f">${f.label}<input type="text" name="${f.k}" value="${val}"></label>
-      <div class="img-add-row"><label class="img-upload-btn">Upload results PDF<input type="file" accept="application/pdf,.pdf" data-pdf-for="${f.k}" style="display:none"></label>
+      <div class="img-add-row"><label class="img-upload-btn">${f.btn||"Upload results PDF"}<input type="file" accept="application/pdf,.pdf" data-pdf-for="${f.k}" data-pdf-folder="${f.folder||"results"}" style="display:none"></label>
         <a class="img-clear-btn" data-pdf-view="${f.k}" href="${val}" target="_blank" rel="noopener" ${val?"":"hidden"}>Open current file</a></div></div>`;
     /* a field whose column comes from a migration that may not have been run yet */
     if(f.late==="stream"&&!feedStreamColReady)return `<label class="f">${f.label}<input type="text" name="${f.k}" value="${val}" disabled>
@@ -1168,7 +1184,7 @@ function showForm(sec,id,forcedType){
       const labelText=e.target.closest(".img-upload-btn").firstChild,original=labelText.nodeValue;
       labelText.nodeValue="Uploading…";
       try{
-        box.value=await uploadPdf(file);
+        box.value=await uploadPdf(file,input.dataset.pdfFolder);
         syncView();
         toast("PDF uploaded — save the gala to publish it");
       }catch(err){
@@ -1381,6 +1397,24 @@ function showForm(sec,id,forcedType){
     $("#meetArticleFields").addEventListener("input",()=>{articleTyped=true;});
     formTarget.querySelector("#adminForm").addEventListener("input",e=>{if(!e.target.closest("#meetArticleFields"))draftArticle();});
     formTarget.querySelector("#adminForm").addEventListener("change",e=>{if(!e.target.closest(".meet-article"))draftArticle();});
+    /* linking an existing article and posting a new one are either/or */
+    $("#meetArticleLink")?.addEventListener("change",e=>{
+      articleOn.disabled=!!e.target.value;
+      if(e.target.value){articleOn.checked=false;$("#meetArticleFields").hidden=true;}
+    });
+  }
+  const articleUpd=$("#meetArticleUpd");
+  /* The gala as it was when the form opened -- its fields and its documents -- so saving a change
+     without ticking "Update the article" can ask whether the article should say so too. */
+  const meetSnapshot=()=>JSON.stringify([[...new FormData(formTarget.querySelector("#adminForm")).entries()],
+    [...(docLinkRows?.querySelectorAll("[data-doclink] [data-k]")||[])].map(i=>i.value.trim())]);
+  const meetAsOpened=articleUpd?meetSnapshot():null;
+  if(articleUpd){
+    articleUpd.addEventListener("change",()=>{$("#meetArticleFields").hidden=!articleUpd.checked;});
+    $("#meetArticleRedraft").addEventListener("click",()=>{
+      const d=meetArticleDraft(Object.fromEntries(new FormData(formTarget.querySelector("#adminForm")).entries()));
+      $("#meetArticleTitle").value=d.title;$("#meetArticleBlurb").value=d.blurb;
+    });
   }
   if(docLinkRows){
     docLinkRows.addEventListener("change",e=>{
@@ -1397,6 +1431,39 @@ function showForm(sec,id,forcedType){
     $("#addDocLink").addEventListener("click",()=>{
       docLinkRows.insertAdjacentHTML("beforeend",docLinkRowHtml());
       docLinkRows.lastElementChild.querySelector('[data-k="label"]').focus();
+    });
+    /* PDFs go to the "documents" store (migration 031), like results files. A line's own PDF
+       button replaces its link; "Upload PDFs" adds a line per file, named after the file. */
+    docLinkRows.addEventListener("change",async e=>{
+      if(!e.target.matches("[data-doclink-pdf]"))return;
+      const file=e.target.files[0],btn=e.target.closest(".doclink-pdf"),row=e.target.closest("[data-doclink]");
+      if(!file)return;
+      btn.classList.add("busy");
+      try{
+        row.querySelector('[data-k="url"]').value=await uploadPdf(file,"meet-docs");
+        const name=row.querySelector('[data-k="label"]');
+        if(!name.value.trim())name.value=pdfTitle(file);
+        const text=row.querySelector('[data-k="text"]');
+        if(!text.value.trim())text.value="View PDF";
+        toast("PDF uploaded — save the gala to publish it");
+      }catch(err){toast(err.message||"Couldn't upload that PDF");}
+      finally{btn.classList.remove("busy");e.target.value="";}
+    });
+    $("#addDocPdf").addEventListener("change",async e=>{
+      const files=[...e.target.files],btn=$("#addDocPdfBtn"),label=btn.firstChild,original=label.nodeValue;
+      if(!files.length)return;
+      let done=0;
+      for(const file of files){
+        label.nodeValue=`Uploading ${done+1} of ${files.length}…`;
+        try{
+          const url=await uploadPdf(file,"meet-docs");
+          docLinkRows.insertAdjacentHTML("beforeend",docLinkRowHtml({label:pdfTitle(file),text:"View PDF",url}));
+          done++;
+        }catch(err){toast(`${file.name}: ${err.message||"couldn't upload it"}`);}
+      }
+      label.nodeValue=original;
+      e.target.value="";
+      if(done)toast(`${done===1?"PDF":done+" PDFs"} uploaded — check the names, then save the gala to publish`);
     });
   }
   const rteEditor=$("#rteEditor");
@@ -1512,10 +1579,27 @@ function showForm(sec,id,forcedType){
       data.key=uniq;
       data.bg=NEW_DEFAULT_GRADIENTS[DB.newsDefaults.length%NEW_DEFAULT_GRADIENTS.length];
     }
-    let article=null;
-    if(isFeed&&$("#meetArticleOn")?.checked){
-      article={title:$("#meetArticleTitle").value.trim(),blurb:$("#meetArticleBlurb").value.trim(),body:meetArticleHtml($("#meetArticleBody").value)};
-      if(!article.title||!article.blurb){toast("The news article needs a headline and a summary");$(article.title?"#meetArticleBlurb":"#meetArticleTitle").focus();return;}
+    if(articleUpd&&!articleUpd.checked&&meetSnapshot()!==meetAsOpened
+      &&confirm(`You've changed this gala, but haven't chosen to update its news article.\n\nPost an update? The article gets a note at the top saying what's changed, and goes back to the top of Club News and the homepage slideshow.\n\nOK = yes, add an update (you'll write it before saving)\nCancel = no, just save the gala`)){
+      articleUpd.checked=true;
+      $("#meetArticleFields").hidden=false;
+      const note=$("#meetArticleNote");
+      note.scrollIntoView({block:"center",behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});
+      note.focus({preventScroll:true});
+      toast("Write what's changed, then save again");
+      return;
+    }
+    let article=null,articleUpdate=null;
+    const linkArticle=isFeed?+($("#meetArticleLink")?.value||0):0;
+    if(isFeed&&($("#meetArticleOn")?.checked||$("#meetArticleUpd")?.checked)){
+      const title=$("#meetArticleTitle").value.trim(),blurb=$("#meetArticleBlurb").value.trim();
+      if(!title||!blurb){toast("The news article needs a headline and a summary");$(title?"#meetArticleBlurb":"#meetArticleTitle").focus();return;}
+      if($("#meetArticleOn")?.checked)article={title,blurb,body:meetArticleHtml($("#meetArticleBody").value)};
+      else{
+        /* "Update, 2 Nov 2026:" in bold, then their words -- paragraphs kept as in the write-up box */
+        const note=meetArticleHtml($("#meetArticleNote").value).replace(/^<p>/,`<p><strong>Update, ${fmtDate(isoToday())}:</strong> `);
+        articleUpdate={title,blurb,note,bump:true};
+      }
     }
     if(isFeed&&id){
       /* bumped_at and the old pin date aren't on the form, so carry them over rather than wipe
@@ -1529,15 +1613,29 @@ function showForm(sec,id,forcedType){
     }
     const submit=e.target.querySelector('button[type="submit"]');
     submit.disabled=true;
-    await publishItem(sec,id,data,article&&(async meetId=>{
-      /* posted by the database (migration 029), since a Meets Secretary may write galas but not news */
+    /* The gala's article is posted, updated or linked by the database (migrations 029, 033),
+       since a Meets Secretary may write galas but not news. */
+    const articleFailed=(error,migration,what)=>/function|schema cache/i.test(error.message||"")
+      ?`Gala saved — but ${what} needs a one-off database update first (migration ${migration})`
+      :`Gala saved — but ${what} didn't work: ${error.code==="P0001"||error.code==="42501"?error.message:saveErrorMessage(error)}`;
+    const held=()=>!isWebmaster()&&reviewReady();
+    const afterSave=article?async meetId=>{
       const {error}=await sb.rpc("post_meet_article",{meet_id:meetId,...article});
-      if(error)return /function|schema cache/i.test(error.message||"")
-        ?"Gala saved — but its article needs a one-off database update first (migration 029)"
-        :`Gala saved — but the article couldn't be posted: ${error.code==="P0001"||error.code==="42501"?error.message:saveErrorMessage(error)}`;
-      return !isWebmaster()&&reviewReady()?"Saved — the gala and its article go live once another member approves them"
+      if(error)return articleFailed(error,"029","posting its article");
+      return held()?"Saved — the gala and its article go live once another member approves them"
         :"Published — with its news article in Club News and on the homepage";
-    }));
+    }:articleUpdate?async meetId=>{
+      const {error}=await sb.rpc("update_meet_article",{meet_id:meetId,...articleUpdate});
+      if(error)return articleFailed(error,"033","updating its article");
+      return held()?"Saved — the gala and its updated article go live once another member approves them"
+        :"Saved — and its article is updated and back at the top of Club News and the homepage";
+    }:linkArticle?async meetId=>{
+      const {error}=await sb.rpc("link_meet_article",{meet_id:meetId,article_id:linkArticle});
+      if(error)return articleFailed(error,"033","linking the article");
+      return held()?"Saved — the gala goes live once another member approves it; its article is linked"
+        :"Saved — the article and the gala now link to each other";
+    }:null;
+    await publishItem(sec,id,data,afterSave);
     submit.disabled=false;
   });
 }
@@ -2104,13 +2202,14 @@ async function uploadImage(file){
   return sb.storage.from("site-images").getPublicUrl(name).data.publicUrl;
 }
 
-/* Results PDFs go to their own store ("documents", migration 031), kept under the file's own
-   name (tidied) so the link and the download still read as e.g. "2026-Autumn-Meet-Results.pdf". */
-async function uploadPdf(file){
+/* Gala PDFs (results, entry packs, meet documents) go to their own store ("documents", migration
+   031), kept under the file's own name (tidied) so the link and the download still read as e.g.
+   "2026-Autumn-Meet-Results.pdf". folder: "results" or "meet-docs". */
+async function uploadPdf(file,folder="results"){
   if(file.type!=="application/pdf"&&!/\.pdf$/i.test(file.name))throw new Error("That isn't a PDF — please choose a .pdf file");
   if(file.size>25*1024*1024)throw new Error("That PDF is over 25 MB — too big to upload");
-  const base=file.name.replace(/\.pdf$/i,"").replace(/[^\w.-]+/g,"-").replace(/^-+|-+$/g,"").slice(0,80)||"results";
-  const name=`results/${Date.now()}-${base}.pdf`;
+  const base=file.name.replace(/\.pdf$/i,"").replace(/[^\w.-]+/g,"-").replace(/^-+|-+$/g,"").slice(0,80)||"document";
+  const name=`${folder}/${Date.now()}-${base}.pdf`;
   const {error}=await sb.storage.from("documents").upload(name,file,{contentType:"application/pdf",cacheControl:"31536000"});
   if(error){
     if(/bucket not found/i.test(error.message||""))throw new Error("PDF uploads need a one-off database update (migration 031) first");
@@ -2118,6 +2217,8 @@ async function uploadPdf(file){
   }
   return sb.storage.from("documents").getPublicUrl(name).data.publicUrl;
 }
+/* A PDF's file name as a line's name: "2026_Meet-Conditions_v2.pdf" -> "2026 Meet Conditions v2" */
+const pdfTitle=file=>file.name.replace(/\.pdf$/i,"").replace(/[_-]+/g," ").replace(/\s+/g," ").trim()||"Document";
 
 /* The photo library: every photo already in the image store, newest first, so a picture can be
    used again without uploading it twice. Nothing ever deletes from the store, so sharing a photo

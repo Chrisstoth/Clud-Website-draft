@@ -75,6 +75,8 @@ function renderMeets(){
       const hl=LINK_HIGHLIGHTS.some(([k])=>k&&k===l.hl)?` hl-${l.hl}`:"";
       return `<div class="link-line${hl}">${l.label?`${esc(l.label)}: `:""}${a}</div>`;
     }).join("");
+    /* the gala's news article (migrations 029/033), which links back here */
+    const story=DB.feed.find(x=>x.type==="news"&&x.sourceMeetId===m.id);
     const r=resolveNewsImage(m.img);
     const thumb=r?`<div class="news-thumb ${r.cls}" style="${r.style}">${r.icon?`<span class="news-thumb-icon">${r.icon}</span>`:""}</div>`:"";
     return `<article class="card meet${meetLive(m)||meetStreaming(m)?" live":""}${done?" done":""}${meetHasEntry(m)?" entries-open":""}${ours?" ours":""}${location.hash===`#meet-${m.id}`?" flash":""}" id="meet-${esc(m.id)}">
@@ -88,6 +90,7 @@ function renderMeets(){
         ${m.license?`<div style="font-size:.82rem;color:var(--muted);margin-top:2px">Licence ${esc(m.license)}</div>`:""}
         ${m.notes&&!done?`<p style="margin-top:10px;font-size:.94rem;color:var(--body2)">${esc(m.notes)}</p>`:""}
         ${m.closing&&m.status==="open"&&!done?`<div class="closing">Entries close <strong>${fmtDate(m.closing)}</strong></div>`:""}
+        ${story?`<a class="meet-story" href="article?id=${esc(story.id)}">📰 ${esc(story.title)} — read the news story</a>`:""}
         ${extraLinks?`<details class="info" style="margin-top:12px"><summary>Meet documents &amp; links</summary><div class="body">${extraLinks}</div></details>`:""}
       </div>
       ${actions?`<div class="meet-actions">${actions}</div>`:""}</article>`;
@@ -1035,9 +1038,12 @@ function renderPartnersFromDb(){
    Which theme shows today is worked out by activeTheme (core.js). Like the partners strip, the
    last list seen is kept in this browser and applied straight away, so a page doesn't flash up
    plain first. ?theme=<id> previews any theme whatever its dates (the members' area links to it);
-   ?theme=off shows the site plain. A visitor can close the message ribbon; a new message brings
-   it back. */
-const THEMES_KEY="bpsc_themes_v1",THEME_HIDDEN_KEY="bpsc_theme_hidden";
+   ?theme=off shows the site plain. Closing the message ribbon only hides it on this page; it's
+   back on the next one. */
+const THEMES_KEY="bpsc_themes_v1";
+/* the page is themed twice (from this browser's copy, then from the database), so remember a
+   close here or the second pass would bring the ribbon straight back */
+let seasonRibbonClosed=false;
 function seasonFor(list){
   const want=new URLSearchParams(location.search).get("theme");
   if(want==="off")return null;
@@ -1052,16 +1058,14 @@ function applySeason(list){
   if(look.snow)body.classList.add("season-snow");
   const header=document.querySelector("header.site"),brand=header&&header.querySelector(".brand");
   if(brand)brand.insertAdjacentHTML("beforeend",`<span class="season-badge" aria-hidden="true">${look.icon}</span>`);
-  const hideId=`${t.id}|${t.message}`;
-  let hidden="";try{hidden=localStorage.getItem(THEME_HIDDEN_KEY)||"";}catch(e){}
-  if(!header||!t.message||hidden===hideId)return;
+  if(!header||!t.message||seasonRibbonClosed)return;
   const href=themeLink(t.link),external=/^https?:/.test(href);
   const text=href?`<a href="${esc(href)}"${external?' target="_blank" rel="noopener"':""}>${esc(t.message)}</a>`:esc(t.message);
   header.insertAdjacentHTML("afterend",`<div class="season-ribbon" role="note"><div class="season-ribbon-wrap">
     <span class="season-ribbon-icon" aria-hidden="true">${look.icon}</span><span class="season-ribbon-text">${text}</span>
     <button type="button" class="season-ribbon-close" aria-label="Hide this message">✕</button></div></div>`);
   document.querySelector(".season-ribbon-close").addEventListener("click",()=>{
-    try{localStorage.setItem(THEME_HIDDEN_KEY,hideId);}catch(e){}
+    seasonRibbonClosed=true;
     document.querySelector(".season-ribbon").remove();
   });
 }

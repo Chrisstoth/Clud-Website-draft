@@ -1485,12 +1485,17 @@ body.theme-dark .sess-ampm{color:var(--ember)}
 .doclink-move button{background:none;border:1.5px solid var(--line);color:var(--muted);border-radius:8px;width:32px;height:38px;cursor:pointer;font-size:1rem;line-height:1}
 .doclink-move button:hover{border-color:var(--flame);color:var(--text)}
 .doclink-row .sess-del{height:38px}
+/* the link box with its "upload a PDF instead" button beside it */
+.doclink-url{display:flex;gap:6px;min-width:0}
+.doclink-pdf{flex:none;display:inline-flex;align-items:center;font-size:.72rem;font-weight:700;letter-spacing:.06em;color:var(--flame);border:1.5px dashed var(--line);border-radius:8px;padding:0 9px;height:38px;cursor:pointer}
+.doclink-pdf:hover{border-color:var(--flame)}
+.doclink-pdf.busy{opacity:.6;pointer-events:none}
 @media(max-width:700px){
   .sess-head{display:none}
   .doclink-row{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-areas:"label label label label" "text text text text" "url url url url" "hl hl move del";border:1px solid var(--line);padding:10px}
   .doclink-row [data-k="label"]{grid-area:label}
   .doclink-row [data-k="text"]{grid-area:text}
-  .doclink-row [data-k="url"]{grid-area:url}
+  .doclink-row .doclink-url{grid-area:url}
   .doclink-row [data-k="hl"]{grid-area:hl}
   .doclink-row .doclink-move{grid-area:move;justify-self:end}
   .doclink-row .sess-del{grid-area:del}
@@ -1666,6 +1671,16 @@ body.theme-dark .article-body a{color:var(--ember)}
 .article-body img{display:block;max-width:100%;border-radius:var(--radius);margin:18px auto}
 .article-cover{height:260px;border-radius:var(--radius);background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;margin-bottom:28px}
 .article-cover .news-thumb-icon{font-size:3.4rem}
+/* a gala's article ends with a live box for the gala (core.js articleMeetBoxHtml) */
+.article-meet{margin-top:28px;padding:18px 20px;background:var(--card);border:1.5px solid var(--line);border-left:4px solid var(--flame);border-radius:var(--radius)}
+.article-meet .eyebrow{margin:0}
+.article-meet h3{font-family:'Montserrat',sans-serif;font-weight:800;font-size:1.15rem;color:var(--text);margin-top:4px}
+.article-meet .venue{color:var(--muted);font-size:.94rem;margin-top:4px}
+.article-meet .state{margin-top:6px;font-size:.94rem;color:var(--body2)}
+.article-meet .actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+/* the gala card's link back to its news article (site.js meetCard) */
+.meet-story{display:inline-block;margin-top:10px;font-size:.92rem;font-weight:600;color:var(--flame-dark);text-decoration:underline;text-underline-offset:2px}
+body.theme-dark .meet-story{color:var(--ember)}
 
 .article-gallery{position:relative;margin-bottom:28px;border-radius:var(--radius);overflow:hidden;background:#000;box-shadow:var(--shadow)}
 .article-gallery-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-ms-overflow-style:none}

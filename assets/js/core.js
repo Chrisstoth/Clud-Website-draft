@@ -544,6 +544,28 @@ const trainingHasDetails=it=>!!(htmlText(it.body).trim()||(it.note||"").trim());
 const trainingLink=it=>trainingHasDetails(it)?`href="article?id=${it.id}"`:'href="club-calendar"';
 const trainingWhen=it=>fmtDate(it.start)+(it.end&&it.end!==it.start?" – "+fmtDate(it.end):"");
 
+/* A gala's article (sourceMeetId, migrations 029/033) ends with a box drawn live from the gala, so
+   dates, entry status and the entry pack are never out of date, and leads to the gala's card.
+   Articles posted before 033 had those links typed onto the end; with the box showing they go. */
+const articleMeet=it=>it.sourceMeetId?DB.feed.find(x=>x.id===it.sourceMeetId&&isMeet(x)):null;
+const stripMeetLinks=html=>String(html||"")
+  .replace(/<p>See all the details on the <a href="open-meets#meet-\d+"[^>]*>Open Meets page<\/a>(, or <a [^>]*>read the entry pack<\/a>)?\.<\/p>\s*$/,"")
+  .replace(/<p><a [^>]*>Read the entry pack<\/a>, or see all the details on the <a href="open-meets"[^>]*>Open Meets<\/a> page\.<\/p>\s*$/,"");
+function articleMeetBoxHtml(m){
+  const done=meetDone(m),team=m.type==="teamMeet";
+  const dates=m.end&&m.end!==m.start?`${fmtDate(m.start)} – ${fmtDate(m.end)}`:fmtDate(m.start);
+  const open=!team&&!done&&m.status==="open"&&!!m.entryUrl;
+  const state=done?"Completed":team?"":open?(m.closing?`Entries close <strong>${fmtDate(m.closing)}</strong>`:"Entries open")
+    :m.entryUrl?"Entries closed":"";
+  const ext=(url,label,cls)=>`<a class="btn small${cls?" "+cls:""}" href="${esc(url)}" target="_blank" rel="noopener">${label}</a>`;
+  return `<aside class="article-meet">
+    <p class="eyebrow">The gala</p>
+    <h3>${esc(m.title)}</h3>
+    <div class="venue">${esc(m.venue||"Venue TBC")} · ${dates}</div>
+    ${state?`<div class="state">${state}</div>`:""}
+    <div class="actions"><a class="btn small" href="open-meets#meet-${esc(m.id)}">Gala details &amp; documents →</a>${open?ext(m.entryUrl,"Entry pack","ghost"):""}${done&&m.resultsUrl?ext(m.resultsUrl,"Results","ghost"):""}</div>
+  </aside>`;
+}
 function articleContentHtml(it){
   const photos=it.photos||[];
   const cover=!photos.length?resolveNewsImage(it.img,"article"):null;
@@ -554,7 +576,8 @@ function articleContentHtml(it){
   const eyebrow=it.type==="news"?storyTopicLabel(it):training?"Training change":"Club Calendar · Social";
   const media=photos.length?articleGalleryHtml(photos)
     :(cover?`<div class="article-cover ${cover.cls}" style="${cover.style}">${cover.icon?`<span class="news-thumb-icon">${cover.icon}</span>`:""}</div>`:"");
-  const bodyHtml=sanitizeArticleHtml(it.body||"")||(training?plainTextHtml(it.note):"")||`<p>${esc(it.blurb||"")}</p>`;
+  const meet=articleMeet(it);
+  const bodyHtml=sanitizeArticleHtml(meet?stripMeetLinks(it.body):it.body||"")||(training?plainTextHtml(it.note):"")||`<p>${esc(it.blurb||"")}</p>`;
   return `<div class="page-head">
       <p class="eyebrow">${esc(eyebrow)}</p>
       <h2 class="display">${esc(it.title||"Untitled")}</h2>
@@ -562,7 +585,8 @@ function articleContentHtml(it){
       ${dateLabel?`<p style="color:var(--muted)">${esc(dateLabel)}</p>`:""}
     </div>
     ${media}
-    <div class="article-body">${bodyHtml}</div>`;
+    <div class="article-body">${bodyHtml}</div>
+    ${meet?articleMeetBoxHtml(meet):""}`;
 }
 
 /* ================= HELPERS ================= */
