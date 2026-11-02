@@ -1031,6 +1031,48 @@ function renderPartnersFromDb(){
   try{localStorage.setItem(PARTNERS_KEY,JSON.stringify(DB.partners.map(({name,url})=>({name,url}))));}catch(e){}
 }
 
+/* ================= SEASONAL THEMES =================
+   Which theme shows today is worked out by activeTheme (core.js). Like the partners strip, the
+   last list seen is kept in this browser and applied straight away, so a page doesn't flash up
+   plain first. ?theme=<id> previews any theme whatever its dates (the members' area links to it);
+   ?theme=off shows the site plain. A visitor can close the message ribbon; a new message brings
+   it back. */
+const THEMES_KEY="bpsc_themes_v1",THEME_HIDDEN_KEY="bpsc_theme_hidden";
+function seasonFor(list){
+  const want=new URLSearchParams(location.search).get("theme");
+  if(want==="off")return null;
+  return (want&&(list||[]).find(t=>String(t.id)===want))||activeTheme(list);
+}
+function applySeason(list){
+  const t=seasonFor(list),look=t&&THEME_LOOKS[t.look],body=document.body;
+  [...body.classList].filter(c=>c.startsWith("season")).forEach(c=>body.classList.remove(c));
+  document.querySelectorAll(".season-ribbon,.season-badge").forEach(el=>el.remove());
+  if(!look)return;
+  body.classList.add("season","season-"+t.look);
+  if(look.snow)body.classList.add("season-snow");
+  const header=document.querySelector("header.site"),brand=header&&header.querySelector(".brand");
+  if(brand)brand.insertAdjacentHTML("beforeend",`<span class="season-badge" aria-hidden="true">${look.icon}</span>`);
+  const hideId=`${t.id}|${t.message}`;
+  let hidden="";try{hidden=localStorage.getItem(THEME_HIDDEN_KEY)||"";}catch(e){}
+  if(!header||!t.message||hidden===hideId)return;
+  const href=themeLink(t.link),external=/^https?:/.test(href);
+  const text=href?`<a href="${esc(href)}"${external?' target="_blank" rel="noopener"':""}>${esc(t.message)}</a>`:esc(t.message);
+  header.insertAdjacentHTML("afterend",`<div class="season-ribbon" role="note"><div class="season-ribbon-wrap">
+    <span class="season-ribbon-icon" aria-hidden="true">${look.icon}</span><span class="season-ribbon-text">${text}</span>
+    <button type="button" class="season-ribbon-close" aria-label="Hide this message">✕</button></div></div>`);
+  document.querySelector(".season-ribbon-close").addEventListener("click",()=>{
+    try{localStorage.setItem(THEME_HIDDEN_KEY,hideId);}catch(e){}
+    document.querySelector(".season-ribbon").remove();
+  });
+}
+try{applySeason(JSON.parse(localStorage.getItem(THEMES_KEY)));}catch(e){}
+function renderThemesFromDb(){
+  /* no table yet (migration 032 not run) means no theme, not the last one this browser saw */
+  const list=DB.themes||[];
+  applySeason(list);
+  try{localStorage.setItem(THEMES_KEY,JSON.stringify(list));}catch(e){}
+}
+
 /* ================= MEMBER GUIDES =================
    Each guide is a tab over one panel area. The page's HTML carries a copy of the guides, so the
    page is never empty while the database loads (or before migration 020 is run); once the real
@@ -1093,7 +1135,7 @@ function renderGuidesFromDb(){
   try{localStorage.setItem(GUIDES_KEY,JSON.stringify(DB.guides.map(({slug,title,body})=>({slug,title,body}))));}catch(e){}
 }
 
-function renderAllPublic(){renderPartnersFromDb();renderGuidesFromDb();renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();renderCommittee();renderFollowPanel();renderFollowBadge();if(typeof renderPathway==="function")renderPathway();}
+function renderAllPublic(){renderThemesFromDb();renderPartnersFromDb();renderGuidesFromDb();renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();renderCommittee();renderFollowPanel();renderFollowBadge();if(typeof renderPathway==="function")renderPathway();}
 
 /* ================= NAV ================= */
 const infoDropdown=$("#infoDropdown"), infoToggle=$("#infoToggle");

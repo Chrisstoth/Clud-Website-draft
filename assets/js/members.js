@@ -5,17 +5,17 @@
 showPendingFeed=true;
 const ALL_FEED_TYPES=["meet","externalMeet","teamMeet","social","news","training"];
 const ROLES = {
-  poster:     {label:"Club Poster",          desc:"Post news, socials, training changes & galas — another member approves before it goes live", sections:["feed","guides"], feedTypes:ALL_FEED_TYPES},
+  poster:     {label:"Club Poster",          desc:"Post news, socials, training changes & galas — another member approves before it goes live", sections:["feed","themes","guides"], feedTypes:ALL_FEED_TYPES},
   meets:      {label:"Open Meets Secretary", desc:"Add club, external & team meets, entry packs & results", sections:["feed","guides"], feedTypes:["meet","externalMeet","teamMeet"]},
   coaching:   {label:"Coaching Lead",        desc:"Edit coach profiles, squad timetables & squad details", sections:["coaches","squads","guides"]},
   volunteers: {label:"Volunteer Coordinator",desc:"Edit volunteer role explainers",   sections:["roles","guides"]},
-  socials:    {label:"Socials Team",         desc:"Add events, links & graphics",     sections:["feed","instagram","guides"], feedTypes:["social"]},
-  comms:      {label:"Comms / Club News",    desc:"Post club news & announcements",   sections:["feed","topics","instagram","guides"], feedTypes:["news"]},
+  socials:    {label:"Socials Team",         desc:"Add events, links & graphics",     sections:["feed","instagram","themes","guides"], feedTypes:["social"]},
+  comms:      {label:"Comms / Club News",    desc:"Post club news & announcements",   sections:["feed","topics","instagram","themes","guides"], feedTypes:["news"]},
   training:   {label:"Coaching / Training Changes", desc:"Post key training schedule changes", sections:["feed","guides"], feedTypes:["training"]},
   membership: {label:"Membership Team",      desc:"View trial & squad enquiries",     sections:["enquiries","guides"]},
   welfare:    {label:"Welfare Officer",      desc:"Edit the Welfare & Safeguarding page", sections:["welfare","guides"]},
   secretary:  {label:"Club Secretary",       desc:"Edit the Club Committee page",     sections:["committee","guides"]},
-  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","access","topics","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","partners","instagram","images","guides"], feedTypes:ALL_FEED_TYPES}
+  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","access","topics","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","partners","themes","instagram","images","guides"], feedTypes:ALL_FEED_TYPES}
 };
 const SECTION_META = {
   feed:{name:"Club Feed", empty:"Nothing published yet — add the first item."},
@@ -29,6 +29,7 @@ const SECTION_META = {
   welfare:{name:"Welfare & Safeguarding Page", empty:""},
   committee:{name:"Club Committee", empty:"No committee roles yet."},
   partners:{name:"Proud Partners", empty:"No partners listed — the Proud Partners strip is hidden on every page until one is added."},
+  themes:{name:"Seasonal Themes", empty:"No themes yet — add one for Christmas, a big meet, or anything else worth dressing the site up for."},
   guides:{name:"Member Guides", empty:"No guides yet — the Member Guides page has no tabs until one is added."},
   instagram:{name:"Instagram on the News Page", empty:""},
   images:{name:"Manage Images", empty:""}
@@ -175,6 +176,15 @@ const SCHEMAS = {
   partners:[
     {k:"name",label:"Partner name (the text shown in the strip)",type:"text",req:1},
     {k:"url",label:"Link — the partner's website (leave blank for no link)",type:"text"}
+  ],
+  themes:[
+    {k:"label",label:"Name (only shown here, e.g. Christmas, Winter Nationals)",type:"text",req:1},
+    {k:"look",label:"Look",type:"select",opts:Object.entries(THEME_LOOKS).map(([k,l])=>[k,`${l.icon} ${l.label}`])},
+    {k:"mode",label:"When it shows",type:"select",opts:THEME_MODES},
+    {k:"start",label:"From",type:"date"},
+    {k:"end",label:"Until (the last day it shows)",type:"date"},
+    {k:"message",label:"Message ribbon under the header (optional — leave blank for just the look), e.g. Good luck to our swimmers at Winter Nationals!",type:"text"},
+    {k:"link",label:"Link for the message (optional — a page on this site, e.g. news or open-meets, or a full web address)",type:"text"}
   ],
   topics:[
     {k:"name",label:"Tag name (e.g. Trips, Open Water, Officials)",type:"text",req:1}
@@ -330,6 +340,8 @@ function itemSummary(sec,it){
       return {t:it.title,s:`${catLabel}${it.commitment?" · "+it.commitment:""}`};}
     case "committee":return {t:it.title,s:`${it.tier==="executive"?"Executive · ":""}${it.person||"Vacant"}`};
     case "partners":return {t:it.name,s:it.url||"No link"};
+    case "themes":{const look=THEME_LOOKS[it.look]||THEME_LOOKS.club;
+      return {t:`${look.icon} ${it.label}`,s:[themeWhen(it),it.message?`“${it.message}”`:"No message — just the look"].join(" · ")};}
     case "guides":{const n=(it.body.match(/<h3[\s>]/gi)||[]).length;
       return {t:it.title,s:`${n} section${n===1?"":"s"} · web address: member-guides#${it.slug}`};}
     case "newsDefaults":return {t:it.label,s:it.img?"Custom photo set":`Gradient placeholder ${it.icon||""}`};
@@ -439,6 +451,24 @@ function moveSlide(id,dir){
   arrangeSlides("reorder_slides",{ids:dir<0?[it.id,other.id]:[other.id,it.id]},"Slideshow order saved");
 }
 
+/* Seasonal themes: when one shows, in words, and which is on the site today. */
+const dayMonth=iso=>new Date(iso+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+function themeWhen(t){
+  const today=isoToday(),showing=activeTheme(DB.themes)===t;
+  const dates=t.mode==="yearly"&&t.start&&t.end?`every year, ${dayMonth(t.start)} – ${dayMonth(t.end)}`
+    :t.start&&t.end?`${fmtDate(t.start)} – ${fmtDate(t.end)}`:"";
+  if(showing)return t.mode==="on"?"● Showing now, until switched off":`● Showing now (${dates})`;
+  if(t.mode==="off")return "Off";
+  if(t.mode==="on"||themeShowsOn(t,today))return "Due now, but another theme is showing instead";
+  if(t.mode==="dates"&&t.end<today)return `Finished (${dates}) — change the dates to use it again`;
+  return dates?`Shows ${dates}`:"Off";
+}
+function themeTodayHtml(){
+  const t=activeTheme(DB.themes),look=t&&THEME_LOOKS[t.look];
+  return `<div class="home-panel"><h3 class="admin-sub">On the site today</h3>
+    <p style="margin:6px 0 0">${t?`${look.icon} <strong>${esc(t.label)}</strong> — ${esc(themeWhen(t).replace(/^● /,""))}. <a href="./?theme=${t.id}" target="_blank" rel="noopener">See it →</a>`:`No theme — the site has its usual look.`}</p></div>`;
+}
+
 function renderAdminSection(){
   const main=$("#adminMain"),sec=adminSection,role=session.role;
   if(sec==="enquiries"){
@@ -476,6 +506,11 @@ function renderAdminSection(){
       <div class="admin-note">The partners list hasn't been set up in the database yet. The webmaster needs to run <code>supabase/migrations/019_partners.sql</code> in the Supabase SQL Editor. Until then every page keeps showing the partners written into its HTML.</div>`;
     return;
   }
+  if(sec==="themes"&&!DB.themes){
+    main.innerHTML=`<h2>${SECTION_META.themes.name}</h2>
+      <div class="admin-note">Seasonal themes haven't been set up in the database yet. The webmaster needs to run <code>supabase/migrations/032_site_themes.sql</code> in the Supabase SQL Editor. Until then the site just shows its usual look.</div>`;
+    return;
+  }
   if(sec==="guides"&&!DB.guides){
     main.innerHTML=`<h2>${SECTION_META.guides.name}</h2>
       <div class="admin-note">The guides haven't been set up in the database yet. The webmaster needs to run <code>supabase/migrations/020_member_guides.sql</code> in the Supabase SQL Editor. Until then the Member Guides page keeps showing the guides written into its HTML.</div>`;
@@ -486,6 +521,8 @@ function renderAdminSection(){
     ?"Each guide is a tab on the <a href=\"member-guides\" target=\"_blank\" rel=\"noopener\">Member Guides</a> page, in this order — use the arrows to move one. Open a guide to edit it: the editor shows it exactly as it will look. Changes show on the public site straight away."
     :sec==="partners"
     ?"The Proud Partners strip under the header on every page. Each partner's name links to the web address given (opening in a new tab); leave the link blank to show the name without one. Use the arrows to change the order. Changes show on the public site straight away."
+    :sec==="themes"
+    ?"A light touch of seasonal colour across the whole public site: the stripe under the header and above the footer, a little badge on the club logo, the striped dividers under page headings and, if you write one, a message ribbon under the header. Christmas and Icy blue also snow gently on the homepage. Only one theme shows at a time: one switched <strong>On now</strong> first, otherwise the one with the shortest dates — so Winter Nationals wins over a month of Christmas. <strong>Preview</strong> shows any theme on the site straight away, whatever its dates. Changes go live straight away."
     :sec==="squads"
     ?"Each squad's weekly sessions, shown on the <a href=\"timetables\" target=\"_blank\" rel=\"noopener\">Squad Timetables</a> page and in the squad details on the <a href=\"coaches#squads\" target=\"_blank\" rel=\"noopener\">Coaches &amp; Squads</a> page. Changes here publish straight to the public page."
     :sec==="topics"
@@ -496,7 +533,7 @@ function renderAdminSection(){
     ?"Your changes publish straight to the public page. Posts from other members wait under <strong>Waiting for approval</strong> until someone other than the author approves them."
     :"Changes here publish straight to the public page — no webmaster needed.";
   const slides=sec==="feed"?homepageSlides():[];
-  const REORDERABLE=["coaches","partners","guides"];
+  const REORDERABLE=["coaches","partners","themes","guides"];
   const rowHtml=(it,i,arr)=>{const s=itemSummary(sec,it);
     const h=sec==="feed"?homeStatus(it,slides):null;
     const cls=h?(h.pinned&&h.slot>=0?" is-pinned":h.slot>=0?" on-home":""):"";
@@ -507,7 +544,7 @@ function renderAdminSection(){
     return `
       <div class="item-block" data-item-block="${it.id}">
       <div class="item-row${cls}"><div><div class="t">${esc(s.t)}</div><div class="s">${esc(s.s)}</div>${sec==="feed"?homeBadges(it,slides):""}</div>
-      <div class="acts">${move}${sec==="feed"&&isPending(it)&&!mySubmission(it)?`<button class="btn small" data-approve="${it.id}">Approve</button>`:""}<button class="btn small ghost" data-edit="${it.id}">Edit</button>
+      <div class="acts">${move}${sec==="themes"?`<a class="btn small ghost" href="./?theme=${it.id}" target="_blank" rel="noopener">Preview</a>`:""}${sec==="feed"&&isPending(it)&&!mySubmission(it)?`<button class="btn small" data-approve="${it.id}">Approve</button>`:""}<button class="btn small ghost" data-edit="${it.id}">Edit</button>
       <button class="btn small dangerous" data-del="${it.id}">Delete</button></div></div>
       <div class="edit-slot" id="editSlot-${it.id}"></div>
       </div>`;};
@@ -547,6 +584,7 @@ function renderAdminSection(){
     ${sec==="squads"?squadsTabsHtml():""}
     <div class="admin-note">${note}</div>
     ${sec==="feed"?homepagePanelHtml(slides,role):""}
+    ${sec==="themes"?themeTodayHtml():""}
     <div style="margin-bottom:18px"><button class="btn small" id="addNew">+ Add new</button></div>
     <div id="itemList">${listHtml}</div>
     <div id="formSlot"></div>
@@ -1419,6 +1457,14 @@ function showForm(sec,id,forcedType){
       if(data.url&&data.url.trim()&&!partnerUrl(data.url)){toast("That link doesn't look like a web address — check it, or leave it blank");formTarget.querySelector('[name="url"]').focus();return;}
       /* new partners go on the end of the strip, not the front */
       if(!id)data.sortOrder=DB.partners.length?Math.max(...DB.partners.map(p=>p.sortOrder))+1:0;
+    }
+    if(sec==="themes"){
+      data.label=(data.label||"").trim();
+      const dated=data.mode==="dates"||data.mode==="yearly";
+      if(dated&&(!data.start||!data.end)){toast("Give it both dates — or choose Off, or On now");formTarget.querySelector(`[name="${data.start?"end":"start"}"]`).focus();return;}
+      if(data.mode==="dates"&&data.end<data.start){toast("The Until date is before the From date");formTarget.querySelector('[name="end"]').focus();return;}
+      if(data.link&&data.link.trim()&&!themeLink(data.link)){toast("That link doesn't look like a page on this site or a web address — check it, or leave it blank");formTarget.querySelector('[name="link"]').focus();return;}
+      if(!id)data.sortOrder=DB.themes.length?Math.max(...DB.themes.map(t=>t.sortOrder))+1:0;
     }
     if(sec==="coaches"){data.squads=(data.squadsRaw||"").split(",").map(s=>s.trim()).filter(Boolean);delete data.squadsRaw;}
     if(sec==="committee"){

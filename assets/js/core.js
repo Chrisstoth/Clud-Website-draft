@@ -13,7 +13,7 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const TT_LOC={lc:"BSV Long Course",deep:"BSV Short Course – Deep End",shallow:"BSV Short Course – Shallow End",bill:"Billericay Pool",land:"BSV Meeting Room"};
 
 /* In-memory copy of what is published, filled by loadContent() on every page load. */
-const DB={feed:[],bin:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfare:[],committee:[],partners:null,guides:null,squadDetails:null,enquiries:[]};
+const DB={feed:[],bin:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfare:[],committee:[],partners:null,guides:null,squadDetails:null,themes:null,enquiries:[]};
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
@@ -122,6 +122,51 @@ const guideFromRow=r=>({id:r.id,slug:r.slug,title:r.title,body:r.body||"",sortOr
 const guideToRow=g=>({title:g.title,body:g.body||"",...(g.slug&&{slug:g.slug}),...(g.sortOrder!==undefined&&{sort_order:g.sortOrder})});
 const committeeToRow=c=>({title:c.title,tier:c.tier||"committee",person:c.person||null,email:c.email||null,photo:c.photo||null,summary:c.summary||null,commitment:c.commitment||null,skills:c.skills||[],duties:c.duties||[]});
 
+/* ================= SEASONAL THEMES =================
+   A light-touch dressing for the public site (migration 032): the stripe under the header and
+   above the footer, a badge on the logo, the lane-rope dividers, and an optional message ribbon.
+   Each look's colours live in site.css (body.season-<key>); "snow" also snows on the homepage. */
+const THEME_LOOKS={
+  christmas:{label:"Christmas",icon:"🎄",snow:true},
+  easter:{label:"Easter pastels",icon:"🐣"},
+  summer:{label:"Summer sun",icon:"☀️"},
+  icy:{label:"Icy blue (winter meets)",icon:"❄️",snow:true},
+  gold:{label:"Gold medal (summer meets)",icon:"🏅"},
+  finals:{label:"Finals (chequered flag)",icon:"🏆"},
+  halloween:{label:"Halloween",icon:"🎃"},
+  club:{label:"Club colours",icon:"🎉"}
+};
+const THEME_MODES=[["off","Off"],["on","On now — until someone switches it off"],["dates","Between the dates below"],["yearly","Between the dates below, every year"]];
+const themeFromRow=r=>({id:r.id,label:r.label,look:r.look,mode:r.mode,start:r.start_date||"",end:r.end_date||"",message:r.message||"",link:r.link||"",sortOrder:r.sort_order??0});
+const themeToRow=t=>({label:t.label,look:t.look,mode:t.mode,start_date:t.start||null,end_date:t.end||null,message:(t.message||"").trim()||null,link:themeLink(t.link)||null,...(t.sortOrder!==undefined&&{sort_order:t.sortOrder})});
+/* A message's link is either a page on this site ("news", "open-meets#winter") or a web address,
+   checked the same way as a partner's. */
+function themeLink(u){
+  const s=String(u||"").trim();
+  if(/^[a-z0-9-]+(\.html)?([?#][^\s"'<>]*)?$/i.test(s))return s;
+  return partnerUrl(s);
+}
+/* "yearly" compares only the month and day, so 20 Dec – 5 Jan runs over New Year every year. */
+function themeShowsOn(t,day){
+  if(t.mode==="on")return true;
+  if(!t.start||!t.end)return false;
+  if(t.mode==="dates")return t.start<=day&&day<=t.end;
+  if(t.mode!=="yearly")return false;
+  const md=day.slice(5),s=t.start.slice(5),e=t.end.slice(5);
+  return s<=e?s<=md&&md<=e:md>=s||md<=e;
+}
+function themeSpanDays(t){
+  const n=Math.round((Date.parse(t.end)-Date.parse(t.start))/864e5);
+  return n<0?n+365:n;
+}
+/* One theme at a time: one switched on now beats any with dates; otherwise the shortest dates win
+   (Winter Nationals inside a month of Christmas), then whichever is higher in the list. */
+function activeTheme(list,day=isoToday()){
+  const rank=t=>t.mode==="on"?-1:themeSpanDays(t);
+  return (list||[]).filter(t=>THEME_LOOKS[t.look]&&themeShowsOn(t,day))
+    .sort((a,b)=>rank(a)-rank(b)||(a.sortOrder??0)-(b.sortOrder??0))[0]||null;
+}
+
 /* Each members'-area section, and the table and translation it reads and writes. */
 const SECTIONS={
   feed:{table:"feed",from:feedFromRow,to:feedToRow,order:"start_date"},
@@ -138,7 +183,9 @@ const SECTIONS={
   /* optional for the same reason (migration 020): the guides page keeps its HTML copy */
   guides:{table:"member_guides",from:guideFromRow,to:guideToRow,order:"sort_order",optional:true},
   /* optional (migration 028): until it's run the Squads tab keeps the wording in pathway.js */
-  squadDetails:{table:"squad_details",from:squadDetailFromRow,to:squadDetailToRow,order:"key",optional:true}
+  squadDetails:{table:"squad_details",from:squadDetailFromRow,to:squadDetailToRow,order:"key",optional:true},
+  /* optional (migration 032): until it's run the site simply has no seasonal theme */
+  themes:{table:"site_themes",from:themeFromRow,to:themeToRow,order:"sort_order",optional:true}
 };
 
 /* Feed items awaiting peer review (migration 024). The database already hides them from the

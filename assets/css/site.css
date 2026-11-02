@@ -55,7 +55,7 @@ a{color:var(--flame-dark)}
 #heroTitle.alt-text{font-family:inherit;font-weight:500;letter-spacing:normal;text-transform:none;font-size:1.05rem;line-height:1.5}
 .eyebrow{font-family:'Montserrat',sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.14em;font-size:.85rem;color:var(--flame-dark)}
 .lane-rope{height:6px;width:120px;border-radius:3px;margin:14px 0 0;
-  background:repeating-linear-gradient(90deg,var(--flame) 0 16px,transparent 16px 22px,var(--ink) 22px 38px,transparent 38px 44px)}
+  background:repeating-linear-gradient(90deg,var(--rope-a,var(--flame)) 0 16px,transparent 16px 22px,var(--rope-b,var(--ink)) 22px 38px,transparent 38px 44px)}
 .lane-rope.on-dark{background:repeating-linear-gradient(90deg,var(--ink) 0 16px,transparent 16px 22px,#fff 22px 38px,transparent 38px 44px)}
 .lane-rope.full{width:100%}
 
@@ -1566,7 +1566,7 @@ body.theme-dark .cal-day.selected button.cal-daynum{color:var(--text)}
 body.theme-dark .burger{color:#fff;border-color:rgba(255,255,255,.3)}
 body.theme-dark .theme-toggle{color:#fff;border-color:rgba(255,255,255,.3)}
 body.theme-dark .eyebrow{color:var(--ember)}
-body.theme-dark .lane-rope:not(.on-dark){background:repeating-linear-gradient(90deg,var(--flame) 0 16px,transparent 16px 22px,#fff 22px 38px,transparent 38px 44px)}
+body.theme-dark .lane-rope:not(.on-dark){background:repeating-linear-gradient(90deg,var(--rope-a,var(--flame)) 0 16px,transparent 16px 22px,var(--rope-b,#fff) 22px 38px,transparent 38px 44px)}
 body.theme-dark .pill.open{color:#5fce93}
 body.theme-dark .pill.open::before{background:rgba(31,138,76,.2)}
 body.theme-dark .feed-badge.home{background:rgba(31,138,76,.2);color:#5fce93}
@@ -2243,3 +2243,53 @@ body.home-v2.content-failed .hero-photo-strip,body.home-v2.content-failed #nextM
   .pulse-demo-exit{margin-left:0}
 }
 @media(prefers-reduced-motion:reduce){.pulse,.pulse-live-flag .live-dot,.pulse-k .live-dot{animation:none}}
+
+/* ---------- seasonal themes (applySeason in site.js, THEME_LOOKS in core.js) ----------
+   Light touch on purpose: the stripe under the header and above the footer, a badge on the logo,
+   the lane-rope colours and an optional message ribbon. Each look only sets the variables. */
+body.season header.site{border-bottom:4px solid transparent;border-image:var(--season-stripe) 1}
+body.season footer.site{border-top:4px solid transparent;border-image:var(--season-stripe) 1}
+.brand{position:relative}
+.season-badge{position:absolute;top:-4px;left:88px;font-size:1.55rem;line-height:1;pointer-events:none;
+  filter:drop-shadow(0 1px 2px rgba(16,16,20,.35));transform:rotate(12deg)}
+@media(min-width:1024px){.season-badge{left:62px;font-size:1.3rem}}
+@media(max-width:560px){.season-badge{top:-3px;left:42px;font-size:1.05rem}}
+.season-ribbon{background:var(--season-ribbon-bg);color:var(--season-ribbon-ink);font-family:'Montserrat',sans-serif;font-weight:700;font-size:.9rem;line-height:1.35}
+.season-ribbon-wrap{position:relative;max-width:1120px;margin:0 auto;padding:9px 48px;display:flex;align-items:center;justify-content:center;gap:10px;text-align:center}
+.season-ribbon-icon{flex:0 0 auto;font-size:1.05rem}
+/* body: outranks the dark theme's own link colour */
+body .season-ribbon a{color:inherit;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+body .season-ribbon a:hover{text-decoration-thickness:2px}
+.season-ribbon-close{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:inherit;font-size:.9rem;cursor:pointer;opacity:.75}
+.season-ribbon-close:hover{opacity:1;background:rgba(255,255,255,.15)}
+@media(max-width:560px){.season-ribbon{font-size:.82rem}.season-ribbon-wrap{padding:8px 42px 8px 14px;justify-content:flex-start;text-align:left}.season-ribbon-close{right:6px}}
+/* Snow on the homepage's orange band: three tiled layers of dots, each falling exactly one tile per
+   loop so it never jumps. z-index -1 keeps it under the words (.hero is its own stacking context). */
+body.season-snow .hero::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.9;
+  background-image:radial-gradient(circle,#fff 0 1.5px,transparent 2.3px),radial-gradient(circle,rgba(255,255,255,.85) 0 1px,transparent 1.7px),radial-gradient(circle,rgba(255,255,255,.75) 0 2px,transparent 2.8px);
+  background-size:120px 120px,80px 80px,190px 190px;background-position:0 0,40px 60px,130px 20px;
+  animation:season-snow 16s linear infinite}
+@keyframes season-snow{to{background-position:0 120px,40px 140px,130px 210px}}
+
+body.season-christmas{--season-stripe:repeating-linear-gradient(135deg,#c8102e 0 10px,#fff 10px 16px,#1b7f3b 16px 26px,#fff 26px 32px);
+  --season-ribbon-bg:linear-gradient(90deg,#9b0f22,#c8102e 50%,#9b0f22);--season-ribbon-ink:#fff;--rope-a:#c8102e;--rope-b:#1b7f3b}
+body.season-easter{--season-stripe:repeating-linear-gradient(90deg,#f9a8d4 0 24px,#fde68a 24px 48px,#c4b5fd 48px 72px,#a7f3d0 72px 96px);
+  --season-ribbon-bg:linear-gradient(90deg,#fce7f3,#fef9c3 50%,#ede9fe);--season-ribbon-ink:#4a1d3f;--rope-a:#ec4899;--rope-b:#8b5cf6}
+body.season-summer{--season-stripe:repeating-linear-gradient(90deg,#fbbf24 0 30px,#0ea5e9 30px 60px);
+  --season-ribbon-bg:linear-gradient(90deg,#0369a1,#0891b2);--season-ribbon-ink:#fff;--rope-a:#f59e0b;--rope-b:#0284c7}
+body.season-icy{--season-stripe:repeating-linear-gradient(90deg,#0b3d91 0 20px,#7dd3fc 20px 40px,#fff 40px 44px);
+  --season-ribbon-bg:linear-gradient(90deg,#0b2a5b,#1e4fa3 50%,#0b2a5b);--season-ribbon-ink:#fff;--rope-a:#38bdf8;--rope-b:#0b3d91}
+body.season-gold{--season-stripe:repeating-linear-gradient(90deg,#d4a017 0 22px,#1e3a8a 22px 44px);
+  --season-ribbon-bg:linear-gradient(90deg,#172554,#1e3a8a 50%,#172554);--season-ribbon-ink:#fde68a;--rope-a:#d4a017;--rope-b:#1e3a8a}
+body.season-finals{--season-stripe:repeating-linear-gradient(90deg,#101014 0 8px,#fff 8px 16px);
+  --season-ribbon-bg:#101014;--season-ribbon-ink:#ffc073;--rope-a:#d4a017;--rope-b:#101014}
+body.season-halloween{--season-stripe:repeating-linear-gradient(135deg,#f97316 0 10px,#3b0764 10px 20px);
+  --season-ribbon-bg:linear-gradient(90deg,#1a0b2e,#3b0764 50%,#1a0b2e);--season-ribbon-ink:#fdba74;--rope-a:#f97316;--rope-b:#6b21a8}
+body.season-club{--season-stripe:repeating-linear-gradient(90deg,#f5841f 0 16px,#101014 16px 22px,#fff 22px 38px,#101014 38px 44px);
+  --season-ribbon-bg:var(--flame);--season-ribbon-ink:#101014}
+/* the rope's dark half would vanish on a dark page */
+body.theme-dark.season-finals{--rope-b:#fff}
+body.theme-dark.season-gold,body.theme-dark.season-icy{--rope-b:#93c5fd}
+body.theme-dark.season-christmas{--rope-b:#2fa85a}
+body.theme-dark.season-halloween{--rope-b:#a855f7}
+body.season-finals .season-ribbon-close:hover,body.season-easter .season-ribbon-close:hover{background:rgba(127,127,127,.18)}
