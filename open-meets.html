@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=93">
+<link rel="stylesheet" href="assets/css/site.css?v=95">
 </head>
 <body class="theme-dark">
 <script>(function(){var t=null;try{t=localStorage.getItem("bpsc_theme")}catch(e){}if(t?t==="light":window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches)document.body.classList.remove("theme-dark")})()</script>
@@ -123,17 +123,34 @@
       <a class="btn small ghost" href="venue#staying">Places to stay</a>
     </aside>
     </div>
+    <nav class="news-jump meets-jump" id="meetsJump" aria-label="Jump to a section">
+      <div class="news-jump-chips">
+        <a class="news-jump-chip" href="#sec-open">Open for entry<span class="mj-n" data-count="open"></span></a>
+        <a class="news-jump-chip" href="#sec-ours">Upcoming BPSC meets<span class="mj-n" data-count="ours"></span></a>
+        <a class="news-jump-chip" href="#sec-other">Other clubs' meets<span class="mj-n" data-count="other"></span><span class="mj-open" data-count="otherOpen" hidden></span></a>
+        <a class="news-jump-chip" href="#sec-team">Team meets<span class="mj-n" data-count="team"></span></a>
+        <a class="news-jump-chip" href="#completed-galas">Results</a>
+      </div>
+    </nav>
+    <section class="meets-section ours open-entry" aria-labelledby="sec-open">
+      <div class="meets-section-head">
+        <h3 class="display meets-heading" id="sec-open">Open for entry</h3>
+        <span class="pill meets-count" id="openMeetsCount" hidden></span>
+      </div>
+      <p class="meets-sub">Our galas at Basildon Sporting Village taking entries now.</p>
+      <div class="grid" id="openMeetsList"></div>
+    </section>
     <section class="meets-section ours" aria-labelledby="sec-ours">
       <div class="meets-section-head">
         <h3 class="display meets-heading" id="sec-ours">Upcoming BPSC meets</h3>
         <span class="pill meets-count" id="meetsCount" hidden></span>
       </div>
-      <p class="meets-sub">Galas we host ourselves at Basildon Sporting Village.</p>
+      <p class="meets-sub">Our galas in the diary that aren't open for entry yet &mdash; the entry pack goes up here when they open.</p>
       <div class="grid" id="meetsList"></div>
     </section>
     <section class="meets-section" aria-labelledby="sec-other">
       <div class="meets-section-head">
-        <h3 class="display meets-heading" id="sec-other">Open meets &amp; championships</h3>
+        <h3 class="display meets-heading" id="sec-other">Other clubs' meets &amp; championships</h3>
         <span class="pill meets-count" id="otherMeetsCount" hidden></span>
       </div>
       <p class="meets-sub">Licensed meets run by other clubs, counties and regions — great extra racing opportunities. Each card shows whether entries are still open.</p>
@@ -193,6 +210,6 @@
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous"></script>
 <script src="assets/js/core.js?v=41"></script>
-<script src="assets/js/site.js?v=56"></script>
+<script src="assets/js/site.js?v=58"></script>
 </body>
 </html>

@@ -40,7 +40,9 @@ function renderMeets(){
      stay in date order below rather than interleaved, so an urgent external closing date is
      still easy to spot without our own galas getting lost among them. */
   const upcomingOpen=upcoming.filter(m=>m.type!=="teamMeet"&&!meetTooFarAhead(m)),upcomingTeam=upcoming.filter(m=>m.type==="teamMeet");
-  const upcomingOurs=upcomingOpen.filter(m=>m.type==="meet"),upcomingOthers=upcomingOpen.filter(m=>m.type==="externalMeet");
+  /* our galas split in two: the ones you can enter right now lead the page, the rest are "coming up" */
+  const oursAll=upcomingOpen.filter(m=>m.type==="meet"),upcomingOthers=upcomingOpen.filter(m=>m.type==="externalMeet");
+  const openOurs=oursAll.filter(meetHasEntry),upcomingOurs=oursAll.filter(m=>!meetHasEntry(m));
   const extLink=(url,label,cls="big ghost")=>`<a class="btn ${cls}" href="${esc(url)}" target="_blank" rel="noopener">${label}</a>`;
   /* Live results are published by the poolside laptop to a separate host, so this is always an external link. */
   const liveLink=url=>`<a class="btn big live" href="${esc(url)}" target="_blank" rel="noopener"><span class="live-dot"></span>Live results</a>`;
@@ -51,14 +53,15 @@ function renderMeets(){
     const dp=dateParts(m.start);
     const pills=[
       meetLive(m)||meetStreaming(m)?'<span class="pill live"><span class="live-dot"></span>Live now</span>':"",
-      done?'<span class="pill closed">Completed</span>':team?"":m.status==="open"?'<span class="pill open">Entries open</span>':'<span class="pill closed">Entries closed</span>',
+      /* "open" with no entry pack yet can't actually be entered, so it doesn't claim to be */
+      done?'<span class="pill closed">Completed</span>':team?"":m.status==="open"?(m.entryUrl?'<span class="pill open">Entries open</span>':'<span class="pill closed">Entry pack soon</span>'):'<span class="pill closed">Entries closed</span>',
       team?`<span class="pill results">${esc(m.league||"Team meet")}</span>`:ours?'<span class="pill hosted">BPSC hosted</span>':"",
       m.level&&!team?`<span class="pill level">${esc(m.level)}</span>`:""
     ].join("");
     let actions;
     if(done)actions=m.resultsUrl?extLink(m.resultsUrl,"Results","big"):`<span class="btn big disabled" aria-disabled="true">Results coming soon</span>`;
     else if(team)actions=m.leagueUrl?extLink(m.leagueUrl,"League info"):"";
-    else actions=(meetHasEntry(m)?extLink(m.entryUrl,"Entry pack","big")
+    else actions=(meetHasEntry(m)?extLink(m.entryUrl,"Enter here","big enter")
         :m.entryUrl&&m.status!=="open"?`<span class="btn big entries-closed" aria-disabled="true">Entries CLOSED</span>`:"")
       +(m.officialsUrl?extLink(m.officialsUrl,"Officials sign-up"):"")
       +(m.volunteerUrl?extLink(m.volunteerUrl,"Volunteer here"):"");
@@ -93,14 +96,24 @@ function renderMeets(){
       ${actions?`<div class="meet-actions">${actions}</div>`:""}</article>`;
   };
   if($("#meetsList")){
-    $("#meetsList").innerHTML=upcomingOurs.length?upcomingOurs.map(meetCard).join(""):`<p style="color:var(--muted)">No Basildon-hosted galas confirmed yet — check back soon.</p>`;
+    if($("#openMeetsList"))$("#openMeetsList").innerHTML=openOurs.length?openOurs.map(meetCard).join(""):`<p style="color:var(--muted)">None of our galas are taking entries right now — see what's coming up below.</p>`;
+    $("#meetsList").innerHTML=upcomingOurs.length?upcomingOurs.map(meetCard).join(""):`<p style="color:var(--muted)">No other Basildon-hosted galas confirmed yet — check back soon.</p>`;
     $("#otherMeetsList").innerHTML=upcomingOthers.length?upcomingOthers.map(meetCard).join(""):`<p style="color:var(--muted)">No other open meets listed yet.</p>`;
     $("#teamMeetsList").innerHTML=upcomingTeam.length?upcomingTeam.map(meetCard).join(""):`<p style="color:var(--muted)">No team meets scheduled yet.</p>`;
     $("#completedMeetsList").innerHTML=completedByYear(completed,meetCard);
     /* "3 upcoming" beside each section heading, so the sections read as separate at a glance */
-    [["#meetsCount",upcomingOurs],["#otherMeetsCount",upcomingOthers],["#teamMeetsCount",upcomingTeam]].forEach(([sel,list])=>{
+    [["#openMeetsCount",openOurs,"open"],["#meetsCount",upcomingOurs,"upcoming"],["#otherMeetsCount",upcomingOthers,"upcoming"],["#teamMeetsCount",upcomingTeam,"upcoming"]].forEach(([sel,list,word])=>{
       const el=$(sel);if(!el)return;
-      el.textContent=`${list.length} upcoming`;el.hidden=!list.length;
+      el.textContent=`${list.length} ${word}`;el.hidden=!list.length;
+    });
+    /* the quick-jump bar: a count on each button, plus a green "N open" on other clubs' meets so a
+       championship taking entries isn't missed now that our own galas come first */
+    const otherOpen=upcomingOthers.filter(meetHasEntry).length;
+    const counts={open:openOurs.length,ours:upcomingOurs.length,other:upcomingOthers.length,team:upcomingTeam.length,otherOpen};
+    document.querySelectorAll("#meetsJump [data-count]").forEach(el=>{
+      const n=counts[el.dataset.count];
+      el.textContent=el.dataset.count==="otherOpen"?`${n} open`:n?String(n):"";
+      el.hidden=!n;
     });
     jumpToMeetFromHash();
   }
@@ -1511,7 +1524,7 @@ document.addEventListener("visibilitychange",()=>{if(!document.hidden&&pulseDay&
 if($("#clubPulse"))syncHomeVersion();
 
 /* ================= INIT ================= */
-const CONTENT_SLOTS="#meetsList,#otherMeetsList,#teamMeetsList,#completedMeetsList,#coachesList,#academyCoachesList,#rolesList,#newsList,#ttBody,#socialsList,#compList,#leagueList,#committeeList,#committeeDetail";
+const CONTENT_SLOTS="#openMeetsList,#meetsList,#otherMeetsList,#teamMeetsList,#completedMeetsList,#coachesList,#academyCoachesList,#rolesList,#newsList,#ttBody,#socialsList,#compList,#leagueList,#committeeList,#committeeDetail";
 document.querySelectorAll(CONTENT_SLOTS).forEach(el=>{el.innerHTML=`<p style="color:var(--muted)">Loading…</p>`;});
 loadContent().then(()=>{
   /* Admins can hide a meet from the public site (without deleting it) by unticking "Show on
