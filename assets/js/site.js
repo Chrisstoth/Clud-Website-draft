@@ -7,21 +7,18 @@ document.addEventListener("touchstart",()=>{},{passive:true});
 const cardLink=(attrs,label)=>`<a class="card-link" ${attrs}><span class="cl-label">${label}</span></a>`;
 const meetHasEntry=m=>m.type!=="teamMeet"&&!meetDone(m)&&m.status==="open"&&!!m.entryUrl;
 /* The results archive runs back to 2024 and only grows, so showing every completed gala as a
-   card leaves a wall of them between the reader and the one they came for. The most recent
-   season's galas stay as ordinary cards; each earlier year folds into one expandable bar.
-   "Most recent season" is whichever year has the newest results, not the calendar year, so
-   there is always something on show -- in January, last year's galas are still the latest. */
+   card leaves a wall of them between the reader and the one they came for. Only the latest gala
+   WE hosted stays on show as a card (its results are what people come looking for); everything
+   else, this year included, folds into one expandable bar per year. */
 function completedByYear(completed,card){
   if(!completed.length)return `<p style="color:var(--muted)">No completed galas yet.</p>`;
+  /* completed is already newest-first */
+  const latest=completed.find(m=>m.type==="meet");
   const years=new Map();
-  completed.forEach(m=>{const y=m.start.slice(0,4);(years.get(y)||years.set(y,[]).get(y)).push(m);});
-  /* completed is already newest-first, so the first key is the season to leave open. */
-  return [...years].map(([year,meets],i)=>{
-    const cards=meets.map(card).join("");
-    if(i===0)return cards;
-    return `<details class="year-group"><summary>${year}<span class="year-count">${meets.length} gala${meets.length===1?"":"s"}</span></summary>
-      <div class="year-body">${cards}</div></details>`;
-  }).join("");
+  completed.forEach(m=>{if(m===latest)return;const y=m.start.slice(0,4);(years.get(y)||years.set(y,[]).get(y)).push(m);});
+  return (latest?card(latest):"")+[...years].map(([year,meets])=>
+    `<details class="year-group"><summary>${year}<span class="year-count">${meets.length}${latest&&latest.start.startsWith(year)?" more":""} gala${meets.length===1?"":"s"}</span></summary>
+      <div class="year-body">${meets.map(m=>card(m)).join("")}</div></details>`).join("");
 }
 /* The Club Calendar links a gala as open-meets#meet-<id>. The cards are drawn after the browser
    has already looked for that anchor, so scroll to it here -- once, opening its season if it's
@@ -100,6 +97,11 @@ function renderMeets(){
     $("#otherMeetsList").innerHTML=upcomingOthers.length?upcomingOthers.map(meetCard).join(""):`<p style="color:var(--muted)">No other open meets listed yet.</p>`;
     $("#teamMeetsList").innerHTML=upcomingTeam.length?upcomingTeam.map(meetCard).join(""):`<p style="color:var(--muted)">No team meets scheduled yet.</p>`;
     $("#completedMeetsList").innerHTML=completedByYear(completed,meetCard);
+    /* "3 upcoming" beside each section heading, so the sections read as separate at a glance */
+    [["#meetsCount",upcomingOurs],["#otherMeetsCount",upcomingOthers],["#teamMeetsCount",upcomingTeam]].forEach(([sel,list])=>{
+      const el=$(sel);if(!el)return;
+      el.textContent=`${list.length} upcoming`;el.hidden=!list.length;
+    });
     jumpToMeetFromHash();
   }
   /* The hero's red LIVE pill only shows while a gala with a live-results link is actually running.

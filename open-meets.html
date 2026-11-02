@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=91">
+<link rel="stylesheet" href="assets/css/site.css?v=93">
 </head>
 <body class="theme-dark">
 <script>(function(){var t=null;try{t=localStorage.getItem("bpsc_theme")}catch(e){}if(t?t==="light":window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches)document.body.classList.remove("theme-dark")})()</script>
@@ -123,18 +123,37 @@
       <a class="btn small ghost" href="venue#staying">Places to stay</a>
     </aside>
     </div>
-    <h3 class="display meets-heading">Our galas</h3>
-    <p class="meets-sub">Meets we host ourselves at Basildon Sporting Village.</p>
-    <div class="grid" id="meetsList"></div>
-    <h3 class="display meets-heading">Open meets &amp; championships</h3>
-    <p class="meets-sub">Licensed meets run by other clubs, counties and regions — great extra racing opportunities. Each card shows whether entries are still open.</p>
-    <div class="grid" id="otherMeetsList"></div>
-    <h3 class="display meets-heading">Team meets &amp; leagues</h3>
-    <p class="meets-sub">Arena League, Essex League and other team galas. Teams are selected by the coaches — there's no individual entry.</p>
-    <div class="grid" id="teamMeetsList"></div>
-    <h3 class="display meets-heading" id="completed-galas">Completed galas</h3>
-    <p class="meets-sub">Results from every gala we've hosted. This season's are listed below &mdash; open a year to see earlier ones.</p>
-    <div class="grid" id="completedMeetsList"></div>
+    <section class="meets-section ours" aria-labelledby="sec-ours">
+      <div class="meets-section-head">
+        <h3 class="display meets-heading" id="sec-ours">Upcoming BPSC meets</h3>
+        <span class="pill meets-count" id="meetsCount" hidden></span>
+      </div>
+      <p class="meets-sub">Galas we host ourselves at Basildon Sporting Village.</p>
+      <div class="grid" id="meetsList"></div>
+    </section>
+    <section class="meets-section" aria-labelledby="sec-other">
+      <div class="meets-section-head">
+        <h3 class="display meets-heading" id="sec-other">Open meets &amp; championships</h3>
+        <span class="pill meets-count" id="otherMeetsCount" hidden></span>
+      </div>
+      <p class="meets-sub">Licensed meets run by other clubs, counties and regions — great extra racing opportunities. Each card shows whether entries are still open.</p>
+      <div class="grid" id="otherMeetsList"></div>
+    </section>
+    <section class="meets-section" aria-labelledby="sec-team">
+      <div class="meets-section-head">
+        <h3 class="display meets-heading" id="sec-team">Team meets &amp; leagues</h3>
+        <span class="pill meets-count" id="teamMeetsCount" hidden></span>
+      </div>
+      <p class="meets-sub">Arena League, Essex League and other team galas. Teams are selected by the coaches — there's no individual entry.</p>
+      <div class="grid" id="teamMeetsList"></div>
+    </section>
+    <section class="meets-section done" aria-labelledby="completed-galas">
+      <div class="meets-section-head">
+        <h3 class="display meets-heading" id="completed-galas">Completed galas</h3>
+      </div>
+      <p class="meets-sub">Results from every gala. Our latest one is below &mdash; open a year to see the rest.</p>
+      <div class="grid" id="completedMeetsList"></div>
+    </section>
   </div>
 </section>
 </main>
@@ -174,6 +193,6 @@
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous"></script>
 <script src="assets/js/core.js?v=41"></script>
-<script src="assets/js/site.js?v=55"></script>
+<script src="assets/js/site.js?v=56"></script>
 </body>
 </html>
