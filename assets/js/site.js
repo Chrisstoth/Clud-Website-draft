@@ -25,13 +25,16 @@ function completedByYear(completed,card){
    folded away under an older year. */
 let meetHashJumped=false;
 function jumpToMeetFromHash(){
-  if(meetHashJumped||!/^#meet-/.test(location.hash))return;
+  /* the section headings too (#sec-team etc.): the cards drawn above them push them down after
+     the browser's own jump, so a shared link to a section needs the same second look */
+  const section=/^#(sec-|completed-galas$)/.test(location.hash);
+  if(meetHashJumped||!(section||/^#meet-/.test(location.hash)))return;
   const el=document.getElementById(decodeURIComponent(location.hash.slice(1)));
   if(!el)return;
   meetHashJumped=true;
   const yr=el.closest("details");
   if(yr)yr.open=true;
-  el.scrollIntoView({block:"center",behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});
+  el.scrollIntoView({block:section?"start":"center",behavior:matchMedia("(prefers-reduced-motion:reduce)").matches?"auto":"smooth"});
 }
 function renderMeets(){
   const all=DB.feed.filter(isMeet).sort((a,b)=>a.start<b.start?-1:1);
