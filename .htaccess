@@ -1,15 +1,25 @@
-# Apache config for IONOS web hosting (Cloudflare Pages ignores this file and uses
-# _headers/_redirects instead — keep the two in step).
+# Apache config for the IONOS web hosting: addresses, HTTPS, clean page URLs, the 404 page
+# and security headers.
 
 Options -MultiViews
 RewriteEngine On
 RewriteBase /
 
-# Always use HTTPS on www.basildonswimming.co.uk (bare domain -> www)
-RewriteCond %{HTTP_HOST} ^basildonswimming\.co\.uk$ [NC]
-RewriteRule ^ https://www.basildonswimming.co.uk%{REQUEST_URI} [L,R=301]
+# The site's address is https://basildonswimming.org -- no www, as the old WordPress site was.
+# www and the .co.uk addresses go there. None of this does anything until those domains are
+# pointed at this folder in IONOS.
+RewriteCond %{HTTP_HOST} ^www\.basildonswimming\.org$ [NC,OR]
+RewriteCond %{HTTP_HOST} ^(www\.)?basildonswimming\.co\.uk$ [NC]
+RewriteRule ^ https://basildonswimming.org%{REQUEST_URI} [L,R=301]
+# SWITCH DAY: once basildonswimming.org is pointed at this folder, remove the # from the next two
+# lines so the test domain (basildonswimmingclub.co.uk) sends visitors to the .org too -- and
+# delete the TEMPORARY line further down.
+#RewriteCond %{HTTP_HOST} ^(www\.)?basildonswimmingclub\.co\.uk$ [NC]
+#RewriteRule ^ https://basildonswimming.org%{REQUEST_URI} [L,R=301]
+
+# Always use HTTPS
 RewriteCond %{HTTPS} off
-# TEMPORARY: trial domain has no SSL certificate yet. Remove this line once it does.
+# TEMPORARY: the test domain has no SSL certificate, so until switch day it stays on http.
 RewriteCond %{HTTP_HOST} !^(www\.)?basildonswimmingclub\.co\.uk$ [NC]
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 

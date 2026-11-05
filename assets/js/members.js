@@ -155,7 +155,8 @@ const SCHEMAS = {
     {k:"img",label:"Picture (optional, replaces card graphic)",type:"imagepicker"},
     {k:"photos",label:"Photo gallery (shown as a slideshow on the article page)",type:"gallery"},
     {k:"heroPhotos",label:"Homepage pictures",type:"heropics"},
-    {k:"body",label:"Full write-up (shown on the article page)",type:"richtext"}
+    {k:"body",label:"Full write-up (shown on the article page)",type:"richtext"},
+    {k:"docLinks",label:"Attachments (e.g. a brochure or letter as a PDF — shown as download buttons under the article)",type:"links",variant:"attach"}
   ],
   news:[
     {k:"topics",label:"Tags",type:"tagpicks"},
@@ -165,7 +166,8 @@ const SCHEMAS = {
     {k:"img",label:"Picture (thumbnail; used as the cover if there's no gallery yet)",type:"imagepicker"},
     {k:"photos",label:"Photo gallery (shown as a slideshow on the article page)",type:"gallery"},
     {k:"heroPhotos",label:"Homepage pictures",type:"heropics"},
-    {k:"body",label:"Article content",type:"richtext"}
+    {k:"body",label:"Article content",type:"richtext"},
+    {k:"docLinks",label:"Attachments (e.g. a brochure or letter as a PDF — shown as download buttons under the article)",type:"links",variant:"attach"}
   ],
   training:[
     {k:"title",label:"What's changing (a short headline, e.g. Changes for Essex Winter Champs weekend)",type:"text",req:1},
@@ -173,7 +175,8 @@ const SCHEMAS = {
     {k:"end",label:"End date (optional, for a range)",type:"date"},
     {k:"blurb",label:"One-line summary (shown on the homepage and in Club News — leave blank to use the first line of the details)",type:"textarea"},
     {k:"img",label:"Picture",type:"imagepicker"},
-    {k:"body",label:"Full details for parents & swimmers (shown on its own page) — tip: a heading for each session, e.g. Friday PM, then a bullet per squad",type:"richtext"}
+    {k:"body",label:"Full details for parents & swimmers (shown on its own page) — tip: a heading for each session, e.g. Friday PM, then a bullet per squad",type:"richtext"},
+    {k:"docLinks",label:"Attachments (e.g. a brochure or letter as a PDF — shown as download buttons under the article)",type:"links",variant:"attach"}
   ],
   partners:[
     {k:"name",label:"Partner name (the text shown in the strip)",type:"text",req:1},
@@ -895,7 +898,14 @@ function showSquadDetailsSection(){
 }
 
 /* Meet documents & links editor: one row per link, in the order they show on the card. */
-function docLinkRowHtml(l={}){
+function docLinkRowHtml(l={},attach){
+  /* An article's attachments are just a name and a file: no link text or highlight colour. */
+  if(attach)return `<div class="doclink-row attach" data-doclink>
+    <input type="text" data-k="label" value="${esc(l.label||"")}" placeholder="Name, e.g. Summer Camp brochure" aria-label="Name">
+    <span class="doclink-url"><input type="text" data-k="url" value="${esc(l.url||"")}" placeholder="Upload the PDF →, or paste a link" aria-label="File link (URL)" inputmode="url"><label class="doclink-pdf" title="Upload a PDF for this line (replaces the link)">PDF<input type="file" accept="application/pdf,.pdf" data-doclink-pdf style="display:none"></label></span>
+    <span class="doclink-move"><button type="button" data-doclink-up aria-label="Move up">↑</button><button type="button" data-doclink-down aria-label="Move down">↓</button></span>
+    <button type="button" class="sess-del" data-doclink-del aria-label="Remove attachment">×</button>
+  </div>`;
   const hlOpts=LINK_HIGHLIGHTS.map(([k,name])=>`<option value="${k}" ${(l.hl||"")===k?"selected":""}>${name}</option>`).join("");
   return `<div class="doclink-row${l.hl?" hl-"+esc(l.hl):""}" data-doclink>
     <input type="text" data-k="label" value="${esc(l.label||"")}" placeholder="Name, e.g. Meet conditions & details" aria-label="Name">
@@ -1066,6 +1076,14 @@ function showForm(sec,id,forcedType){
         </div>
         ${loose.length?`<label class="f">Or, if it's already written in Club News, link that article to this gala
           <select id="meetArticleLink"><option value="">— No, not linked —</option>${loose.map(x=>`<option value="${x.id}">${esc(x.title)} (${slidePostedLabel(x)})</option>`).join("")}</select></label>`:""}
+      </div>`;
+    }
+    if(f.type==="links"&&f.variant==="attach"){
+      return `<div class="f">${f.label}
+        <div class="doclink-rows" id="docLinkRows" data-attach>${(it[f.k]||[]).map(l=>docLinkRowHtml(l,true)).join("")}</div>
+        <div class="img-add-row"><label class="img-upload-btn" id="addDocPdfBtn">+ Upload PDFs<input type="file" accept="application/pdf,.pdf" multiple id="addDocPdf" style="display:none"></label>
+          <button type="button" class="btn small ghost" id="addDocLink">+ Add a link instead</button></div>
+        <p class="hint" style="margin:0">Each one shows as a download button under the article, in this order, with the name you give it (filled in from the file name — change it if you like). A line's <b>PDF</b> button swaps in a new version of its file. Uploads are kept on this site (PDFs up to 25 MB).</p>
       </div>`;
     }
     if(f.type==="links"){
@@ -1421,6 +1439,9 @@ function showForm(sec,id,forcedType){
     });
   }
   if(docLinkRows){
+    /* the same editor does a gala's documents and an article's attachments */
+    const attach=docLinkRows.hasAttribute("data-attach"),pdfFolder=attach?"news-docs":"meet-docs";
+    const saveWord=attach?"the post":"the gala";
     docLinkRows.addEventListener("change",e=>{
       if(e.target.dataset.k!=="hl")return;
       const row=e.target.closest("[data-doclink]");
@@ -1433,7 +1454,7 @@ function showForm(sec,id,forcedType){
       else if(e.target.closest("[data-doclink-down]")&&row.nextElementSibling)row.before(row.nextElementSibling);
     });
     $("#addDocLink").addEventListener("click",()=>{
-      docLinkRows.insertAdjacentHTML("beforeend",docLinkRowHtml());
+      docLinkRows.insertAdjacentHTML("beforeend",docLinkRowHtml({},attach));
       docLinkRows.lastElementChild.querySelector('[data-k="label"]').focus();
     });
     /* PDFs go to the "documents" store (migration 031), like results files. A line's own PDF
@@ -1444,12 +1465,12 @@ function showForm(sec,id,forcedType){
       if(!file)return;
       btn.classList.add("busy");
       try{
-        row.querySelector('[data-k="url"]').value=await uploadPdf(file,"meet-docs");
+        row.querySelector('[data-k="url"]').value=await uploadPdf(file,pdfFolder);
         const name=row.querySelector('[data-k="label"]');
         if(!name.value.trim())name.value=pdfTitle(file);
         const text=row.querySelector('[data-k="text"]');
-        if(!text.value.trim())text.value="View PDF";
-        toast("PDF uploaded — save the gala to publish it");
+        if(text&&!text.value.trim())text.value="View PDF";
+        toast(`PDF uploaded — save ${saveWord} to publish it`);
       }catch(err){toast(err.message||"Couldn't upload that PDF");}
       finally{btn.classList.remove("busy");e.target.value="";}
     });
@@ -1460,14 +1481,14 @@ function showForm(sec,id,forcedType){
       for(const file of files){
         label.nodeValue=`Uploading ${done+1} of ${files.length}…`;
         try{
-          const url=await uploadPdf(file,"meet-docs");
-          docLinkRows.insertAdjacentHTML("beforeend",docLinkRowHtml({label:pdfTitle(file),text:"View PDF",url}));
+          const url=await uploadPdf(file,pdfFolder);
+          docLinkRows.insertAdjacentHTML("beforeend",docLinkRowHtml(attach?{label:pdfTitle(file),url}:{label:pdfTitle(file),text:"View PDF",url},attach));
           done++;
         }catch(err){toast(`${file.name}: ${err.message||"couldn't upload it"}`);}
       }
       label.nodeValue=original;
       e.target.value="";
-      if(done)toast(`${done===1?"PDF":done+" PDFs"} uploaded — check the names, then save the gala to publish`);
+      if(done)toast(`${done===1?"PDF":done+" PDFs"} uploaded — check the names, then save ${saveWord} to publish`);
     });
   }
   const rteEditor=$("#rteEditor");
@@ -1509,6 +1530,7 @@ function showForm(sec,id,forcedType){
     liveData.topics=pickedTags();
     if(galleryField)liveData.photos=galleryPhotos;
     if(rteEditor)liveData.body=sanitizeArticleHtml(rteEditor.innerHTML);
+    if(docLinkRows)liveData.docLinks=[...docLinkRows.querySelectorAll("[data-doclink]")].map(r=>{const o={};r.querySelectorAll("[data-k]").forEach(i=>o[i.dataset.k]=i.value.trim());return o;}).filter(l=>l.url);
     showArticlePreview(liveData);
   });
   $("#cancelForm").addEventListener("click",()=>{formTarget.innerHTML="";editingId=null;});
@@ -1550,7 +1572,7 @@ function showForm(sec,id,forcedType){
       const rowEls=[...docLinkRows.querySelectorAll("[data-doclink]")];
       const links=rowEls.map(r=>{const o={};r.querySelectorAll("[data-k]").forEach(i=>o[i.dataset.k]=i.value.trim());return o;});
       const bad=links.findIndex(l=>!l.url&&(l.label||l.text));
-      if(bad>-1){toast("Each document or link needs its link (URL) — or remove that line");rowEls[bad].querySelector('[data-k="url"]').focus();return;}
+      if(bad>-1){toast(docLinkRows.hasAttribute("data-attach")?"Each attachment needs its file — upload the PDF, or remove that line":"Each document or link needs its link (URL) — or remove that line");rowEls[bad].querySelector('[data-k="url"]').focus();return;}
       data.docLinks=links.filter(l=>l.url);
     }
     if(raceDayPicks){

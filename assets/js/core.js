@@ -571,6 +571,26 @@ function articleMeetBoxHtml(m){
     <div class="actions"><a class="btn small" href="open-meets#meet-${esc(m.id)}">Gala details &amp; documents →</a>${open&&m.entryUrl?ext(m.entryUrl,"Enter here","ghost"):""}${!team&&!done&&m.entryPackUrl?ext(m.entryPackUrl,"Entry pack","ghost"):""}${done&&m.resultsUrl?ext(m.resultsUrl,"Results","ghost"):""}</div>
   </aside>`;
 }
+/* An article's attachments (its doc_links: a brochure, a letter…) as download buttons under the
+   text. Most are PDFs kept in the "documents" store; anything that isn't a plain web address is
+   left out rather than linked. */
+function articleAttachmentsHtml(it){
+  const files=(it.docLinks||[]).map(l=>l&&{name:(l.label||"").trim(),url:partnerUrl(l.url)}).filter(l=>l&&l.url);
+  if(!files.length)return "";
+  const isPdf=u=>/\.pdf([?#].*)?$/i.test(u);
+  return `<section class="article-files" aria-label="Attachments">
+    <p class="eyebrow">${files.length===1?"Attachment":"Attachments"}</p>
+    ${files.map(f=>{
+      let fallback=f.url.split(/[?#]/)[0].split("/").pop()||"";
+      try{fallback=decodeURIComponent(fallback);}catch(e){}
+      fallback=fallback.replace(/^\d{10,}-/,"")||"Download";
+      return `<a class="article-file" href="${esc(f.url)}" target="_blank" rel="noopener">
+        <span class="article-file-ico" aria-hidden="true">${isPdf(f.url)?"PDF":"↗"}</span>
+        <span class="article-file-name">${esc(f.name||fallback)}</span>
+        <span class="article-file-go">${isPdf(f.url)?"Open":"Visit"} <span aria-hidden="true">→</span></span>
+      </a>`;}).join("")}
+  </section>`;
+}
 function articleContentHtml(it){
   const photos=it.photos||[];
   const cover=!photos.length?resolveNewsImage(it.img,"article"):null;
@@ -591,6 +611,7 @@ function articleContentHtml(it){
     </div>
     ${media}
     <div class="article-body">${bodyHtml}</div>
+    ${articleAttachmentsHtml(it)}
     ${meet?articleMeetBoxHtml(meet):""}`;
 }
 
