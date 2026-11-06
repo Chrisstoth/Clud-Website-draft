@@ -511,12 +511,8 @@ body.theme-dark .quick-links-divider{background:#31313a}
   .hero-slide+.hero-slide{margin-left:0}
   .hero-arrow{width:32px;height:32px;font-size:1.1rem}
 }
-.live-results{position:absolute;top:0;right:20px;display:inline-flex;align-items:center;gap:7px;background:#c81e2c;color:#fff;font-family:'Montserrat',sans-serif;font-weight:700;font-size:.78rem;letter-spacing:.03em;text-transform:uppercase;padding:9px 16px;border-radius:999px;text-decoration:none;box-shadow:0 4px 14px rgba(16,16,20,.28);z-index:2;animation:live-pulse 1.8s ease-in-out infinite}
-.live-results:hover{background:#a8121e}
-.live-results .live-dot{width:8px;height:8px;border-radius:50%;background:#fff;flex:0 0 auto}
 @keyframes live-pulse{0%,100%{box-shadow:0 4px 14px rgba(16,16,20,.28),0 0 0 0 rgba(200,30,44,.5)}50%{box-shadow:0 4px 14px rgba(16,16,20,.28),0 0 0 9px rgba(200,30,44,0)}}
-@media(max-width:600px){.live-results{position:static;margin:0 20px 18px}}
-/* [hidden] must beat .live-results' own display:inline-flex, or the pill shows with no gala on. */
+/* [hidden] must beat any element's own display rule (e.g. inline-flex buttons). */
 [hidden]{display:none!important}
 
 /* Live results: the one red thing on the page, so it reads as "happening right now" wherever it appears. */
@@ -540,7 +536,7 @@ body.theme-dark .quick-links-divider{background:#31313a}
 .btn.enter,body.theme-dark .btn.enter,.btn.enter:hover{color:#fff;font-weight:800}
 .btn.enter::before{background:#1f8a4c}
 .btn.enter:hover::before{background:#176b3a}
-@media(prefers-reduced-motion:reduce){.live-results,.btn.live::before,.pill.live .live-dot{animation:none}}
+@media(prefers-reduced-motion:reduce){.btn.live::before,.pill.live .live-dot{animation:none}}
 
 .hero-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:40px;align-items:center;position:relative}
 .hero h1{font-size:clamp(1.9rem,3.6vw,2.6rem);color:var(--ink);margin-top:4px}
@@ -2262,8 +2258,6 @@ body.theme-dark .pulse-k{color:var(--flame)}
 
 /* the rest of the V2 homepage adapting around the panel */
 body.home-v2.home-event .hero h1{font-size:clamp(1.4rem,2.4vw,1.85rem)}
-/* the panel already carries the live button -- two pulsing red things would compete */
-body.home-v2.home-live #liveResultsPill{display:none}
 /* content couldn't load: no empty black slideshow or blank card, just the ordinary banner */
 body.home-v2.content-failed .hero-photo-strip,body.home-v2.content-failed #nextMeetCard:empty{display:none}
 

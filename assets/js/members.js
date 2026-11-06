@@ -220,7 +220,7 @@ let feedFilter={type:"",tag:""};
 function renderLogin(message){
   $("#whoAmI").innerHTML="";
   $("#adminBody").innerHTML=`<div class="login-wrap"><div class="card">
-    <p class="eyebrow" style="color:var(--ember)">Members' area</p>
+    <p class="eyebrow" style="color:var(--ember)">Admin area</p>
     <h2 class="display" style="font-size:1.8rem;margin-top:6px">Sign in</h2>
     <p style="color:var(--muted);font-size:.92rem;margin-top:10px">Enter your club email address and we'll send you a sign-in link. There's no password to remember.</p>
     ${message?`<div class="admin-note" style="margin-top:16px">${esc(message)}</div>`:""}
@@ -2100,7 +2100,7 @@ async function showAccessSection(){
   const ready=data.some(m=>m.email.toLowerCase()!==session.email.toLowerCase());
   const roleName=r=>ROLES[r]?ROLES[r].label:r;
   main.innerHTML=`<h2>${name}</h2>
-    <div class="admin-note">Everyone who can sign in to the members' area. <strong>Club Posters</strong> can post and edit every kind of feed item, but nothing goes live until someone else approves it. <strong>Webmasters</strong> can change everything, publish straight away and manage this list. Removing someone stops them straight away.</div>
+    <div class="admin-note">Everyone who can sign in to the admin area. <strong>Club Posters</strong> can post and edit every kind of feed item, but nothing goes live until someone else approves it. <strong>Webmasters</strong> can change everything, publish straight away and manage this list. Removing someone stops them straight away.</div>
     ${ready?"":`<div class="admin-note">Only your own account shows until the webmaster runs <code>supabase/migrations/024_peer_review.sql</code> in the Supabase SQL Editor.</div>`}
     ${data.map(m=>{const me=m.email.toLowerCase()===session.email.toLowerCase();
       return `<div class="item-row"><div><div class="t">${esc(m.label||roleName(m.role))}${me?" (you)":""}</div>

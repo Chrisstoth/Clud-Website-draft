@@ -121,14 +121,6 @@ function renderMeets(){
     });
     jumpToMeetFromHash();
   }
-  /* The hero's red LIVE pill only shows while a gala with a live-results link is actually running.
-     A button that pulses permanently and goes nowhere just trains people to ignore it. */
-  const livePill=$("#liveResultsPill"),liveNow=all.find(meetLive);
-  if(livePill){
-    if(liveNow){livePill.href=liveNow.liveUrl;livePill.hidden=false;livePill.title="Live results — "+liveNow.title;}
-    else livePill.hidden=true;
-  }
-
   if(!$("#nextMeetCard"))return;
   const isHome=isHomeVenue;
   const clubUpcoming=upcoming.filter(m=>m.type==="meet");
