@@ -1212,10 +1212,21 @@ $("#burger").addEventListener("click",()=>{
 window.addEventListener("resize",sizeDrawer);
 window.addEventListener("scroll",sizeDrawer,{passive:true});
 
-/* ================= JOIN FORM → EMAIL =================
-   Each form posts to send-enquiry.php, which emails the membership team. Nothing is kept
-   in the browser (the forms carry children's names and dates of birth). If the mailer
-   can't be reached, the visitor's own email app opens with the enquiry already written. */
+/* ================= JOIN FORM → EMAIL + RECORD =================
+   Each form posts to send-enquiry.php, which emails the membership team, then a back-up copy
+   is saved to the enquiries table (members' area → Trial Enquiries, Membership/Webmaster only)
+   noting whether the email went. Nothing is kept in the browser (the forms carry children's
+   names and dates of birth). If the email can't be sent, the visitor's own email app opens
+   with the enquiry already written. */
+async function recordEnquiry(f,path,emailed){
+  const v=k=>{const x=f.get(k);return x==null?null:String(x)};
+  try{
+    const {error}=await sb.rpc("submit_enquiry",{p_pathway:path,p_email:v("email"),p_swimmer:v("swimmer"),
+      p_parent:v("parent"),p_dob:v("dob"),p_stage:v("stage"),p_se_no:v("seNo"),p_level:v("level"),
+      p_notes:v("notes"),p_emailed:emailed});
+    return !error;
+  }catch(e){return false;}
+}
 const ENQUIRY_TO="info@phoenixbasildonsc.org";
 function enquiryStatus(html,bad){
   const s=$("#joinStatus");
@@ -1240,8 +1251,11 @@ async function submitEnquiry(e,path,type){
     res=await fetch("send-enquiry.php",{method:"POST",body:f,headers:{Accept:"application/json"}});
     data=await res.json().catch(()=>({}));
   }catch(err){}
+  const emailed=!!(res&&res.ok&&data.ok===true);
+  /* a form the mailer rejected (bad field, spam box filled) isn't a real enquiry: don't record it */
+  if(!(res&&res.status===400)&&!(emailed&&data.skipped))await recordEnquiry(f,path,emailed);
   btn.disabled=false;btn.textContent=label;
-  if(res&&res.ok&&data.ok===true){
+  if(emailed){
     form.reset();
     enquiryStatus(`<strong>Thanks — your enquiry has been sent.</strong> The membership team will reply to you by email.`);
     toast("Enquiry sent");

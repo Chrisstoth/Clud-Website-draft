@@ -1,8 +1,8 @@
 <?php
 /* Join Us form -> email to the membership team.
    join.html posts each enquiry here and this script emails it to ENQUIRY_TO, with the
-   parent's address as Reply-To so the team can just press Reply. Nothing is stored:
-   the forms carry children's names and dates of birth.
+   parent's address as Reply-To so the team can just press Reply. (The page then saves a
+   back-up copy to the database for the members' area: see supabase/migrations/035_enquiries.sql.)
    Runs on the IONOS web hosting's own PHP mail, so there's nothing to set up or log in to.
    To send enquiries somewhere else, change ENQUIRY_TO. ENQUIRY_FROM must stay a real
    club mailbox at IONOS, or the email may be rejected as spam. */
@@ -39,7 +39,7 @@ if ($origin !== '') {
 
 // Hidden "website" box: people never see it, spam bots fill it in. Pretend it worked.
 if (trim((string) ($_POST['website'] ?? '')) !== '') {
-  reply(200, ['ok' => true]);
+  reply(200, ['ok' => true, 'skipped' => true]); // "skipped": the page doesn't keep a record either
 }
 
 /* One line of text: no line breaks or control characters, limited length. */

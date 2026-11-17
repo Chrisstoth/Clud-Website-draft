@@ -3,8 +3,8 @@
 --
 -- Shape follows the site: one "feed" table holding every dated/publishable item tagged
 -- by type, plus coaches, squads, volunteer roles and the default picture library.
--- Trial enquiries are deliberately NOT stored here — they contain children's details and
--- are emailed to the membership address instead.
+-- Trial enquiries are emailed to the membership address; a back-up copy is kept in the
+-- enquiries table, readable only by Membership/Webmaster (see migrations/035_enquiries.sql).
 
 create table if not exists public.feed (
   id                   bigint generated always as identity primary key,

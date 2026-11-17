@@ -477,9 +477,7 @@ function themeTodayHtml(){
 function renderAdminSection(){
   const main=$("#adminMain"),sec=adminSection,role=session.role;
   if(sec==="enquiries"){
-    main.innerHTML=`<h2>${SECTION_META.enquiries.name}</h2>
-      <div class="admin-note">Enquiries from the public <em>Join Us</em> form are emailed straight to <strong>info@phoenixbasildonsc.org</strong>, with the subject “Join Us enquiry: …”. Press Reply to answer the parent or swimmer directly. They aren't kept on the website, because they include children's names and dates of birth.</div>
-      <p style="color:var(--muted)">To send them to a different address, change <code>ENQUIRY_TO</code> at the top of <code>send-enquiry.php</code> (and the matching line in <code>assets/js/site.js</code>).</p>`;
+    showEnquiriesSection();
     return;
   }
   if(sec==="welfare"){
@@ -2085,7 +2083,7 @@ function showPasswordForm(){
    Who can sign in to the members' area. Removing a row takes effect at once: every save checks
    the members table, and the next page load signs them out. The sign-in itself (Supabase
    Authentication) can't be created from the browser, so adding someone is a two-step job. */
-const ACCESS_ROLES=["poster","webmaster"];
+const ACCESS_ROLES=["poster","membership","webmaster"];
 async function showAccessSection(){
   const main=$("#adminMain"),name=SECTION_META.access.name;
   main.innerHTML=`<h2>${name}</h2><p style="color:var(--muted);margin-top:16px">Loading…</p>`;
@@ -2096,7 +2094,7 @@ async function showAccessSection(){
   const ready=data.some(m=>m.email.toLowerCase()!==session.email.toLowerCase());
   const roleName=r=>ROLES[r]?ROLES[r].label:r;
   main.innerHTML=`<h2>${name}</h2>
-    <div class="admin-note">Everyone who can sign in to the admin area. <strong>Club Posters</strong> can post and edit every kind of feed item, but nothing goes live until someone else approves it. <strong>Webmasters</strong> can change everything, publish straight away and manage this list. Removing someone stops them straight away.</div>
+    <div class="admin-note">Everyone who can sign in to the admin area. <strong>Club Posters</strong> can post and edit every kind of feed item, but nothing goes live until someone else approves it. <strong>Membership Team</strong> accounts only see the Join Us enquiries (and the Member Guides). <strong>Webmasters</strong> can change everything, publish straight away and manage this list. Removing someone stops them straight away.</div>
     ${ready?"":`<div class="admin-note">Only your own account shows until the webmaster runs <code>supabase/migrations/024_peer_review.sql</code> in the Supabase SQL Editor.</div>`}
     ${data.map(m=>{const me=m.email.toLowerCase()===session.email.toLowerCase();
       return `<div class="item-row"><div><div class="t">${esc(m.label||roleName(m.role))}${me?" (you)":""}</div>
@@ -2129,6 +2127,48 @@ async function showAccessSection(){
     if(!gone.length)return toast("Couldn't remove them: run migration 024 first");
     toast(`${email} removed`);
     showAccessSection();
+  }));
+}
+
+/* ================= TRIAL ENQUIRIES =================
+   Back-up record of Join Us enquiries (each one is also emailed to the club). Only Membership
+   and Webmaster accounts can read or delete them -- the database enforces that (migration 035). */
+const ENQUIRY_PATHS={lessons:"Academy (swim lesson stage)",competitive:"Competitive swimmer (squad trial)",masters:"Masters"};
+async function showEnquiriesSection(){
+  const main=$("#adminMain"),name=SECTION_META.enquiries.name;
+  main.innerHTML=`<h2>${name}</h2><p style="color:var(--muted);margin-top:16px">Loading…</p>`;
+  const {data,error}=await sb.from("enquiries").select("*").order("received_at",{ascending:false}).limit(500);
+  if(adminSection!=="enquiries")return;
+  const intro=`<div class="admin-note">Every enquiry from the public <em>Join Us</em> form is emailed to <strong>info@phoenixbasildonsc.org</strong> and also kept here as a record. Only the Membership Team and Webmasters can see this list. They include children's details, so please <strong>delete each one once it's been dealt with</strong>.</div>`;
+  if(error){
+    main.innerHTML=`<h2>${name}</h2>${intro}<div class="admin-note">The enquiry record isn't set up in the database yet. The webmaster needs to run <code>supabase/migrations/035_enquiries.sql</code> in the Supabase SQL Editor. Enquiries are still being emailed in the meantime. (${esc(error.message)})</div>`;
+    return;
+  }
+  const when=d=>new Date(d).toLocaleString("en-GB",{weekday:"short",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+  const dob=d=>d?d.split("-").reverse().join("/"):"";
+  const missed=data.filter(q=>!q.emailed).length;
+  main.innerHTML=`<h2>${name}</h2>${intro}
+    ${missed?`<div class="admin-note"><strong>⚠ ${missed} enquir${missed===1?"y":"ies"} below didn't go out by email</strong> (marked ⚠). The person was asked to email it themselves, but may not have, so check these have been answered.</div>`:""}
+    ${data.length?data.map(q=>{
+      const bits=[q.parent&&`Parent: ${esc(q.parent)}`,`<a href="mailto:${esc(q.email)}" style="display:inline;padding:0">${esc(q.email)}</a>`,
+        q.dob&&`DOB ${dob(q.dob)}`,q.stage&&esc(q.stage),q.se_no&&`SE ${esc(q.se_no)}`,q.level&&esc(q.level)].filter(Boolean);
+      return `<div class="item-row"><div style="flex:1;min-width:220px">
+        <div class="t">${q.emailed?"":`<span title="The email to the club didn't send">⚠ </span>`}${esc(q.swimmer)} — ${esc(ENQUIRY_PATHS[q.pathway]||q.pathway)}</div>
+        <div class="s">${bits.join(" · ")}</div>
+        <div class="s">Received ${when(q.received_at)}${q.emailed?"":" · <strong>email didn't send</strong>"}</div>
+        ${q.notes?`<div class="s" style="white-space:pre-wrap;margin-top:6px;color:var(--text)">“${esc(q.notes)}”</div>`:""}
+      </div><div class="acts">
+        <a class="btn small" href="mailto:${esc(q.email)}?subject=${encodeURIComponent("Your enquiry to Basildon & Phoenix SC")}">Reply</a>
+        <button class="btn small dangerous" data-del-enquiry="${q.id}">Delete</button>
+      </div></div>`;}).join("")
+    :`<p style="color:var(--muted)">No enquiries on record.</p>`}`;
+  main.querySelectorAll("[data-del-enquiry]").forEach(b=>b.addEventListener("click",async()=>{
+    if(!confirm("Delete this enquiry from the record? It can't be undone. (The email copy in the inbox isn't affected.)"))return;
+    b.disabled=true;
+    const {data:gone,error}=await sb.from("enquiries").delete().eq("id",Number(b.dataset.delEnquiry)).select("id");
+    if(error||!gone.length){b.disabled=false;return toast(error?saveErrorMessage(error):"Couldn't delete it — you may not have access");}
+    toast("Enquiry deleted");
+    showEnquiriesSection();
   }));
 }
 
