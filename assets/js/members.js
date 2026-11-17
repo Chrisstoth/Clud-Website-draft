@@ -24,7 +24,7 @@ const SECTION_META = {
   squads:{name:"Squads", empty:"No squads yet — add the first one."},
   topics:{name:"News Tags", empty:"The club hasn't added any tags of its own yet. Squads are tags already — add others (Trips, Open Water, Officials…) here."},
   roles:{name:"Volunteer Roles", empty:"No roles yet."},
-  enquiries:{name:"Trial Enquiries (inbox)", empty:"No enquiries yet — the public Join Us form feeds this inbox."},
+  enquiries:{name:"Trial Enquiries"},
   newsDefaults:{name:"Default News Pictures", empty:"No default picture categories yet."},
   welfare:{name:"Welfare & Safeguarding Page", empty:""},
   committee:{name:"Club Committee", empty:"No committee roles yet."},
@@ -478,12 +478,8 @@ function renderAdminSection(){
   const main=$("#adminMain"),sec=adminSection,role=session.role;
   if(sec==="enquiries"){
     main.innerHTML=`<h2>${SECTION_META.enquiries.name}</h2>
-      <div class="admin-note">Read-only inbox in this draft. Enquiries submitted through the public <em>Join Us</em> form appear here instantly. In the real build these could also forward to the membership email.</div>
-      ${DB.enquiries.length?DB.enquiries.map(q=>`<div class="item-row"><div>
-        <div class="t">${esc(q.swimmer)} — ${esc(q.type)}</div>
-        <div class="s">${esc(q.parent)} · ${esc(q.email)} · DOB ${esc(q.dob)} · ${esc(q.detail)} · received ${esc(q.received)}</div>
-        ${q.notes?`<div class="s inbox-msg">“${esc(q.notes)}”</div>`:""}
-      </div></div>`).join(""):`<p style="color:var(--muted)">${SECTION_META.enquiries.empty}</p>`}`;
+      <div class="admin-note">Enquiries from the public <em>Join Us</em> form are emailed straight to <strong>info@phoenixbasildonsc.org</strong>, with the subject “Join Us enquiry: …”. Press Reply to answer the parent or swimmer directly. They aren't kept on the website, because they include children's names and dates of birth.</div>
+      <p style="color:var(--muted)">To send them to a different address, change <code>ENQUIRY_TO</code> at the top of <code>send-enquiry.php</code> (and the matching line in <code>assets/js/site.js</code>).</p>`;
     return;
   }
   if(sec==="welfare"){

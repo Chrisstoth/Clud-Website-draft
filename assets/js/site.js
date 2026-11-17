@@ -1212,14 +1212,45 @@ $("#burger").addEventListener("click",()=>{
 window.addEventListener("resize",sizeDrawer);
 window.addEventListener("scroll",sizeDrawer,{passive:true});
 
-/* ================= JOIN FORM → INBOX ================= */
-function submitEnquiry(e,type,detailFn){
+/* ================= JOIN FORM → EMAIL =================
+   Each form posts to send-enquiry.php, which emails the membership team. Nothing is kept
+   in the browser (the forms carry children's names and dates of birth). If the mailer
+   can't be reached, the visitor's own email app opens with the enquiry already written. */
+const ENQUIRY_TO="info@phoenixbasildonsc.org";
+function enquiryStatus(html,bad){
+  const s=$("#joinStatus");
+  s.innerHTML=html;s.hidden=false;s.classList.toggle("bad",!!bad);
+  s.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+function enquiryMailto(form,type){
+  const lines=[`Join Us enquiry: ${type}`,""];
+  form.querySelectorAll("input:not([name=website]),select,textarea").forEach(el=>{
+    const label=el.closest("label")?.firstChild?.textContent.trim()||el.name;
+    if(el.value.trim())lines.push(`${label}: ${el.value.trim()}`);
+  });
+  return `mailto:${ENQUIRY_TO}?subject=${encodeURIComponent("Join Us enquiry: "+type)}&body=${encodeURIComponent(lines.join("\n"))}`;
+}
+async function submitEnquiry(e,path,type){
   e.preventDefault();
-  const f=new FormData(e.target);
-  DB.enquiries.unshift({id:Date.now(),parent:f.get("parent"),email:f.get("email"),swimmer:f.get("swimmer"),dob:f.get("dob"),type,detail:detailFn(f),notes:f.get("notes"),received:"Just now"});
-  saveEnquiries();
-  e.target.reset();
-  toast("Enquiry sent — the membership team will be in touch");
+  const form=e.target,btn=form.querySelector('button[type="submit"]'),label=btn.textContent;
+  const f=new FormData(form);f.set("path",path);
+  btn.disabled=true;btn.textContent="Sending…";
+  let res=null,data={};
+  try{
+    res=await fetch("send-enquiry.php",{method:"POST",body:f,headers:{Accept:"application/json"}});
+    data=await res.json().catch(()=>({}));
+  }catch(err){}
+  btn.disabled=false;btn.textContent=label;
+  if(res&&res.ok&&data.ok===true){
+    form.reset();
+    enquiryStatus(`<strong>Thanks — your enquiry has been sent.</strong> The membership team will reply to you by email.`);
+    toast("Enquiry sent");
+    return;
+  }
+  if(res&&res.status===400&&data.error){enquiryStatus(esc(data.error),true);return;}
+  /* Mailer down or unreachable: hand the enquiry to the visitor's email app instead */
+  enquiryStatus(`We couldn't send that automatically, so your email app should now open with your enquiry filled in — just press <strong>Send</strong>. If nothing opens, please email <a href="mailto:${ENQUIRY_TO}" style="display:inline;padding:0">${ENQUIRY_TO}</a>.`,true);
+  location.href=enquiryMailto(form,type);
 }
 if($("#joinLessons")){
   document.querySelectorAll(".path-card").forEach(b=>b.addEventListener("click",()=>{
@@ -1232,9 +1263,9 @@ if($("#joinLessons")){
   /* default pathway so a form is always visible and swaps in place */
   document.querySelector('.path-card[data-path="lessons"]').classList.add("sel");
   $("#joinLessons").hidden=false;
-  $("#joinLessons").addEventListener("submit",e=>submitEnquiry(e,"Academy / lessons",f=>f.get("stage")));
-  $("#joinCompetitive").addEventListener("submit",e=>submitEnquiry(e,"Competitive trial",f=>`SE ${f.get("seNo")} · ${f.get("level")}`));
-  $("#joinMasters").addEventListener("submit",e=>submitEnquiry(e,"Masters",()=>"Masters enquiry"));
+  $("#joinLessons").addEventListener("submit",e=>submitEnquiry(e,"lessons","Academy (swim lesson stage)"));
+  $("#joinCompetitive").addEventListener("submit",e=>submitEnquiry(e,"competitive","Competitive swimmer (squad trial)"));
+  $("#joinMasters").addEventListener("submit",e=>submitEnquiry(e,"masters","Masters"));
 }
 
 if($("#roleCatTabs")){

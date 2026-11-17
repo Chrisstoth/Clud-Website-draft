@@ -13,7 +13,7 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const TT_LOC={lc:"BSV Long Course",deep:"BSV Short Course – Deep End",shallow:"BSV Short Course – Shallow End",bill:"Billericay Pool",land:"BSV Meeting Room"};
 
 /* In-memory copy of what is published, filled by loadContent() on every page load. */
-const DB={feed:[],bin:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfare:[],committee:[],partners:null,guides:null,squadDetails:null,themes:null,enquiries:[]};
+const DB={feed:[],bin:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[],welfare:[],committee:[],partners:null,guides:null,squadDetails:null,themes:null};
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
@@ -211,16 +211,9 @@ async function loadContent(){
   DB.feed=DB.feed.filter(it=>!it.deletedAt&&(showPendingFeed||it.review!=="pending"));
 }
 
-/* Trial enquiries carry children's names and dates of birth, so they are deliberately kept
-   out of the shared database. They stay in this browser until the form is switched over to
-   emailing the membership address. */
-const ENQUIRY_KEY="bpsc_enquiries_v1";
-function loadEnquiries(){try{DB.enquiries=JSON.parse(localStorage.getItem(ENQUIRY_KEY)||"[]");}catch(e){DB.enquiries=[];}}
-function saveEnquiries(){
-  try{localStorage.setItem(ENQUIRY_KEY,JSON.stringify(DB.enquiries));}
-  catch(e){toast("Couldn't save that enquiry in this browser");}
-}
-loadEnquiries();
+/* Join Us enquiries are emailed (send-enquiry.php) and never stored. Earlier drafts kept them
+   in the browser; clear any that are left, as they hold children's names and dates of birth. */
+try{localStorage.removeItem("bpsc_enquiries_v1");}catch(e){}
 
 /* Photos come off phones at 3–12MB, far larger than any card displays them. Shrinking them
    on upload keeps pages quick to load and stops one photo filling the whole storage budget.

@@ -1336,6 +1336,8 @@ form.stack{display:grid;gap:16px;max-width:560px}
 label.f input,label.f select,label.f textarea{font:inherit;font-size:1rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text);padding:11px 13px;border:1.5px solid var(--line);border-radius:10px;background:var(--field)}
 label.f input:focus,label.f select:focus,label.f textarea:focus{border-color:var(--flame);outline:none;box-shadow:0 0 0 3px rgba(242,107,33,.18)}
 .hint{font-size:.85rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:normal}
+.join-status{max-width:560px;margin-top:18px;padding:12px 14px;border-radius:10px;border:1.5px solid #2e9d5b;background:rgba(46,157,91,.1);color:var(--text)}
+.join-status.bad{border-color:var(--flame);background:rgba(242,107,33,.1)}
 label.f.checkbox-f{display:flex;align-items:center;gap:10px}
 label.f.checkbox-f input{all:revert;width:18px;height:18px;accent-color:var(--flame)}
 /* News form: "Which squads is this for?" */
