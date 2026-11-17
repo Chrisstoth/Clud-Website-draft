@@ -1061,8 +1061,14 @@ a.cal-chip{text-decoration:none;cursor:pointer}
 a.cal-chip:hover::before,a.cal-chip:focus-visible::before{filter:brightness(1.18)}
 a.cal-chip:hover .cal-chip-label{text-decoration:underline}
 /* a day with events opens its list when tapped; the date is the keyboard way in */
-.cal-day.has-items{cursor:pointer}
-.cal-day.has-items:hover{border-color:var(--muted)}
+.cal-day[data-day]{cursor:pointer}
+.cal-day[data-day]:hover{border-color:var(--muted)}
+/* the day panel's "Normal training" timetable (site.js calTrainingBlock) */
+.cal-training{margin-top:16px;max-width:760px}
+.cal-daylist-head+.cal-training{margin-top:6px}
+.cal-training .tt-head{margin-bottom:12px}
+.cal-training .tt-head h3{font-size:1.25rem}
+.cal-training.changed .tt-head h3{color:var(--muted)}
 .cal-day.selected{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink) inset}
 button.cal-daynum{all:unset;font-size:.78rem;font-weight:700;color:var(--muted);cursor:pointer;align-self:flex-start;padding:0 3px;margin:0 -3px;border-radius:4px}
 button.cal-daynum:focus-visible{outline:2px solid var(--flame);outline-offset:1px}
@@ -2210,6 +2216,8 @@ body:not(.home-v2) .v2-only{display:none!important}
 .pulse-also span{font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-size:.72rem;margin-right:4px}
 .pulse-also a,body.theme-dark .pulse-also a{color:var(--ember)}
 .pulse-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px 14px;max-width:380px}
+/* "+N more" is a phone-only thing (site.js pulseButtons): computers show every button */
+.pulse-actions .pulse-more{display:none}
 /* a second gala on the same day: the same panel, a size down, so the lead one still reads first */
 .pulse-event.is-secondary{padding-block:18px;border-bottom-width:3px}
 .pulse-event.is-secondary .pulse-event-title{font-size:clamp(1.25rem,2.3vw,1.75rem);margin-top:10px}
@@ -2278,6 +2286,8 @@ body.home-v2.content-failed .hero-photo-strip,body.home-v2.content-failed #nextM
   .pulse-event.is-secondary .pulse-event-title{font-size:1.2rem}
   .pulse-where{font-size:.9rem}
   .pulse-actions{gap:10px 12px}
+  .pulse-actions:not(.show-all) .pulse-extra{display:none}
+  .pulse-actions:not(.show-all) .pulse-more{display:inline-block}
   /* one row, like on a computer: two boxes fill the width, and a third or fourth sits off to the
      right with its edge peeking in, a swipe away -- rather than wrapping onto a second row */
   .pulse-strip{display:grid;grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(46%,1fr);

@@ -292,6 +292,17 @@ try{ttSquadId=+localStorage.getItem("bpsc_tt_squad")||null;}catch(e){}
 /* "timetables?squad=<id>" (from the squad pathway map) opens straight on that squad. */
 {const q=+new URLSearchParams(location.search).get("squad");if(q)ttSquadId=q;}
 
+/* Every squad's sessions on one weekday ("Mon".."Sun"), split AM / PM -- "" when nobody trains.
+   Shared by the timetable's "By day" view and the Club Calendar's day panel. */
+function ttClubDay(day){
+  const rows=DB.squads.flatMap(sq=>(sq.sessions||[]).filter(s=>s.day===day).map(s=>({...s,squad:sq.name})))
+    .sort((a,b)=>a.start.localeCompare(b.start)||a.squad.localeCompare(b.squad));
+  return ["AM","PM"].map(p=>{
+    const list=rows.filter(s=>ttPeriod(s)===p);
+    return list.length?`<div class="tt-group">${p}</div>`+list.map(s=>`<div class="tt-row club">
+      <strong>${esc(s.start)}–${esc(s.end)}</strong><span><strong>${esc(s.squad)}</strong>${ttLandTag(s)}</span><span class="muted">${esc(s.loc)}</span></div>`).join(""):"";
+  }).join("");
+}
 function renderTimetable(){
   const body=$("#ttBody"),chips=$("#ttChips"),today=ttTodayKey();
   if(!body)return;
@@ -300,16 +311,10 @@ function renderTimetable(){
 
   if(ttView==="day"){
     chips.innerHTML=TT_DAYS.map(d=>`<button type="button" class="tt-chip${d===ttDay?" active":""}" data-day="${d}" aria-pressed="${d===ttDay}">${TT_DAY_NAMES[d]}</button>`).join("");
-    const rows=DB.squads.flatMap(sq=>(sq.sessions||[]).filter(s=>s.day===ttDay).map(s=>({...s,squad:sq.name})))
-      .sort((a,b)=>a.start.localeCompare(b.start)||a.squad.localeCompare(b.squad));
-    const groups=["AM","PM"].map(p=>{
-      const list=rows.filter(s=>ttPeriod(s)===p);
-      return list.length?`<div class="tt-group">${p}</div>`+list.map(s=>`<div class="tt-row club">
-        <strong>${esc(s.start)}–${esc(s.end)}</strong><span><strong>${esc(s.squad)}</strong>${ttLandTag(s)}</span><span class="muted">${esc(s.loc)}</span></div>`).join(""):"";
-    }).join("");
+    const groups=ttClubDay(ttDay);
     body.innerHTML=`<div class="card"><div class="tt-head"><div><h3 class="display">${TT_DAY_NAMES[ttDay]}</h3>
       <div class="tt-lead">All squads${ttDay===today?" · today":""}</div></div></div>
-      ${rows.length?groups:`<p style="color:var(--muted)">No training on ${TT_DAY_NAMES[ttDay]}.</p>`}</div>`;
+      ${groups||`<p style="color:var(--muted)">No training on ${TT_DAY_NAMES[ttDay]}.</p>`}</div>`;
     return;
   }
 
@@ -403,10 +408,9 @@ function renderCalendarGrid(){
         :`<div class="cal-chip ${c.cls}" title="${tip}"><span class="cal-chip-label">${esc(it.title)}</span></div>`;
     }).join("");
     const label=iso?new Date(iso+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"}):"";
-    const num=!inMonth?"":dayItems.length
-      ?`<button type="button" class="cal-daynum" data-day="${iso}" aria-label="${label}: ${dayItems.length} event${dayItems.length===1?"":"s"}" aria-expanded="${iso===calSelected}" aria-controls="calDayList">${dayNum}</button>`
-      :`<div class="cal-daynum">${dayNum}</div>`;
-    html+=`<div class="cal-day${inMonth?"":" out"}${iso&&iso===todayIso?" today":""}${dayItems.length?" has-items":""}${iso&&iso===calSelected?" selected":""}"${dayItems.length?` data-day="${iso}"`:""}>${num}${chips}</div>`;
+    /* every day opens: a quiet one shows the normal training timetable for that weekday */
+    const num=!inMonth?"":`<button type="button" class="cal-daynum" data-day="${iso}" aria-label="${label}: ${dayItems.length?`${dayItems.length} event${dayItems.length===1?"":"s"}`:"normal training"}" aria-expanded="${iso===calSelected}" aria-controls="calDayList">${dayNum}</button>`;
+    html+=`<div class="cal-day${inMonth?"":" out"}${iso&&iso===todayIso?" today":""}${dayItems.length?" has-items":""}${iso&&iso===calSelected?" selected":""}"${inMonth?` data-day="${iso}"`:""}>${num}${chips}</div>`;
   }
   $("#calGrid").innerHTML=html;
   renderCalDayList(items);
@@ -416,14 +420,29 @@ function renderCalendarGrid(){
 function renderCalDayList(items){
   const box=$("#calDayList");
   if(!box)return;
-  const its=calSelected?calOnDay(items||calItems(),calSelected):[];
-  if(!its.length){box.hidden=true;box.innerHTML="";return;}
+  if(!calSelected){box.hidden=true;box.innerHTML="";return;}
+  const its=calOnDay(items||calItems(),calSelected);
   /* the same cards as the Socials / Competitions / League galas rows below, so a day reads like the rest of the page */
   box.innerHTML=`<div class="cal-daylist-head"><h4>${esc(new Date(calSelected+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"}))}</h4>
     <button type="button" class="cal-daylist-close" aria-label="Close">×</button></div>
-    <div class="cal-daylist-cards">${its.map(it=>isMeet(it)?meetRowCard(it,calItemHref(it))
-      :it.type==="social"?socialCard(it):newsCard(it,false,true)).join("")}</div>`;
+    ${its.length?`<div class="cal-daylist-cards">${its.map(it=>isMeet(it)?meetRowCard(it,calItemHref(it))
+      :it.type==="social"?socialCard(it):newsCard(it,false,true)).join("")}</div>`:""}
+    ${calTrainingBlock(calSelected,its)}`;
   box.hidden=false;
+}
+/* Under the day's events: what the squad timetable says for that weekday. With no training change
+   posted for the day it's "Normal training"; with one, it's the usual timetable and the change
+   above is what counts. */
+function calTrainingBlock(iso,its){
+  if(!DB.squads.length)return "";
+  const day=TT_DAYS[(new Date(iso+"T12:00:00").getDay()+6)%7];
+  const changed=its.some(it=>it.type==="training");
+  const groups=ttClubDay(day);
+  return `<div class="card cal-training${changed?" changed":""}"><div class="tt-head"><div>
+      <h3 class="display">${changed?"Usual timetable":"Normal training"}</h3>
+      <div class="tt-lead">${changed?"A training change applies on this day — check it above first.":`All squads, as on any ${TT_DAY_NAMES[day]}.`}</div></div>
+      <a class="btn small ghost" href="timetables">Squad timetables →</a></div>
+    ${groups||`<p style="color:var(--muted);margin:0">No training on ${TT_DAY_NAMES[day]}s.</p>`}</div>`;
 }
 function calSelectDay(iso){
   calSelected=calSelected===iso?"":iso;
@@ -1318,8 +1337,17 @@ function pulseActions(it){
   if(isHomeVenue(it))add("venue","Venue & getting here");
   return out;
 }
-function pulseButtons(list){
-  return list.map((a,i)=>`<a class="btn small${a.live?" live":i===0?"":" ghost"}" href="${esc(a.href)}"${a.ext?' target="_blank" rel="noopener"':""}>${a.live?'<span class="live-dot" aria-hidden="true"></span>':a.stream?'<span class="stream-play" aria-hidden="true">▶</span>':""}${esc(a.label)}${a.ext?'<span class="sr-only"> (opens in a new tab)</span>':""}</a>`).join("");
+/* On a phone a well-filled gala could stack six or more buttons, so only the first PULSE_PHONE_BUTTONS
+   show (they're in order of importance -- live first) and the rest sit behind a "+N more" button.
+   Hiding just one isn't worth it (the "more" button takes the same room), so that only kicks in when
+   two or more would go. Computers always show them all; the CSS does the hiding (site.css). A panel
+   someone has opened stays open when the panel is redrawn. */
+const PULSE_PHONE_BUTTONS=3;
+const pulseOpenActions=new Set();
+function pulseButtons(list,key){
+  const fold=list.length-PULSE_PHONE_BUTTONS>=2;
+  const btns=list.map((a,i)=>`<a class="btn small${a.live?" live":i===0?"":" ghost"}${fold&&i>=PULSE_PHONE_BUTTONS?" pulse-extra":""}" href="${esc(a.href)}"${a.ext?' target="_blank" rel="noopener"':""}>${a.live?'<span class="live-dot" aria-hidden="true"></span>':a.stream?'<span class="stream-play" aria-hidden="true">▶</span>':""}${esc(a.label)}${a.ext?'<span class="sr-only"> (opens in a new tab)</span>':""}</a>`).join("");
+  return fold?btns+`<button type="button" class="btn small ghost pulse-more" data-pulse-more="${esc(key)}" aria-expanded="false">+${list.length-PULSE_PHONE_BUTTONS} more</button>`:btns;
 }
 
 const PULSE_STYLES={race:"Race Day",home_meet:"Home Meet",championship:"Championships"};
@@ -1352,7 +1380,7 @@ function pulseEventPanel(it,alsoToday,idx=0){
       ${note?`<p class="pulse-note">${esc(note)}</p>`:""}
       ${also}
     </div>
-    ${actions.length?`<div class="pulse-actions">${pulseButtons(actions)}</div>`:""}
+    ${actions.length?`<div class="pulse-actions${pulseOpenActions.has(String(it.id))?" show-all":""}">${pulseButtons(actions,it.id)}</div>`:""}
   </article>`;
 }
 
@@ -1500,6 +1528,16 @@ document.addEventListener("click",e=>{
   /* the sample gala's outside links have nowhere real to go */
   const fake=e.target.closest('a[href="#demo"]');
   if(fake){e.preventDefault();toast("Demo — on a real race day this opens the gala's own link");return;}
+  const more=e.target.closest("[data-pulse-more]");
+  if(more){
+    const box=more.closest(".pulse-actions");
+    pulseOpenActions.add(more.dataset.pulseMore);
+    box.classList.add("show-all");
+    /* the button is about to vanish: hand keyboard focus to the first link it revealed */
+    const first=box.querySelector(".pulse-extra");
+    if(first)first.focus();
+    return;
+  }
   const c=e.target.closest("[data-home-context]");
   if(c){
     if(c.getAttribute("aria-pressed")==="true")return;
