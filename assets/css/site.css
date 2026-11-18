@@ -1397,6 +1397,25 @@ footer.site h4{color:#fff;font-family:'Montserrat',sans-serif;text-transform:upp
 footer.site a{color:#c9c9cf;text-decoration:none;display:block;padding:4px 0;font-size:.92rem}
 footer.site a:hover{color:var(--ember)}
 .foot-base{border-top:1px solid rgba(255,255,255,.1);padding:16px 20px;font-size:.8rem;color:#84848c;text-align:center}
+footer.site .foot-base a{display:inline;padding:0;font-size:inherit;color:#a9a9b0;text-decoration:underline;text-underline-offset:2px}
+footer.site .foot-base a:hover{color:var(--ember)}
+
+/* Privacy & cookies page: plain reading text */
+.privacy{max-width:760px}
+.privacy h3{font-size:1.15rem;margin:40px 0 10px;scroll-margin-top:100px}
+.privacy h3:first-child{margin-top:0}
+.privacy p,.privacy li{color:var(--body2);line-height:1.65}
+.privacy p+p,.privacy ul+p,.privacy p+ul{margin-top:10px}
+.privacy ul{padding-left:22px;display:grid;gap:6px}
+.privacy strong{color:var(--text)}
+.privacy a{color:var(--flame-dark);font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.privacy a:hover{color:var(--flame)}
+.privacy .updated{margin-top:40px;font-size:.85rem;color:var(--muted)}
+
+/* Venue map: a placeholder until the visitor chooses to load Google Maps */
+.map-consent{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;height:100%;min-height:280px;padding:28px 24px;text-align:center}
+.map-consent .hint{max-width:34ch}
+.map-consent .hint a{color:var(--flame-dark);font-weight:700;text-decoration:underline}
 @media(max-width:760px){.foot-grid{grid-template-columns:1fr}}
 
 /* ---------- admin ---------- */

@@ -1602,6 +1602,19 @@ function startHomeDemo(key){
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&pulseDay&&pulseDay!==isoToday())safely(renderClubPulse);});
 if($("#clubPulse"))syncHomeVersion();
 
+/* Venue map: Google Maps can set Google's cookies, so it only loads when the visitor presses
+   "Show map". Until then the site sets no cookies at all (see privacy.html). */
+document.querySelectorAll("[data-load-map]").forEach(btn=>btn.addEventListener("click",()=>{
+  const map=document.createElement("iframe");
+  map.title=btn.dataset.mapTitle||"Map";
+  map.src=btn.dataset.loadMap;
+  map.referrerPolicy="no-referrer-when-downgrade";
+  map.allowFullscreen=true;
+  map.style.cssText="border:0;width:100%;height:100%;min-height:280px;display:block";
+  btn.closest(".map-consent").replaceWith(map);
+  map.focus();
+}));
+
 /* ================= INIT ================= */
 const CONTENT_SLOTS="#openMeetsList,#meetsList,#otherMeetsList,#teamMeetsList,#completedMeetsList,#coachesList,#academyCoachesList,#rolesList,#newsList,#ttBody,#socialsList,#compList,#leagueList,#committeeList,#committeeDetail";
 document.querySelectorAll(CONTENT_SLOTS).forEach(el=>{el.innerHTML=`<p style="color:var(--muted)">Loading…</p>`;});
