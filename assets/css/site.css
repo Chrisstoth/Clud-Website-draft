@@ -2306,6 +2306,11 @@ body .pulse-event .btn.live{color:#fff}
   color:var(--text);text-decoration:none;transition:background .15s}
 /* training change: first thing a parent needs, but not an alarm -- flame edge, no red */
 .pulse-cell.is-notice{flex-grow:2;box-shadow:inset 4px 0 0 var(--flame)}
+/* ...except a pool closure (migration 040), which is a warning: red edge and a ⚠ */
+.pulse-cell.is-closure{box-shadow:inset 4px 0 0 #c81e2c;background:rgba(200,30,44,.06)}
+.pulse-cell.is-closure .pulse-k,body.theme-dark .pulse-cell.is-closure .pulse-k{color:#c81e2c}
+body.theme-dark .pulse-cell.is-closure .pulse-k{color:#ff6b6b}
+.pulse-warn{font-size:.95rem;letter-spacing:0}
 .pulse-sum{font-size:.85rem;color:var(--body2);line-height:1.35;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .pulse-cell+.pulse-cell::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:2px;background:var(--line);transform:skewX(calc(-1 * var(--slant-deg)))}
 .pulse-cell:hover{background:rgba(245,132,31,.08)}
@@ -2404,6 +2409,17 @@ body .season-ribbon a{color:inherit;text-decoration:underline;text-underline-off
 body .season-ribbon a:hover{text-decoration-thickness:2px}
 .season-ribbon-close{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:inherit;font-size:.9rem;cursor:pointer;opacity:.75}
 .season-ribbon-close:hover{opacity:1;background:rgba(255,255,255,.15)}
+/* Pool closure warning (migration 040): the same shape as the seasonal ribbon, in warning red */
+.closure-ribbon{background:linear-gradient(90deg,#9b1420,#c81e2c 50%,#9b1420);color:#fff;font-family:'Montserrat',sans-serif;font-weight:700;font-size:.92rem;line-height:1.35}
+.closure-ribbon+.closure-ribbon{border-top:1px solid rgba(255,255,255,.25)}
+.closure-ribbon-wrap{position:relative;max-width:1120px;margin:0 auto;padding:10px 48px;display:flex;align-items:center;justify-content:center;gap:10px;text-align:center}
+.closure-ribbon-icon{flex:0 0 auto;font-size:1.15rem}
+body .closure-ribbon a{color:inherit;text-decoration:none}
+.closure-ribbon-more{margin-left:10px;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+body .closure-ribbon a:hover .closure-ribbon-more{text-decoration-thickness:2px}
+.closure-ribbon-close{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:30px;height:30px;border:0;border-radius:50%;background:transparent;color:inherit;font-size:.9rem;cursor:pointer;opacity:.75}
+.closure-ribbon-close:hover{opacity:1;background:rgba(255,255,255,.15)}
+@media(max-width:560px){.closure-ribbon{font-size:.84rem}.closure-ribbon-wrap{padding:8px 42px 8px 14px;justify-content:flex-start;text-align:left}.closure-ribbon-close{right:6px}}
 @media(max-width:560px){.season-ribbon{font-size:.82rem}.season-ribbon-wrap{padding:8px 42px 8px 14px;justify-content:flex-start;text-align:left}.season-ribbon-close{right:6px}}
 /* Snow on the homepage's orange band: three tiled layers of dots, each falling exactly one tile per
    loop so it never jumps. z-index -1 keeps it under the words (.hero is its own stacking context). */

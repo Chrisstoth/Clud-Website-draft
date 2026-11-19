@@ -1110,6 +1110,33 @@ function applySeason(list){
   });
 }
 try{applySeason(JSON.parse(localStorage.getItem(THEMES_KEY)));}catch(e){}
+
+/* ================= POOL CLOSURE RIBBON =================
+   A training change ticked as a pool closure (migration 040) puts a red warning under the header on
+   every page, from the day before until it's over (closureWarning, core.js) -- above any seasonal
+   ribbon. It goes by itself when its "until" time passes, even on a page left open. ✕ hides it on
+   this page only, like the seasonal ribbon, so nothing is stored. */
+const closureRibbonsClosed=new Set();
+let closureTimer=0;
+function renderClosureRibbon(){
+  document.querySelectorAll(".closure-ribbon").forEach(el=>el.remove());
+  clearTimeout(closureTimer);
+  const header=document.querySelector("header.site");
+  if(!header||!DB.feed)return;
+  const list=DB.feed.filter(it=>closureWarning(it)&&!closureRibbonsClosed.has(it.id)).sort(byStart);
+  /* look again when the next one ends (or the day turns, for tomorrow's to start) */
+  const next=Math.min(...DB.feed.filter(closurePinned).map(trainingEndsAt),new Date(isoShift(isoToday(),1)+"T00:00:00").getTime());
+  closureTimer=setTimeout(renderClosureRibbon,Math.min(Math.max(next-Date.now(),1000)+500,6*3600000));
+  if(!list.length)return;
+  header.insertAdjacentHTML("afterend",list.map(it=>`<div class="closure-ribbon" role="note"><div class="closure-ribbon-wrap">
+    <span class="closure-ribbon-icon" aria-hidden="true">⚠</span>
+    <span class="closure-ribbon-text"><a ${trainingLink(it)}>${esc(it.title)}<span class="closure-ribbon-more">Details →</span></a></span>
+    <button type="button" class="closure-ribbon-close" data-closure-close="${it.id}" aria-label="Hide this warning">✕</button></div></div>`).join(""));
+  document.querySelectorAll("[data-closure-close]").forEach(b=>b.addEventListener("click",()=>{
+    closureRibbonsClosed.add(+b.dataset.closureClose);
+    b.closest(".closure-ribbon").remove();
+  }));
+}
 function renderThemesFromDb(){
   /* no table yet (migration 032 not run) means no theme, not the last one this browser saw */
   const list=DB.themes||[];
@@ -1179,7 +1206,7 @@ function renderGuidesFromDb(){
   try{localStorage.setItem(GUIDES_KEY,JSON.stringify(DB.guides.map(({slug,title,body})=>({slug,title,body}))));}catch(e){}
 }
 
-function renderAllPublic(){renderThemesFromDb();renderPartnersFromDb();renderGuidesFromDb();renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();renderCommittee();renderFollowPanel();renderFollowBadge();if(typeof renderPathway==="function")renderPathway();}
+function renderAllPublic(){renderThemesFromDb();renderClosureRibbon();renderPartnersFromDb();renderGuidesFromDb();renderMeets();renderCoaches();renderTimetable();renderRoles();renderSocials();renderNews();renderHeroFeed();renderArticle();renderWelfare();renderCommittee();renderFollowPanel();renderFollowBadge();if(typeof renderPathway==="function")renderPathway();}
 
 /* ================= NAV ================= */
 const infoDropdown=$("#infoDropdown"), infoToggle=$("#infoToggle");
@@ -1439,15 +1466,18 @@ function pulseEventPanel(it,alsoToday,idx=0){
   </article>`;
 }
 
-/* A training change is the first thing a parent needs on the day -- visible, but not an alarm. It's
+/* A training change is the first thing a parent needs on the day -- visible, but not an alarm (a pool
+   closure is the exception: red, with a ⚠). It's
    the first box of the strip (a double-width one with a flame edge) rather than a block of its own,
    so the whole "today" area stays one row. The summary line shows on computers only; on a phone the
    box is just the title and when, and a tap opens the details. */
 function pulseTrainingCell(t){
-  const when=!meetRunning(t)?"Tomorrow":t.end&&t.end!==t.start?`Today · until ${fmtDate(t.end)}`:"Today";
-  const sum=trainingSummary(t);
-  return `<a class="pulse-cell is-notice" ${trainingLink(t)}>
-      <span class="pulse-k">Session update</span><span class="pulse-v">${esc(t.title)}</span>
+  const clock=fmtClock(t.untilTime),last=!t.end||t.end===t.start;
+  const when=!meetRunning(t)?(clock&&last?`Tomorrow · until ${clock}`:"Tomorrow")
+    :!last?`Today · until ${fmtDate(t.end)}${clock?`, ${clock}`:""}`:clock?`Today · until ${clock}`:"Today";
+  const sum=trainingSummary(t),closure=t.closure===true;
+  return `<a class="pulse-cell is-notice${closure?" is-closure":""}" ${trainingLink(t)}>
+      <span class="pulse-k">${closure?'<span class="pulse-warn" aria-hidden="true">⚠</span>Pool closure':"Session update"}</span><span class="pulse-v">${esc(t.title)}</span>
       ${sum?`<span class="pulse-sum">${esc(sum)}</span>`:""}
       <span class="pulse-s">${esc(when)}<span class="pulse-s-more"> · ${trainingHasDetails(t)?"Read the details →":"Club Calendar →"}</span></span></a>`;
 }

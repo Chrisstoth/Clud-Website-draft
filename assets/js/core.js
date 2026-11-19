@@ -17,7 +17,7 @@ const DB={feed:[],bin:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[]
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",entryPackUrl:"entry_pack_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",streamUrl:"stream_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",topics:"topics",raceDays:"race_days",homepageMode:"homepage_mode",bumpedAt:"bumped_at",masters:"masters"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",entryPackUrl:"entry_pack_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",streamUrl:"stream_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",topics:"topics",raceDays:"race_days",homepageMode:"homepage_mode",bumpedAt:"bumped_at",masters:"masters",closure:"closure",untilTime:"until_time"};
 /* Highlight colours a meet's documents & links line can be given, so one that matters (a changed
    warm-up time, a late programme) stands out. The key is stored on the link; "" is no highlight. */
 const LINK_HIGHLIGHTS=[["","No highlight"],["orange","Orange"],["yellow","Yellow"],["green","Green"],["blue","Blue"],["red","Red"]];
@@ -57,6 +57,7 @@ function feedToRow(it){
   if(row.topics===null)row.topics=[];
   if(Array.isArray(row.race_days)&&!row.race_days.length)row.race_days=null;
   if(row.masters===null)row.masters=false;
+  if(row.closure===null)row.closure=false;
   /* columns from a migration that may not have been run yet: leave them out rather than have
      every save fail with "column not found" (see checkFeedLateCols) */
   if(!feedLateColsReady)Object.values(FEED_LATE_COLS).forEach(c=>delete row[c]);
@@ -64,6 +65,7 @@ function feedToRow(it){
   if(!feedPackColReady)delete row.entry_pack_url;
   if(!feedBumpColReady)delete row.bumped_at;
   if(!feedMastersColReady)delete row.masters;
+  if(!feedClosureColsReady){delete row.closure;delete row.until_time;}
   return row;
 }
 /* Galas' racing days and homepage style (migration 021). The members' area asks once, at sign-in,
@@ -84,15 +86,18 @@ let feedSlideColsReady=false;
 let feedSlideOffReady=false;
 /* A gala ticked as a Masters gala (migration 036), checked on its own likewise. */
 let feedMastersColReady=false;
+/* A training change's pool closure tick box and "until" time (migration 040), likewise. */
+let feedClosureColsReady=false;
 async function checkFeedLateCols(){
-  const [late,stream,pack,bump,slide,off,masters]=await Promise.all([
+  const [late,stream,pack,bump,slide,off,masters,closure]=await Promise.all([
     sb.from("feed").select(Object.values(FEED_LATE_COLS).join(",")).limit(1),
     sb.from("feed").select("stream_url").limit(1),
     sb.from("feed").select("entry_pack_url").limit(1),
     sb.from("feed").select("bumped_at").limit(1),
     sb.from("feed").select("hero_at,pinned").limit(1),
     sb.from("feed").select("off_slideshow").limit(1),
-    sb.from("feed").select("masters").limit(1)]);
+    sb.from("feed").select("masters").limit(1),
+    sb.from("feed").select("closure,until_time").limit(1)]);
   feedLateColsReady=!late.error;
   feedStreamColReady=!stream.error;
   feedPackColReady=!pack.error;
@@ -100,6 +105,7 @@ async function checkFeedLateCols(){
   feedSlideColsReady=!slide.error;
   feedSlideOffReady=!off.error;
   feedMastersColReady=!masters.error;
+  feedClosureColsReady=!closure.error;
   return feedLateColsReady;
 }
 const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads:r.squads||[],photo:r.photo||"",bio:r.bio||"",sortOrder:r.sort_order??0});
@@ -184,8 +190,11 @@ function activeTheme(list,day=isoToday()){
    FEED_FIELDS plus the read-only ones feedFromRow picks up. A column added to the feed later needs
    sharing in its migration (select public.share_feed_columns();) as well as adding here. */
 const FEED_READ_COLS=[...new Set(["id","created_at","source_meet_id","review","deleted_at","hero_at","pinned","off_slideshow",...Object.values(FEED_FIELDS)])].join(",");
+/* The same, less the columns of the newest migration (040), for a database that hasn't run it yet:
+   after 037 a "*" read is refused, so without this the whole feed would fail to load. */
+const FEED_READ_COLS_OLDER=FEED_READ_COLS.split(",").filter(c=>c!=="closure"&&c!=="until_time").join(",");
 const SECTIONS={
-  feed:{table:"feed",from:feedFromRow,to:feedToRow,order:"start_date",cols:FEED_READ_COLS},
+  feed:{table:"feed",from:feedFromRow,to:feedToRow,order:"start_date",cols:FEED_READ_COLS,olderCols:FEED_READ_COLS_OLDER},
   coaches:{table:"coaches",from:coachFromRow,to:coachToRow,order:"sort_order"},
   squads:{table:"squads",from:squadFromRow,to:squadToRow,order:"sort_order"},
   topics:{table:"news_topics",from:topicFromRow,to:topicToRow,order:"name"},
@@ -216,7 +225,9 @@ async function loadContent(){
   const readSection=async k=>{
     if(!SECTIONS[k].cols)return read(k,"*");
     const r=await read(k,SECTIONS[k].cols);
-    return r.error?read(k,"*"):r;
+    if(!r.error)return r;
+    const older=SECTIONS[k].olderCols&&await read(k,SECTIONS[k].olderCols);
+    return older&&!older.error?older:read(k,"*");
   };
   const [results,names]=await Promise.all([
     Promise.all(keys.map(readSection)),
@@ -389,7 +400,8 @@ const publishedOn=it=>it.bumpedAt?isoDay(new Date(it.bumpedAt)):[it.start,it.cre
 const newestFirst=(a,b)=>publishedOn(b).localeCompare(publishedOn(a))||(b.bumpedAt||b.createdAt||"").localeCompare(a.bumpedAt||a.createdAt||"");
 const HERO_SLOTS=6;
 /* Before migration 027 there's no pinned column: the old "pin until" date still counts. */
-const heroPinned=it=>it.pinned!==undefined?!!it.pinned:!!(it.start&&it.pinUntil&&it.pinUntil>=isoToday());
+/* A pool closure (migration 040) is pinned by itself until it's over, whatever the pin says. */
+const heroPinned=it=>closurePinned(it)||(it.pinned!==undefined?!!it.pinned:!!(it.start&&it.pinUntil&&it.pinUntil>=isoToday()));
 const slideTime=it=>Date.parse(it.heroAt||it.bumpedAt||it.createdAt||"")||0;
 const slideOver=it=>it.type!=="news"&&!!(it.end||it.start)&&(it.end||it.start)<isoToday();
 /* The whole arranged list, pinned first, each part top-down. A gala isn't a slide of its own --
@@ -569,6 +581,24 @@ const plainTextHtml=t=>String(t||"").split(/\n\s*\n/).map(p=>p.trim()).filter(Bo
 const trainingSummary=it=>it.blurb||(htmlText(it.body)||it.note||"").split("\n").map(s=>s.trim()).find(Boolean)||"";
 const trainingHasDetails=it=>!!(htmlText(it.body).trim()||(it.note||"").trim());
 const trainingLink=it=>trainingHasDetails(it)?`href="article?id=${it.id}"`:'href="club-calendar"';
+/* When a training change is over (migration 040): its "until" time on its last day, e.g. when the
+   pool opens again, or else the end of that day. Times are the club's (UK) clock, as the browser's. */
+const TIME_RX=/^([01]\d|2[0-3]):[0-5]\d$/;
+function trainingEndsAt(it){
+  const day=it.end||it.start;
+  if(!day)return 0;
+  const timed=TIME_RX.test(it.untilTime||"");
+  const at=new Date(`${day}T${timed?it.untilTime:"00:00"}:00`);
+  if(!timed)at.setDate(at.getDate()+1);
+  return at.getTime();
+}
+const trainingOver=it=>Date.now()>=trainingEndsAt(it);
+/* "4pm", "9:30am" */
+const fmtClock=t=>{if(!TIME_RX.test(t||""))return "";let [h,m]=t.split(":").map(Number);const ap=h<12?"am":"pm";h=h%12||12;return `${h}${m?":"+String(m).padStart(2,"0"):""}${ap}`;};
+/* A pool closure: pinned to the top of the slideshow from when it's posted until it's over, with
+   the warning ribbon on every page from the day before. */
+const closurePinned=it=>it.type==="training"&&it.closure===true&&!!it.start&&!trainingOver(it);
+const closureWarning=it=>closurePinned(it)&&it.start<=isoShift(isoToday(),1);
 const trainingWhen=it=>fmtDate(it.start)+(it.end&&it.end!==it.start?" – "+fmtDate(it.end):"");
 
 /* A gala's article (sourceMeetId, migrations 029/033) ends with a box drawn live from the gala, so
@@ -728,7 +758,7 @@ function clubPulse(feed){
   const today=isoToday(),tomorrow=isoShift(today,1);
   const dated=(feed||[]).filter(it=>it&&it.start);
   const events=dated.filter(it=>it.type in PULSE_EVENT_RANK);
-  const training=dated.filter(it=>it.type==="training"&&(meetRunning(it)||it.start===tomorrow)).sort(byStart);
+  const training=dated.filter(it=>it.type==="training"&&(meetRunning(it)||it.start===tomorrow)&&!trainingOver(it)).sort(byStart);
   /* a gala is "on" only on its racing days, and not at all if an editor switched it off for the homepage */
   const onToday=it=>isMeet(it)?it.homepageMode!=="off"&&meetRacingToday(it):meetRunning(it);
   const on=events.filter(onToday).sort((a,b)=>

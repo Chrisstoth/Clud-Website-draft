@@ -179,6 +179,8 @@ const SCHEMAS = {
     {k:"title",label:"What's changing (a short headline, e.g. Changes for Essex Winter Champs weekend)",type:"text",req:1},
     {k:"start",label:"Date",type:"date",req:1},
     {k:"end",label:"End date (optional, for a range)",type:"date"},
+    {k:"untilTime",label:"Until (time, optional) — when it's over on the last day, e.g. 16:00 if the pool opens at 4pm. Leave blank for the whole day",type:"time",late:"closure"},
+    {k:"closure",label:"⚠ Pool closure — show a red warning across the site (from the day before) and keep this pinned to the top of the homepage slideshow until it's over",type:"checkbox",dflt:false,late:"closure"},
     {k:"blurb",label:"One-line summary (shown on the homepage and in Club News — leave blank to use the first line of the details)",type:"textarea"},
     {k:"img",label:"Picture",type:"imagepicker"},
     {k:"body",label:"Full details for parents & swimmers (shown on its own page) — tip: a heading for each session, e.g. Friday PM, then a bullet per squad",type:"richtext"},
@@ -413,8 +415,8 @@ async function approveItem(id){
   toast("Approved — now live on the public site");
 }
 function homeStatus(it,slides){
-  const slot=slides.indexOf(it),pinned=heroPinned(it);
-  return {slot,pinned,until:pinned?"pinned until someone unpins it":slot>=0?"until newer posts push it off":""};
+  const slot=slides.indexOf(it),pinned=heroPinned(it),auto=closurePinned(it);
+  return {slot,pinned,auto,until:pinned?"pinned until someone unpins it":slot>=0?"until newer posts push it off":""};
 }
 function homeBadges(it,slides){
   if(isDraft(it))return `<div class="feed-badges"><span class="feed-badge draft">✏️ Draft — not on the site</span>${it.submittedBy?`<span class="feed-badge note">Last saved by ${esc(it.submittedBy)}</span>`:""}</div>`;
@@ -422,7 +424,8 @@ function homeBadges(it,slides){
   if(it.visible===false)return `<span class="feed-badge off">Hidden from site</span>`;
   const h=homeStatus(it,slides),b=[];
   if(h.slot>=0)b.push(`<span class="feed-badge home">On homepage · slide ${h.slot+1} of ${slides.length}</span>`);
-  if(h.pinned)b.push(`<span class="feed-badge pin">📌 Pinned to the front</span>`);
+  if(h.auto)b.push(`<span class="feed-badge pin">⚠ Pool closure · pinned to the front until it's over</span>`);
+  else if(h.pinned)b.push(`<span class="feed-badge pin">📌 Pinned to the front</span>`);
   if(it.offSlideshow)b.push(`<span class="feed-badge off">Taken off the homepage slideshow</span>`);
   if(h.pinned&&h.slot<0)b.push(`<span class="feed-badge off">Not showing — the slideshow is full of other pinned items</span>`);
   if(!h.pinned&&h.slot>=0)b.push(`<span class="feed-badge note">${esc(h.until)}</span>`);
@@ -449,7 +452,8 @@ function homepagePanelHtml(slides,role){
     const group=order.filter(x=>heroPinned(x)===h.pinned),g=group.indexOf(it);
     const title=mine?`<button type="button" class="home-slide-link" data-jump="${it.id}">${esc(it.title)}</button>`:`<span class="home-slide-title">${esc(it.title)}</span>`;
     const acts=arrange?`<span class="home-slide-acts">
-        <button type="button" class="home-slide-pin${h.pinned?" on":""}" data-slide-pin="${it.id}" aria-pressed="${h.pinned}" title="${h.pinned?"Unpin":"Keep at the front until unpinned"}">📌 ${h.pinned?"Unpin":"Pin"}</button>
+        ${h.auto?`<span class="home-slide-pin on" title="A pool closure stays pinned until it's over. To unpin it sooner, untick Pool closure on the post.">⚠ Closure</span>`
+          :`<button type="button" class="home-slide-pin${h.pinned?" on":""}" data-slide-pin="${it.id}" aria-pressed="${h.pinned}" title="${h.pinned?"Unpin":"Keep at the front until unpinned"}">📌 ${h.pinned?"Unpin":"Pin"}</button>`}
         <span class="doclink-move">
           <button type="button" data-slide-move="${it.id}" data-dir="-1" ${g===0?"disabled":""} title="Move up" aria-label="Move ${esc(it.title)} up">↑</button>
           <button type="button" data-slide-move="${it.id}" data-dir="1" ${g===group.length-1?"disabled":""} title="Move down" aria-label="Move ${esc(it.title)} down">↓</button>
@@ -457,7 +461,7 @@ function homepagePanelHtml(slides,role){
     const posted=slidePostedLabel(it);
     return `${i===HERO_SLOTS?`<li class="home-slides-break" aria-hidden="true">Next in line — move one up to put it on the homepage</li>`:""}
       <li class="${h.pinned?"is-pinned":""}${i>=HERO_SLOTS?" is-next":""}"><div class="home-slide-row"><div>${title}
-      <span class="home-slide-meta">${esc(heroFeedContent(it).tag)}${posted?` · ${posted}`:""}${h.pinned?" · 📌 pinned":""}</span></div>${acts}</div></li>`;
+      <span class="home-slide-meta">${esc(heroFeedContent(it).tag)}${posted?` · ${posted}`:""}${h.auto?" · ⚠ pool closure, pinned until it's over":h.pinned?" · 📌 pinned":""}</span></div>${acts}</div></li>`;
   };
   const hint=arrange?`<p class="home-slides-hint">The first ${HERO_SLOTS} are on the homepage. New posts go to the top. 📌 Pin keeps a post at the front until it's unpinned; the arrows change the order; ✕ takes a post off the slideshow (it stays in Club News). Galas, socials and training changes drop off once they're over.</p>`:"";
   return `<div class="home-panel">${head}${hint}<ol class="home-slides">${list.map(row).join("")}</ol>${arrange?slidesOffHtml():""}</div>`;
@@ -1188,9 +1192,9 @@ function showForm(sec,id,forcedType,tpl){
     if(f.type==="checkbox"){
       /* most tick boxes start ticked (Show on the website); one with dflt:false starts unticked */
       const on=f.dflt===false?it[f.k]===true:it[f.k]!==false;
-      const notYet=f.late==="masters"&&!feedMastersColReady;
+      const notYet=f.late==="masters"?!feedMastersColReady:f.late==="closure"?!feedClosureColsReady:false;
       return `<label class="f checkbox-f"><input type="checkbox" name="${f.k}" ${on?"checked":""}${notYet?" disabled":""}> ${f.label}</label>
-        ${notYet?`<p class="hint" style="margin:-6px 0 0;color:var(--warn)">Needs a one-off database update (migration 036) before it can be saved. Everything else on this form saves as normal.</p>`:""}`;
+        ${notYet?`<p class="hint" style="margin:-6px 0 0;color:var(--warn)">Needs a one-off database update (migration ${f.late==="closure"?"040":"036"}) before it can be saved. Everything else on this form saves as normal.</p>`:""}`;
     }
     if(f.type==="tagpicks"){
       /* Squads (from Squad Timetables) and the club's own tags (News Tags). Stored as references,
@@ -1356,6 +1360,8 @@ function showForm(sec,id,forcedType,tpl){
       <div class="img-add-row"><label class="img-upload-btn">${f.btn||"Upload results PDF"}<input type="file" accept="application/pdf,.pdf" data-pdf-for="${f.k}" data-pdf-folder="${f.folder||"results"}" style="display:none"></label>
         <a class="img-clear-btn" data-pdf-view="${f.k}" href="${val}" target="_blank" rel="noopener" ${val?"":"hidden"}>Open current file</a></div></div>`;
     /* a field whose column comes from a migration that may not have been run yet */
+    if(f.late==="closure"&&!feedClosureColsReady)return `<label class="f">${f.label}<input type="${f.type}" name="${f.k}" value="${val}" disabled>
+      <span class="hint" style="color:var(--warn)">Needs a one-off database update (migration 040) before it can be saved. Everything else on this form saves as normal.</span></label>`;
     if(f.late==="stream"&&!feedStreamColReady)return `<label class="f">${f.label}<input type="text" name="${f.k}" value="${val}" disabled>
       <span class="hint" style="color:var(--warn)">Needs a one-off database update (migration 023) before it can be saved. Everything else on this form saves as normal.</span></label>`;
     return `<label class="f">${f.label}<input type="${f.type}" name="${f.k}" value="${val}" ${f.req?"required":""}></label>`;
