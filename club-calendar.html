@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Club Calendar — Basildon &amp; Phoenix Swimming Club</title>
-<meta name="description" content="League galas, competitions, socials and key training changes at Basildon &amp; Phoenix SC.">
+<meta name="description" content="League galas, competitions, Masters galas, socials and key training changes at Basildon &amp; Phoenix SC.">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/site.css?v=99">
+<link rel="stylesheet" href="assets/css/site.css?v=100">
 </head>
 <body class="theme-dark">
 <script>(function(){var t=null;try{t=localStorage.getItem("bpsc_theme")}catch(e){}if(t?t==="light":window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches)document.body.classList.remove("theme-dark")})()</script>
@@ -113,7 +113,7 @@
       <p class="eyebrow">More than swimming</p>
       <h2 class="display">Club Calendar</h2>
       <div class="lane-rope"></div>
-      <p>Everything coming up in one place — league galas, competitions, socials and key training changes. For full meet entry details see Open Meets.</p>
+      <p>Everything coming up in one place — league galas, competitions, Masters galas, socials and key training changes. For full meet entry details see Open Meets.</p>
     </div>
 
     <div class="cal-card">
@@ -125,6 +125,7 @@
       <div class="cal-legend">
         <span><i class="cal-dot comp"></i>Competitions</span>
         <span><i class="cal-dot league"></i>League galas</span>
+        <span><i class="cal-dot masters"></i>Masters galas</span>
         <span><i class="cal-dot social"></i>Socials</span>
         <span><i class="cal-dot training"></i>Key training changes</span>
       </div>
@@ -155,6 +156,14 @@
         <button class="cat-arrow prev" data-row="leagueList" aria-label="Scroll league galas left">‹</button>
         <div class="cat-row" id="leagueList"></div>
         <button class="cat-arrow next" data-row="leagueList" aria-label="Scroll league galas right">›</button>
+      </div>
+    </div>
+    <div class="cat-row-wrap">
+      <h3 class="display">Masters Galas</h3>
+      <div class="cat-row-scroll">
+        <button class="cat-arrow prev" data-row="mastersList" aria-label="Scroll Masters galas left">‹</button>
+        <div class="cat-row" id="mastersList"></div>
+        <button class="cat-arrow next" data-row="mastersList" aria-label="Scroll Masters galas right">›</button>
       </div>
     </div>
   </div>
@@ -195,7 +204,7 @@
 
 <div id="toast" role="status"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.js" integrity="sha384-KX6Y/AMIv9qA8TLCDul2JatZWeyrJVgj3Xu/0r30Nr05xO8md1+wHAgtdsRV9LoE" crossorigin="anonymous"></script>
-<script src="assets/js/core.js?v=43"></script>
-<script src="assets/js/site.js?v=63"></script>
+<script src="assets/js/core.js?v=45"></script>
+<script src="assets/js/site.js?v=64"></script>
 </body>
 </html>

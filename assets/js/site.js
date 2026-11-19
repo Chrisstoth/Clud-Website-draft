@@ -42,7 +42,9 @@ function renderMeets(){
   /* BPSC-hosted galas get their own section, first, on Open Meets -- meets we're just entering
      stay in date order below rather than interleaved, so an urgent external closing date is
      still easy to spot without our own galas getting lost among them. */
-  const upcomingOpen=upcoming.filter(m=>m.type!=="teamMeet"&&!meetTooFarAhead(m)),upcomingTeam=upcoming.filter(m=>m.type==="teamMeet");
+  /* Masters galas -- ours, other clubs', or a Masters league -- all go in their own section instead */
+  const upcomingMasters=upcoming.filter(m=>isMastersMeet(m)&&!meetTooFarAhead(m));
+  const upcomingOpen=upcoming.filter(m=>!isMastersMeet(m)&&m.type!=="teamMeet"&&!meetTooFarAhead(m)),upcomingTeam=upcoming.filter(m=>!isMastersMeet(m)&&m.type==="teamMeet");
   /* our galas split in two: the ones you can enter right now lead the page, the rest are "coming up" */
   const oursAll=upcomingOpen.filter(m=>m.type==="meet"),upcomingOthers=upcomingOpen.filter(m=>m.type==="externalMeet");
   const openOurs=oursAll.filter(meetHasEntry),upcomingOurs=oursAll.filter(m=>!meetHasEntry(m));
@@ -58,6 +60,7 @@ function renderMeets(){
       meetLive(m)||meetStreaming(m)?'<span class="pill live"><span class="live-dot"></span>Live now</span>':"",
       /* "open" with no entry pack yet can't actually be entered, so it doesn't claim to be */
       done?'<span class="pill closed">Completed</span>':team?"":m.status==="open"?(m.entryUrl||m.entryPackUrl?'<span class="pill open">Entries open</span>':'<span class="pill closed">Entry pack soon</span>'):'<span class="pill closed">Entries closed</span>',
+      isMastersMeet(m)?'<span class="pill masters">Masters</span>':"",
       team?`<span class="pill results">${esc(m.league||"Team meet")}</span>`:ours?'<span class="pill hosted">BPSC hosted</span>':"",
       m.level&&!team?`<span class="pill level">${esc(m.level)}</span>`:""
     ].join("");
@@ -104,19 +107,21 @@ function renderMeets(){
     $("#meetsList").innerHTML=upcomingOurs.length?upcomingOurs.map(meetCard).join(""):`<p style="color:var(--muted)">No other Basildon-hosted galas confirmed yet — check back soon.</p>`;
     $("#otherMeetsList").innerHTML=upcomingOthers.length?upcomingOthers.map(meetCard).join(""):`<p style="color:var(--muted)">No other open meets listed yet.</p>`;
     $("#teamMeetsList").innerHTML=upcomingTeam.length?upcomingTeam.map(meetCard).join(""):`<p style="color:var(--muted)">No team meets scheduled yet.</p>`;
+    if($("#mastersMeetsList"))$("#mastersMeetsList").innerHTML=upcomingMasters.length?upcomingMasters.map(meetCard).join(""):`<p style="color:var(--muted)">No Masters galas listed yet.</p>`;
     $("#completedMeetsList").innerHTML=completedByYear(completed,meetCard);
     /* "3 upcoming" beside each section heading, so the sections read as separate at a glance */
-    [["#openMeetsCount",openOurs,"open"],["#meetsCount",upcomingOurs,"upcoming"],["#otherMeetsCount",upcomingOthers,"upcoming"],["#teamMeetsCount",upcomingTeam,"upcoming"]].forEach(([sel,list,word])=>{
+    [["#openMeetsCount",openOurs,"open"],["#meetsCount",upcomingOurs,"upcoming"],["#otherMeetsCount",upcomingOthers,"upcoming"],["#teamMeetsCount",upcomingTeam,"upcoming"],["#mastersMeetsCount",upcomingMasters,"upcoming"]].forEach(([sel,list,word])=>{
       const el=$(sel);if(!el)return;
       el.textContent=`${list.length} ${word}`;el.hidden=!list.length;
     });
     /* the quick-jump bar: a count on each button, plus a green "N open" on other clubs' meets so a
        championship taking entries isn't missed now that our own galas come first */
     const otherOpen=upcomingOthers.filter(meetHasEntry).length;
-    const counts={open:openOurs.length,ours:upcomingOurs.length,other:upcomingOthers.length,team:upcomingTeam.length,otherOpen};
+    const counts={open:openOurs.length,ours:upcomingOurs.length,other:upcomingOthers.length,team:upcomingTeam.length,otherOpen,
+      masters:upcomingMasters.length,mastersOpen:upcomingMasters.filter(meetHasEntry).length};
     document.querySelectorAll("#meetsJump [data-count]").forEach(el=>{
       const n=counts[el.dataset.count];
-      el.textContent=el.dataset.count==="otherOpen"?`${n} open`:n?String(n):"";
+      el.textContent=/Open$/.test(el.dataset.count)?`${n} open`:n?String(n):"";
       el.hidden=!n;
     });
     jumpToMeetFromHash();
@@ -355,11 +360,14 @@ if($("#page-info-timetable")){
   });
 }
 
-/* Club Calendar: team meets (and legacy "Team event" level meets) are "League Galas"; all other meets are "Competitions". */
-function isLeagueGala(m){return m.type==="teamMeet"||m.level==="Team event";}
+/* Club Calendar: a gala ticked as Masters is a "Masters gala", whoever runs it -- a Masters league
+   included; otherwise team meets (and legacy "Team event" level meets) are "League Galas" and all
+   other meets are "Competitions". */
+function isLeagueGala(m){return !isMastersMeet(m)&&(m.type==="teamMeet"||m.level==="Team event");}
 function calCatInfo(it){
   if(it.type==="training")return{cls:"training",label:"Training change"};
   if(it.type==="social")return{cls:"social",label:"Social"};
+  if(isMastersMeet(it))return{cls:"masters",label:"Masters gala"};
   return isLeagueGala(it)?{cls:"league",label:"League gala"}:{cls:"comp",label:"Competition"};
 }
 /* Where a calendar entry leads: socials and training changes with something to read open their own
@@ -462,7 +470,7 @@ function meetRowCard(m,href="open-meets"){
       <div class="comp-date"><span class="d">${dp.d}</span><span class="m">${dp.m}</span></div>
       <h3>${esc(m.title)}</h3>
     </div>
-    ${ours?'<div><span class="pill hosted">BPSC hosted</span></div>':""}
+    ${ours||isMastersMeet(m)?`<div>${isMastersMeet(m)?'<span class="pill masters">Masters</span> ':""}${ours?'<span class="pill hosted">BPSC hosted</span>':""}</div>`:""}
     <div class="comp-meta">${esc(m.venue||"Venue TBC")}${m.poolType?` · ${esc(m.poolType)}`:""}</div>
     <div class="comp-foot">
       <span class="comp-status">${m.type==="teamMeet"?esc(m.league||"Team meet"):meetHasEntry(m)?"":open?"Entry pack soon":"Entries closed"}</span>
@@ -490,11 +498,13 @@ function renderSocials(){
   $("#socialsList").innerHTML=socials.length?socials.map(socialCard).join(""):`<p style="color:var(--muted)">No socials scheduled yet.</p>`;
 
   const meets=DB.feed.filter(it=>isMeet(it)&&!meetDone(it)).sort((a,b)=>a.start<b.start?-1:1);
-  const comps=meets.filter(m=>!isLeagueGala(m));
+  const masters=meets.filter(isMastersMeet);
+  const comps=meets.filter(m=>!isMastersMeet(m)&&!isLeagueGala(m));
   const leagues=meets.filter(isLeagueGala);
   $("#compList").innerHTML=comps.length?comps.map(meetRowCard).join(""):`<p style="color:var(--muted)">No competitions scheduled yet.</p>`;
   $("#leagueList").innerHTML=leagues.length?leagues.map(meetRowCard).join(""):`<p style="color:var(--muted)">No league galas scheduled yet.</p>`;
-  ["socialsList","compList","leagueList"].forEach(updateCatArrows);
+  if($("#mastersList"))$("#mastersList").innerHTML=masters.length?masters.map(meetRowCard).join(""):`<p style="color:var(--muted)">No Masters galas scheduled yet.</p>`;
+  ["socialsList","compList","leagueList","mastersList"].forEach(updateCatArrows);
 }
 if($("#calGrid")){
   const calMonth=step=>{calViewDate.setMonth(calViewDate.getMonth()+step);calSelected="";calRemember();renderCalendarGrid();};

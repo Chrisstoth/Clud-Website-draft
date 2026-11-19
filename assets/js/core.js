@@ -17,7 +17,7 @@ const DB={feed:[],bin:[],coaches:[],squads:[],topics:[],roles:[],newsDefaults:[]
 
 /* The database uses snake_case columns and spells the three meet types as separate
    values; the pages were written against these camelCase names, so translate at the edge. */
-const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",entryPackUrl:"entry_pack_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",streamUrl:"stream_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",topics:"topics",raceDays:"race_days",homepageMode:"homepage_mode",bumpedAt:"bumped_at"};
+const FEED_FIELDS={type:"type",title:"title",start:"start_date",end:"end_date",host:"host",league:"league",level:"level",license:"license",poolType:"pool_type",venue:"venue",closing:"closing",status:"status",entryUrl:"entry_url",entryPackUrl:"entry_pack_url",officialsUrl:"officials_url",volunteerUrl:"volunteer_url",resultsUrl:"results_url",liveUrl:"live_url",streamUrl:"stream_url",leagueUrl:"league_url",docLinks:"doc_links",notes:"notes",blurb:"blurb",link:"link",color:"color",note:"note",img:"img",photos:"photos",body:"body",visible:"visible",heroCard:"hero_card",heroPhotos:"hero_photos",pinUntil:"pin_until",topics:"topics",raceDays:"race_days",homepageMode:"homepage_mode",bumpedAt:"bumped_at",masters:"masters"};
 /* Highlight colours a meet's documents & links line can be given, so one that matters (a changed
    warm-up time, a late programme) stands out. The key is stored on the link; "" is no highlight. */
 const LINK_HIGHLIGHTS=[["","No highlight"],["orange","Orange"],["yellow","Yellow"],["green","Green"],["blue","Blue"],["red","Red"]];
@@ -56,12 +56,14 @@ function feedToRow(it){
   if(row.doc_links===null)row.doc_links=[];
   if(row.topics===null)row.topics=[];
   if(Array.isArray(row.race_days)&&!row.race_days.length)row.race_days=null;
+  if(row.masters===null)row.masters=false;
   /* columns from a migration that may not have been run yet: leave them out rather than have
      every save fail with "column not found" (see checkFeedLateCols) */
   if(!feedLateColsReady)Object.values(FEED_LATE_COLS).forEach(c=>delete row[c]);
   if(!feedStreamColReady)delete row.stream_url;
   if(!feedPackColReady)delete row.entry_pack_url;
   if(!feedBumpColReady)delete row.bumped_at;
+  if(!feedMastersColReady)delete row.masters;
   return row;
 }
 /* Galas' racing days and homepage style (migration 021). The members' area asks once, at sign-in,
@@ -80,20 +82,24 @@ let feedBumpColReady=false;
 let feedSlideColsReady=false;
 /* Taking a post off the slideshow (migration 030): until it's there, no red cross. */
 let feedSlideOffReady=false;
+/* A gala ticked as a Masters gala (migration 036), checked on its own likewise. */
+let feedMastersColReady=false;
 async function checkFeedLateCols(){
-  const [late,stream,pack,bump,slide,off]=await Promise.all([
+  const [late,stream,pack,bump,slide,off,masters]=await Promise.all([
     sb.from("feed").select(Object.values(FEED_LATE_COLS).join(",")).limit(1),
     sb.from("feed").select("stream_url").limit(1),
     sb.from("feed").select("entry_pack_url").limit(1),
     sb.from("feed").select("bumped_at").limit(1),
     sb.from("feed").select("hero_at,pinned").limit(1),
-    sb.from("feed").select("off_slideshow").limit(1)]);
+    sb.from("feed").select("off_slideshow").limit(1),
+    sb.from("feed").select("masters").limit(1)]);
   feedLateColsReady=!late.error;
   feedStreamColReady=!stream.error;
   feedPackColReady=!pack.error;
   feedBumpColReady=!bump.error;
   feedSlideColsReady=!slide.error;
   feedSlideOffReady=!off.error;
+  feedMastersColReady=!masters.error;
   return feedLateColsReady;
 }
 const coachFromRow=r=>({id:r.id,name:r.name,role:r.role,quals:r.quals||"",squads:r.squads||[],photo:r.photo||"",bio:r.bio||"",sortOrder:r.sort_order??0});
@@ -173,8 +179,13 @@ function activeTheme(list,day=isoToday()){
 }
 
 /* Each members'-area section, and the table and translation it reads and writes. */
+/* The feed is read column by column (migration 037): who posted, approved or binned an item is
+   kept off the public API, so asking for "*" is refused. These are the columns the pages use --
+   FEED_FIELDS plus the read-only ones feedFromRow picks up. A column added to the feed later needs
+   sharing in its migration (select public.share_feed_columns();) as well as adding here. */
+const FEED_READ_COLS=[...new Set(["id","created_at","source_meet_id","review","deleted_at","hero_at","pinned","off_slideshow",...Object.values(FEED_FIELDS)])].join(",");
 const SECTIONS={
-  feed:{table:"feed",from:feedFromRow,to:feedToRow,order:"start_date"},
+  feed:{table:"feed",from:feedFromRow,to:feedToRow,order:"start_date",cols:FEED_READ_COLS},
   coaches:{table:"coaches",from:coachFromRow,to:coachToRow,order:"sort_order"},
   squads:{table:"squads",from:squadFromRow,to:squadToRow,order:"sort_order"},
   topics:{table:"news_topics",from:topicFromRow,to:topicToRow,order:"name"},
@@ -199,7 +210,24 @@ const SECTIONS={
 let showPendingFeed=false;
 async function loadContent(){
   const keys=Object.keys(SECTIONS);
-  const results=await Promise.all(keys.map(k=>sb.from(SECTIONS[k].table).select("*").order(SECTIONS[k].order,{ascending:true,nullsFirst:false})));
+  const read=(k,cols)=>sb.from(SECTIONS[k].table).select(cols).order(SECTIONS[k].order,{ascending:true,nullsFirst:false});
+  /* With a column list, fall back to "*" if it's refused -- a column on the list that an older
+     migration hasn't added yet, or a database from before 037 -- rather than show an empty site. */
+  const readSection=async k=>{
+    if(!SECTIONS[k].cols)return read(k,"*");
+    const r=await read(k,SECTIONS[k].cols);
+    return r.error?read(k,"*"):r;
+  };
+  const [results,names]=await Promise.all([
+    Promise.all(keys.map(readSection)),
+    /* the members' area alone: who posted, approved and binned each item, for club accounts only */
+    showPendingFeed?sb.rpc("feed_names").then(r=>r.data||[],()=>[]):[],
+    loadCalColours().catch(()=>{})]);
+  const fi=keys.indexOf("feed");
+  if(names.length&&results[fi].data){
+    const by=new Map(names.map(n=>[n.id,n]));
+    results[fi].data.forEach(row=>{const n=by.get(row.id);if(n){row.submitted_by=n.submitted_by;row.approved_by=n.approved_by;row.deleted_by=n.deleted_by;}});
+  }
   const failed=results.find((r,i)=>r.error&&!SECTIONS[keys[i]].optional);
   if(failed)throw failed.error;
   keys.forEach((k,i)=>{
@@ -649,6 +677,36 @@ const meetStreaming=m=>!!m.streamUrl&&meetRacingToday(m);
    hosted by someone else (county champs etc.), "teamMeet" = league/team gala (no entries or volunteers). */
 const MEET_TYPES=["meet","externalMeet","teamMeet"];
 const isMeet=it=>MEET_TYPES.includes(it.type);
+/* Any of the three can be ticked as a Masters gala (migration 036): it then has its own section on
+   Open Meets and its own colour on the Club Calendar, whoever hosts it. */
+const isMastersMeet=it=>isMeet(it)&&it.masters===true;
+
+/* ================= CALENDAR COLOURS =================
+   Each kind of event on the Club Calendar has a colour, used for its chips, its dot in the key
+   and its label on cards. site.css holds the built-in ones (--cal-<kind>); the club can change them
+   in the members' area (migration 036), and loadContent() lays those over the top. The swatches
+   all carry white text, and are the only colours offered. */
+const CAL_KINDS=[
+  {key:"comp",label:"Competitions",what:"Open meets: our own and other clubs' (not Masters)",def:"#c9660a"},
+  {key:"league",label:"League galas",what:"Team meets: Arena League, Essex League… (not Masters)",def:"#101014"},
+  {key:"masters",label:"Masters galas",what:"Any gala ticked as a Masters gala, including Masters leagues",def:"#1d5fc4"},
+  {key:"social",label:"Socials",what:"Socials and events",def:"#f5841f"},
+  {key:"training",label:"Key training changes",what:"Training changes",def:"#b3261e"}
+];
+const CAL_SWATCHES=[
+  ["#f5841f","Club orange"],["#c9660a","Dark orange"],["#b3261e","Red"],["#be185d","Pink"],
+  ["#7e22ce","Purple"],["#4338ca","Indigo"],["#1d5fc4","Blue"],["#0f766e","Teal"],
+  ["#15803d","Green"],["#a16207","Gold"],["#475569","Slate"],["#101014","Black"]
+];
+const okCalColour=c=>/^#[0-9a-f]{6}$/.test(String(c||""));
+const calSwatchName=c=>(CAL_SWATCHES.find(([h])=>h===c)||[c,c])[1];
+/* Reads only each kind and its live colour -- what the public is allowed to see. A missing table
+   (migration 036 not run) just leaves the built-in colours. */
+async function loadCalColours(){
+  const {data,error}=await sb.from("calendar_colours").select("kind,colour");
+  if(error||!data)return;
+  data.forEach(r=>{if(CAL_KINDS.some(k=>k.key===r.kind)&&okCalColour(r.colour))document.documentElement.style.setProperty(`--cal-${r.kind}`,r.colour);});
+}
 /* Our own pool -- the homepage calls a gala there a home meet, and points at the venue page for it. */
 const isHomeVenue=m=>/basildon/i.test(m.venue||"");
 

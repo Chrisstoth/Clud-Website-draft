@@ -13,6 +13,10 @@
   --text:#101014;
   --body2:#3c3c42;
   --field:#ffffff;
+  /* Club Calendar colours, one per kind of event. The club can change them in the members' area
+     (Calendar Colours) -- core.js sets these on the page from the database. Keep in step with
+     CAL_KINDS in core.js and the seed in migration 036. */
+  --cal-comp:#c9660a;--cal-league:#101014;--cal-masters:#1d5fc4;--cal-social:#f5841f;--cal-training:#b3261e;
   --radius:14px;
   --shadow:0 1px 2px rgba(16,16,20,.05),0 6px 20px rgba(16,16,20,.06);
   /* one lean for the whole site. --slant-deg is the real source of truth: a skew transform
@@ -887,6 +891,9 @@ body.theme-dark .entries-open,body.theme-dark .comp-card.entries-open{
    --slant-deg accent as the eyebrow tabs, sized small enough that the angle costs nothing. */
 .meet.ours .datebox::before{background:linear-gradient(150deg,var(--flame) 0%,var(--flame-dark) 100%)}
 .meet.ours .datebox .m{color:#3a1c00}
+/* in the Masters galas' own calendar colour, so the label and the calendar chip match */
+.pill.masters{color:#fff}
+.pill.masters::before{background:var(--cal-masters)}
 .pill.hosted{color:#fff}
 .pill.hosted::before{background:linear-gradient(100deg,var(--flame) 0%,var(--flame-dark) 100%)}
 body.theme-dark .meet.ours .datebox .m{color:#3a1c00}
@@ -1035,10 +1042,11 @@ body.theme-dark .committee-item.active .t{color:var(--ember)}
 .cal-legend{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin:14px 0 4px;font-size:.78rem;color:var(--muted)}
 .cal-legend span{display:inline-flex;align-items:center;gap:6px}
 .cal-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
-.cal-dot.comp{background:var(--flame-dark)}
-.cal-dot.league{background:var(--ink)}
-.cal-dot.social{background:var(--flame)}
-.cal-dot.training{background:var(--warn)}
+.cal-dot.comp{background:var(--cal-comp)}
+.cal-dot.league{background:var(--cal-league)}
+.cal-dot.masters{background:var(--cal-masters)}
+.cal-dot.social{background:var(--cal-social)}
+.cal-dot.training{background:var(--cal-training)}
 .cal-dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:14px;font-size:.76rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:center}
 .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:6px}
 .cal-day{min-height:88px;border:1px solid var(--line);border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:3px;background:var(--paper);min-width:0}
@@ -1051,10 +1059,11 @@ body.theme-dark .committee-item.active .t{color:var(--ember)}
    skew overflow at the free corners. */
 .cal-chip{position:relative;z-index:0;font-size:.68rem;font-weight:600;color:#fff;padding:2px 6px;white-space:nowrap;cursor:default}
 .cal-chip::before{content:"";position:absolute;inset:0;z-index:-1;transform:skewX(calc(-1 * var(--slant-deg)))}
-.cal-chip.comp::before{background:var(--flame-dark)}
-.cal-chip.league::before{background:var(--ink)}
-.cal-chip.social::before{background:var(--flame)}
-.cal-chip.training::before{background:var(--warn)}
+.cal-chip.comp::before{background:var(--cal-comp)}
+.cal-chip.league::before{background:var(--cal-league)}
+.cal-chip.masters::before{background:var(--cal-masters)}
+.cal-chip.social::before{background:var(--cal-social)}
+.cal-chip.training::before{background:var(--cal-training)}
 .cal-chip-label{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* chips that lead somewhere (an article, or the gala on Open Meets) */
 a.cal-chip{text-decoration:none;cursor:pointer}
@@ -1451,6 +1460,18 @@ footer.site .foot-base a:hover{color:var(--ember)}
    read from across the list before any badge text is. */
 .item-row.on-home{border-left:4px solid var(--ember)}
 .item-row.is-pinned{border-left:4px solid var(--flame);background:linear-gradient(90deg,#fdeee2 0%,var(--card) 60%)}
+/* Calendar Colours (members' area): each kind's colour shown as a calendar bar, then the swatches */
+.cal-colours{display:grid;gap:10px}
+.cal-sample{position:relative;z-index:0;display:inline-block;color:#fff;font-size:.8rem;font-weight:700;padding:2px 10px;margin-right:2px}
+.cal-sample::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--c);transform:skewX(calc(-1 * var(--slant-deg)))}
+body.theme-dark .cal-sample::before{box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
+.cal-swatches{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.cal-swatch{width:32px;height:32px;border-radius:50%;border:2px solid var(--card);box-shadow:0 0 0 1px var(--line);padding:0;cursor:pointer}
+.cal-swatch:hover:not(:disabled){transform:scale(1.12)}
+.cal-swatch:focus-visible{outline:2px solid var(--flame);outline-offset:3px}
+.cal-swatch.live{box-shadow:0 0 0 3px var(--text);cursor:default}
+.cal-swatch.asked{box-shadow:0 0 0 3px var(--flame);cursor:default}
+.cal-swatch:disabled:not(.live):not(.asked){opacity:.22;cursor:not-allowed}
 .feed-badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .feed-badge{font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:999px;line-height:1.4}
 .feed-badge.home{background:#e6f4ec;color:var(--ok)}
@@ -1594,6 +1615,8 @@ body.theme-dark{--paper:#0d0d11;--card:#1e1e26;--line:#3a3a44;--muted:#a5a3a0;--
 body.theme-dark header.site{background:#111116;color:#fff;box-shadow:0 1px 0 #282830}
 body.theme-dark .brand{color:#fff}
 body.theme-dark .brand .name .line-two{color:var(--ember)}
+/* a faint edge, so a dark calendar colour (black league galas) still shows on the dark day boxes */
+body.theme-dark .cal-chip::before,body.theme-dark .cal-dot{box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
 body.theme-dark .cal-day.selected{border-color:var(--text);box-shadow:0 0 0 1px var(--text) inset}
 body.theme-dark .cal-day.selected button.cal-daynum{color:var(--text)}
 /* dark desktop nav: the flame fill reads fine on the dark bar unchanged -- only the

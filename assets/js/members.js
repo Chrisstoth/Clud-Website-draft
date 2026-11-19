@@ -5,7 +5,7 @@
 showPendingFeed=true;
 const ALL_FEED_TYPES=["meet","externalMeet","teamMeet","social","news","training"];
 const ROLES = {
-  poster:     {label:"Club Poster",          desc:"Post news, socials, training changes & galas — another member approves before it goes live", sections:["feed","themes","guides"], feedTypes:ALL_FEED_TYPES},
+  poster:     {label:"Club Poster",          desc:"Post news, socials, training changes & galas, and change calendar colours — another member approves before it goes live", sections:["feed","calendar","themes","guides"], feedTypes:ALL_FEED_TYPES},
   meets:      {label:"Open Meets Secretary", desc:"Add club, external & team meets, entry packs & results", sections:["feed","guides"], feedTypes:["meet","externalMeet","teamMeet"]},
   coaching:   {label:"Coaching Lead",        desc:"Edit coach profiles, squad timetables & squad details", sections:["coaches","squads","guides"]},
   volunteers: {label:"Volunteer Coordinator",desc:"Edit volunteer role explainers",   sections:["roles","guides"]},
@@ -15,7 +15,7 @@ const ROLES = {
   membership: {label:"Membership Team",      desc:"View trial & squad enquiries",     sections:["enquiries","guides"]},
   welfare:    {label:"Welfare Officer",      desc:"Edit the Welfare & Safeguarding page", sections:["welfare","guides"]},
   secretary:  {label:"Club Secretary",       desc:"Edit the Club Committee page",     sections:["committee","guides"]},
-  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","access","topics","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","partners","themes","instagram","images","guides"], feedTypes:ALL_FEED_TYPES}
+  webmaster:  {label:"Webmaster",            desc:"Full access to every section",     sections:["feed","access","topics","coaches","squads","roles","enquiries","newsDefaults","welfare","committee","partners","calendar","themes","instagram","images","guides"], feedTypes:ALL_FEED_TYPES}
 };
 const SECTION_META = {
   feed:{name:"Club Feed", empty:"Nothing published yet — add the first item."},
@@ -29,6 +29,7 @@ const SECTION_META = {
   welfare:{name:"Welfare & Safeguarding Page", empty:""},
   committee:{name:"Club Committee", empty:"No committee roles yet."},
   partners:{name:"Proud Partners", empty:"No partners listed — the Proud Partners strip is hidden on every page until one is added."},
+  calendar:{name:"Calendar Colours", empty:""},
   themes:{name:"Seasonal Themes", empty:"No themes yet — add one for Christmas, a big meet, or anything else worth dressing the site up for."},
   guides:{name:"Member Guides", empty:"No guides yet — the Member Guides page has no tabs until one is added."},
   instagram:{name:"Instagram on the News Page", empty:""},
@@ -48,11 +49,14 @@ const FEED_TYPE_META = {
 const NEW_DEFAULT_GRADIENTS=["linear-gradient(135deg,#d4551a,#101014)","linear-gradient(135deg,#f26b21,#ffb25e)","linear-gradient(135deg,#101014,#3c3c46)","linear-gradient(135deg,#1a6fd4,#5eb6ff)","linear-gradient(135deg,#7a1ad4,#c15eff)","linear-gradient(135deg,#3c3c46,#101014)"];
 function slugify(s){return String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");}
 
+/* The same tick box on all three gala forms (migration 036). Unticked unless it's been ticked. */
+const MASTERS_FIELD={k:"masters",label:"Masters gala: for our adult Masters swimmers. It goes in the Masters galas section of Open Meets and has its own colour on the Club Calendar",type:"checkbox",dflt:false,late:"masters"};
 /* Field schemas drive the mock edit forms. Feed items are keyed by their type ("meet"/"social"/"news"). */
 const SCHEMAS = {
   meet:[
     {k:"title",label:"Meet name",type:"text",req:1},
     {k:"visible",label:"Show on the website (untick to hide without deleting)",type:"checkbox"},
+    MASTERS_FIELD,
     {k:"level",label:"Level / type",type:"select",opts:["Level 1","Level 2","Level 3","Level 4","Club"]},
     {k:"license",label:"Licence number (optional)",type:"text"},
     {k:"poolType",label:"Pool / course (e.g. 25m Short Course)",type:"text"},
@@ -103,6 +107,7 @@ const SCHEMAS = {
   externalMeet:[
     {k:"title",label:"Meet name (e.g. Essex County Championships)",type:"text",req:1},
     {k:"visible",label:"Show on the website (untick to hide without deleting)",type:"checkbox"},
+    MASTERS_FIELD,
     {k:"host",label:"Hosted by (e.g. Essex County ASA)",type:"text",req:1},
     {k:"level",label:"Level / type",type:"select",opts:["Level 1","Level 2","Level 3","Level 4","Regional","National","Other"]},
     {k:"license",label:"Licence number (optional)",type:"text"},
@@ -128,6 +133,7 @@ const SCHEMAS = {
   teamMeet:[
     {k:"title",label:"Meet name (e.g. Arena League — Round 1)",type:"text",req:1},
     {k:"visible",label:"Show on the website (untick to hide without deleting)",type:"checkbox"},
+    MASTERS_FIELD,
     {k:"league",label:"League / competition (e.g. Arena League, Essex League)",type:"text",req:1},
     {k:"poolType",label:"Pool / course (e.g. 25m Short Course)",type:"text"},
     {k:"start",label:"Date",type:"date",req:1},
@@ -329,7 +335,7 @@ function itemSummary(sec,it){
       const who=it.type==="externalMeet"?` · host: ${it.host||"?"}`:"";
       const home=it.homepageMode==="off"?" · not on the homepage":"";
       const racing=meetRaceDays(it).length?` · ${meetRaceDays(it).length} racing days`:"";
-      return {t:it.title,s:`${typeLabel}${who} · ${fmtDate(it.start)} · ${it.venue||"Venue TBC"}${racing} · ${state}${home}`};
+      return {t:it.title,s:`${isMastersMeet(it)?"Masters · ":""}${typeLabel}${who} · ${fmtDate(it.start)} · ${it.venue||"Venue TBC"}${racing} · ${state}${home}`};
     }
     if(it.type==="social")return {t:it.title,s:`${typeLabel} · ${fmtDate(it.start)}`};
     if(it.type==="news"){const tags=storyTags(it).map(t=>t.name).join(", ");
@@ -474,8 +480,89 @@ function themeTodayHtml(){
     <p style="margin:6px 0 0">${t?`${look.icon} <strong>${esc(t.label)}</strong> — ${esc(themeWhen(t).replace(/^● /,""))}. <a href="./?theme=${t.id}" target="_blank" rel="noopener">See it →</a>`:`No theme — the site has its usual look.`}</p></div>`;
 }
 
+/* ================= CALENDAR COLOURS =================
+   One colour per kind of event on the Club Calendar (migration 036), picked from swatches that all
+   carry white text. The same second-person rule as posts: a webmaster's pick goes live, anyone
+   else's waits (pending_colour) until a different club account approves it. The database enforces
+   that -- a Club Poster's save can't touch the live colour however the page is tinkered with. */
+async function showCalendarColoursSection(){
+  const main=$("#adminMain");
+  const head=`<h2>${SECTION_META.calendar.name}</h2>`;
+  main.innerHTML=`${head}<p style="color:var(--muted)">Loading…</p>`;
+  /* the whole rows (who asked for a change, who approved it) come from calendar_colours_admin(),
+     which answers club accounts only (migration 037); before 037 the table itself still gives them */
+  let {data,error}=await sb.rpc("calendar_colours_admin");
+  if(error)({data,error}=await sb.from("calendar_colours").select("*").order("sort_order"));
+  if(adminSection!=="calendar")return;
+  if(error){
+    main.innerHTML=`${head}<div class="admin-note">Calendar colours haven't been set up in the database yet. The webmaster needs to run <code>supabase/migrations/036_masters_calendar_colours.sql</code> in the Supabase SQL Editor. Until then the calendar keeps its built-in colours.</div>`;
+    return;
+  }
+  const rows=CAL_KINDS.map(k=>({...k,row:data.find(r=>r.kind===k.key)})).filter(k=>k.row);
+  const me=session.email.toLowerCase();
+  const chip=(c,text)=>okCalColour(c)?`<span class="cal-sample" style="--c:${c}">${esc(text)}</span>`:"";
+  const rowHtml=k=>{
+    const r=k.row,pending=okCalColour(r.pending_colour)?r.pending_colour:"";
+    const mine=pending&&(r.submitted_by||"").toLowerCase()===me;
+    /* a colour another kind has (or has asked for) is greyed out, so no two kinds look alike */
+    const taken=new Map();
+    rows.filter(o=>o!==k).forEach(o=>{
+      if(okCalColour(o.row.colour))taken.set(o.row.colour,o.label);
+      if(okCalColour(o.row.pending_colour)&&!taken.has(o.row.pending_colour))taken.set(o.row.pending_colour,`${o.label} (waiting for approval)`);
+    });
+    const swatches=CAL_SWATCHES.map(([hex,name])=>{
+      const live=hex===r.colour,asked=hex===pending,usedBy=taken.get(hex);
+      const tip=live?`${name}: the colour now`:asked?`${name}: waiting for approval`:usedBy?`${name}: already used for ${usedBy}`:name;
+      return `<button type="button" class="cal-swatch${live?" live":""}${asked?" asked":""}" style="background:${hex}" data-cal-kind="${k.key}" data-cal-pick="${hex}"
+        title="${esc(tip)}" aria-label="${esc(tip)}" aria-pressed="${live}"${live||asked||usedBy?" disabled":""}></button>`;
+    }).join("");
+    const changed=r.approved_by&&r.approved_at?` · last changed by ${r.approved_by}, ${fmtDate(isoDay(new Date(r.approved_at)))}`:"";
+    const badge=pending?`<div class="feed-badges"><span class="feed-badge pin">⏳ Waiting for approval: ${esc(calSwatchName(pending))}${r.submitted_by?` · from ${esc(r.submitted_by)}`:""}</span>${mine?`<span class="feed-badge note">Another member needs to approve this</span>`:""}</div>`:"";
+    const acts=pending?`${mine?"":`<button class="btn small" data-cal-approve="${k.key}">Approve</button>`}
+      <button class="btn small ghost" data-cal-discard="${k.key}">${mine?"Withdraw":"Discard"}</button>`:"";
+    return `<div class="item-row cal-colour-row"><div>
+        <div class="t">${chip(r.colour,k.label)}${pending?` <span aria-hidden="true">→</span> ${chip(pending,k.label)}`:""}</div>
+        <div class="s">${esc(k.what)} · now ${esc(calSwatchName(r.colour))}${esc(changed)}</div>
+        ${badge}
+        <div class="cal-swatches" role="group" aria-label="Colour for ${esc(k.label)}">${swatches}</div>
+      </div>${acts?`<div class="acts">${acts}</div>`:""}</div>`;
+  };
+  main.innerHTML=`${head}
+    <div class="admin-note">The colour of each kind of event on the <a href="club-calendar" target="_blank" rel="noopener">Club Calendar</a>: its bars on the calendar and its dot in the key. The Masters colour is also used for the Masters label on gala cards. Every colour here is readable with white writing, in light and dark mode, and one already used by another kind is greyed out so no two look the same.
+    ${isWebmaster()?"Your changes go live straight away. Changes from other members wait here until someone other than the person who made them approves them.":"A colour you pick waits here until another club member approves it. The calendar keeps its current colour until then."}</div>
+    <div class="cal-colours">${rows.map(rowHtml).join("")}</div>`;
+  main.onclick=async e=>{
+    const pick=e.target.closest("[data-cal-pick]"),ap=e.target.closest("[data-cal-approve]"),dis=e.target.closest("[data-cal-discard]");
+    const btn=pick||ap||dis;
+    if(!btn||btn.disabled)return;
+    main.querySelectorAll(".cal-colours button").forEach(b=>b.disabled=true);
+    let error,said;
+    if(ap){
+      ({error}=await sb.rpc("approve_calendar_colour",{colour_kind:ap.dataset.calApprove}));
+      said="Approved — the calendar shows it now";
+    }else{
+      const kind=(pick||dis).dataset.calKind||dis.dataset.calDiscard;
+      const change=pick?(isWebmaster()?{colour:pick.dataset.calPick,pending_colour:null}:{pending_colour:pick.dataset.calPick}):{pending_colour:null};
+      const res=await sb.from("calendar_colours").update(change).eq("kind",kind).select("kind");
+      error=res.error||(!res.data.length&&{code:"42501"});
+      said=dis?"Change taken back":isWebmaster()?"Saved — the calendar shows it now":"Saved — it goes on the calendar once another member approves it";
+    }
+    if(error){
+      toast(error.code==="P0001"||(ap&&error.code==="42501"&&error.message)?error.message:saveErrorMessage(error));
+      return showCalendarColoursSection();
+    }
+    await loadCalColours();
+    toast(said);
+    showCalendarColoursSection();
+  };
+}
+
 function renderAdminSection(){
   const main=$("#adminMain"),sec=adminSection,role=session.role;
+  if(sec==="calendar"){
+    showCalendarColoursSection();
+    return;
+  }
   if(sec==="enquiries"){
     showEnquiriesSection();
     return;
@@ -963,7 +1050,13 @@ function showForm(sec,id,forcedType){
   const fields=SCHEMAS[schemaKey].map(f=>{
     const val=esc(it[f.k]??"");
     if(f.type==="textarea")return `<label class="f">${f.label}<textarea name="${f.k}" rows="3" ${f.req?"required":""}>${val}</textarea></label>`;
-    if(f.type==="checkbox")return `<label class="f checkbox-f"><input type="checkbox" name="${f.k}" ${it[f.k]===false?"":"checked"}> ${f.label}</label>`;
+    if(f.type==="checkbox"){
+      /* most tick boxes start ticked (Show on the website); one with dflt:false starts unticked */
+      const on=f.dflt===false?it[f.k]===true:it[f.k]!==false;
+      const notYet=f.late==="masters"&&!feedMastersColReady;
+      return `<label class="f checkbox-f"><input type="checkbox" name="${f.k}" ${on?"checked":""}${notYet?" disabled":""}> ${f.label}</label>
+        ${notYet?`<p class="hint" style="margin:-6px 0 0;color:var(--warn)">Needs a one-off database update (migration 036) before it can be saved. Everything else on this form saves as normal.</p>`:""}`;
+    }
     if(f.type==="tagpicks"){
       /* Squads (from Squad Timetables) and the club's own tags (News Tags). Stored as references,
          so a tag or squad deleted since is simply no longer offered. */
@@ -2094,7 +2187,7 @@ async function showAccessSection(){
   const ready=data.some(m=>m.email.toLowerCase()!==session.email.toLowerCase());
   const roleName=r=>ROLES[r]?ROLES[r].label:r;
   main.innerHTML=`<h2>${name}</h2>
-    <div class="admin-note">Everyone who can sign in to the admin area. <strong>Club Posters</strong> can post and edit every kind of feed item, but nothing goes live until someone else approves it. <strong>Membership Team</strong> accounts only see the Join Us enquiries (and the Member Guides). <strong>Webmasters</strong> can change everything, publish straight away and manage this list. Removing someone stops them straight away.</div>
+    <div class="admin-note">Everyone who can sign in to the admin area. <strong>Club Posters</strong> can post and edit every kind of feed item and change the calendar colours, but nothing goes live until someone else approves it. <strong>Membership Team</strong> accounts only see the Join Us enquiries (and the Member Guides). <strong>Webmasters</strong> can change everything, publish straight away and manage this list. Removing someone stops them straight away.</div>
     ${ready?"":`<div class="admin-note">Only your own account shows until the webmaster runs <code>supabase/migrations/024_peer_review.sql</code> in the Supabase SQL Editor.</div>`}
     ${data.map(m=>{const me=m.email.toLowerCase()===session.email.toLowerCase();
       return `<div class="item-row"><div><div class="t">${esc(m.label||roleName(m.role))}${me?" (you)":""}</div>
