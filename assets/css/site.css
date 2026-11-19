@@ -1449,6 +1449,31 @@ footer.site .foot-base a:hover{color:var(--ember)}
 .admin-filter .chip-n{opacity:.6;font-weight:600;margin-left:3px}
 .admin-filter-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-right:4px}
 .admin-filter+.admin-sub{margin-top:22px}
+/* Club Feed groups (Drafts, Waiting for approval, Upcoming, Past): a clear bar with a count, so
+   where one group ends and the next starts is obvious at a glance */
+.admin-group{display:flex;align-items:center;gap:10px;margin:34px 0 12px;padding:10px 14px;border-radius:10px;
+  background:var(--card);border:1px solid var(--line);border-left:5px solid var(--g,var(--muted));
+  font-family:'Montserrat',sans-serif;font-size:1rem;font-weight:800;color:var(--text);letter-spacing:-.005em}
+.admin-group-n{margin-left:auto;min-width:28px;text-align:center;padding:2px 9px;border-radius:999px;
+  background:var(--g,var(--muted));color:#fff;font-size:.78rem;font-weight:800}
+.admin-group.drafts{--g:#7e22ce}
+.admin-group.waiting{--g:var(--flame)}
+.admin-group.upcoming{--g:var(--ok)}
+.admin-group.past{--g:#64748b}
+#itemList>.admin-group:first-child,.admin-filter+.admin-group{margin-top:8px}
+.admin-group-note,.admin-group-empty{color:var(--muted);font-size:.86rem;margin:-4px 0 12px}
+.admin-past{margin-top:34px}
+.admin-past>summary{list-style:none;cursor:pointer;position:relative;border-radius:10px}
+.admin-past>summary::-webkit-details-marker{display:none}
+.admin-past>summary .admin-group{margin:0;padding-right:96px}
+.admin-past>summary .admin-group::before{content:"▸";display:inline-block;color:var(--muted);transition:transform .15s}
+.admin-past[open]>summary .admin-group::before{transform:rotate(90deg)}
+.admin-past-hint{position:absolute;right:58px;top:50%;transform:translateY(-50%);font-size:.78rem;font-weight:700;color:var(--muted)}
+.admin-past>summary:hover .admin-group{border-color:var(--g)}
+.admin-past>summary:focus-visible{outline:3px solid var(--flame);outline-offset:2px}
+.admin-past[open]>summary{margin-bottom:12px}
+.feed-badge.draft{background:#7e22ce;color:#fff}
+#admin .form-actions{display:flex;gap:10px;flex-wrap:wrap}
 .item-block .item-row{margin-bottom:0}
 .item-block:has(.edit-slot:not(:empty)) .item-row{border-radius:12px 12px 0 0;border-bottom-color:transparent}
 .item-row{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap}

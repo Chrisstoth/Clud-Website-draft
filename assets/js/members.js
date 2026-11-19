@@ -222,6 +222,8 @@ let squadsTab="timetables";
 /* Club Feed list filter: item type and (for Club News) category tag; "" means all. Kept across
    saves so the list doesn't jump back to everything after each edit. */
 let feedFilter={type:"",tag:""};
+/* The Club Feed's past items start folded away; once opened they stay open across saves. */
+let pastOpen=false;
 
 function renderLogin(message){
   $("#whoAmI").innerHTML="";
@@ -363,11 +365,16 @@ function feedItemsForRole(role){return DB.feed.filter(it=>role.feedTypes.include
 /* Where a Club Feed item stands on the homepage slideshow today. Worked out with the same
    heroSlideOrder() the homepage runs (core.js), so these badges can't drift from what visitors
    actually see. Pinned items stay until unpinned; the rest are moved down by newer posts. */
-const publicFeed=()=>DB.feed.filter(it=>it.visible!==false&&it.review!=="pending");
+const publicFeed=()=>DB.feed.filter(it=>it.visible!==false&&it.review!=="pending"&&!isDraft(it));
 const homepageSlides=()=>heroFeedItems(publicFeed());
 /* Peer review (migration 024): a non-webmaster's save waits until someone else approves it. */
 const isWebmaster=()=>session.role.key==="webmaster";
 const isPending=it=>it.review==="pending";
+/* Drafts (migration 038): saved half-written, seen only in the members' area, until published. */
+const isDraft=it=>it.review==="draft";
+/* Set at sign-in. Until 038 has run, the database would publish a Webmaster's "draft" (and send
+   anyone else's for approval), so there's no "Save as draft" button until it's there. */
+let feedDraftsReady=false;
 /* every row carries a review state once migration 024 has run */
 const reviewReady=()=>DB.feed.some(it=>it.review);
 const mySubmission=it=>(it.submittedBy||"").toLowerCase()===session.email.toLowerCase();
@@ -388,6 +395,7 @@ function homeStatus(it,slides){
   return {slot,pinned,until:pinned?"pinned until someone unpins it":slot>=0?"until newer posts push it off":""};
 }
 function homeBadges(it,slides){
+  if(isDraft(it))return `<div class="feed-badges"><span class="feed-badge draft">✏️ Draft — not on the site</span>${it.submittedBy?`<span class="feed-badge note">Last saved by ${esc(it.submittedBy)}</span>`:""}</div>`;
   if(isPending(it))return reviewBadge(it);
   if(it.visible===false)return `<span class="feed-badge off">Hidden from site</span>`;
   const h=homeStatus(it,slides),b=[];
@@ -654,13 +662,18 @@ function renderAdminSection(){
         ${tags.map(t=>chip("data-ftag",t.ref,t.name,newsItems.filter(it=>hasTag(it,t.ref)).length,feedFilter.tag===t.ref)).join("")}</div>`:"";
     const shown=items.filter(it=>(!feedFilter.type||it.type===feedFilter.type)&&(!feedFilter.tag||hasTag(it,feedFilter.tag)));
     const byDate=[...shown].sort((a,b)=>(a.start||"").localeCompare(b.start||""));
-    const pending=byDate.filter(isPending),live=byDate.filter(it=>!isPending(it));
+    const drafts=byDate.filter(isDraft),pending=byDate.filter(isPending),live=byDate.filter(it=>!isPending(it)&&!isDraft(it));
     const upcoming=live.filter(it=>!it.start||!meetDone(it)),past=live.filter(it=>it.start&&meetDone(it)).reverse();
+    const head=(cls,icon,label,n)=>`<h3 class="admin-group ${cls}"><span aria-hidden="true">${icon}</span>${label}<span class="admin-group-n">${n}</span></h3>`;
+    const none=what=>`<p class="admin-group-empty">${what}${shown.length<items.length?" matching this filter":""}.</p>`;
     return `${typeChips}${tagChips}
-      ${pending.length?`<h3 class="admin-sub">Waiting for approval (${pending.length})</h3>${pending.map(rowHtml).join("")}`:""}
-      <h3 class="admin-sub">${galasOnly?"Upcoming galas":"Upcoming"}</h3>
-      ${upcoming.length?upcoming.map(rowHtml).join(""):`<p style="color:var(--muted)">Nothing upcoming${shown.length<items.length?" matching this filter":""}.</p>`}
-      ${past.length?`<h3 class="admin-sub">${galasOnly?"Past galas":"Past items"}</h3>${past.map(rowHtml).join("")}`:""}`;
+      ${drafts.length?`${head("drafts","✏️","Drafts",drafts.length)}<p class="admin-group-note">Not on the site and not waiting for approval — open one to finish it, then Publish.</p>${drafts.map(rowHtml).join("")}`:""}
+      ${pending.length?`${head("waiting","⏳","Waiting for approval",pending.length)}${pending.map(rowHtml).join("")}`:""}
+      ${head("upcoming","📅",galasOnly?"Upcoming galas":"Upcoming",upcoming.length)}
+      ${upcoming.length?upcoming.map(rowHtml).join(""):none("Nothing upcoming")}
+      ${past.length?`<details class="admin-past" id="pastItems"${pastOpen?" open":""}>
+        <summary>${head("past","🗂️",galasOnly?"Past galas":"Past items",past.length)}<span class="admin-past-hint">${pastOpen?"Hide":"Show"}</span></summary>
+        ${past.map(rowHtml).join("")}</details>`:""}`;
   };
   let listHtml;
   if(!items.length)listHtml=`<p style="color:var(--muted)">${SECTION_META[sec].empty}</p>`;
@@ -702,6 +715,8 @@ function renderAdminSection(){
       if(!find()){feedFilter={type:"",tag:""};editingId=null;$("#itemList").innerHTML=feedListHtml();}
       const block=find();
       if(block){
+        const fold=block.closest("details");
+        if(fold&&!fold.open)fold.open=true;
         block.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
         block.classList.remove("flash");void block.offsetWidth;block.classList.add("flash");
       }
@@ -742,23 +757,42 @@ function renderAdminSection(){
     }
     if(del)deleteItem(sec,+del.dataset.del);
   });
+  /* "toggle" doesn't bubble, so listen on the way down */
+  main.addEventListener("toggle",e=>{
+    if(e.target.id!=="pastItems")return;
+    pastOpen=e.target.open;
+    const hint=e.target.querySelector(".admin-past-hint");
+    if(hint)hint.textContent=pastOpen?"Hide":"Show";
+  },true);
 }
 
 /* Every write goes to the database, then the local copy is reloaded so the list on screen
    matches what was actually stored (ids, defaults, anything a policy refused). */
 /* afterSave (optional) runs once the item is stored, with its id, before the reload -- e.g. to
    post a gala's article -- and returns the message to show instead of the usual one. */
-async function publishItem(sec,id,data,afterSave){
+/* review (feed only, once 024 has run): {draft} keeps it a draft (038); anything else asks to
+   publish, and the database decides whether that's live or waiting for approval. It's sent on
+   every feed save, so finishing a draft publishes it. */
+async function publishItem(sec,id,data,afterSave,review){
   const s=SECTIONS[sec];
   const row=s.to(data);
+  if(review)row.review=review.draft?"draft":"published";
+  const wasDraft=!!(id&&sec==="feed"&&isDraft(DB.feed.find(x=>x.id===id)||{}));
   const insert=()=>{const q=sb.from(s.table).insert(row);return sec==="feed"?q.select("id").single():q;};
   const res=id?await sb.from(s.table).update(row).eq("id",id):await insert();
-  if(res.error){toast(saveErrorMessage(res.error));return false;}
+  if(res.error){
+    /* the review check from 024 refuses "draft" until 038 has run */
+    toast(review?.draft&&(res.error.code==="23514"||/feed_review_check/.test(res.error.message||""))
+      ?"Drafts need a one-off database update first: the webmaster needs to run supabase/migrations/038_feed_drafts.sql"
+      :saveErrorMessage(res.error));
+    return false;
+  }
   const said=afterSave?await afterSave(id||res.data.id):"";
   await loadContent();
   renderAdminShell();
   const held=sec==="feed"&&!isWebmaster()&&reviewReady();
-  toast(said||(held?"Saved — it goes live once another member approves it":id?"Saved — live on the public site":"Published to the public site"));
+  toast(review?.draft?`Draft saved — not on the site${review.articleAsked?". Its news article isn't saved with a draft: tick it again when you publish the gala":""}`
+    :said||(held?"Saved — it goes live once another member approves it":id&&!wasDraft?"Saved — live on the public site":"Published to the public site"));
   return true;
 }
 /* Swaps an item with its neighbour and renumbers the whole list 0..n-1 in the new order, so
@@ -1151,7 +1185,7 @@ function showForm(sec,id,forcedType){
           <p class="hint" style="margin:0">The rest of the article stays as it is — to rewrite it, edit it in Club News.</p>
         </div></div>`;
       /* Stories in Club News not yet tied to a gala, newest first, for "link an article". */
-      const loose=DB.feed.filter(x=>x.type==="news"&&!x.sourceMeetId).sort((a,b)=>(b.bumpedAt||b.createdAt||"")<(a.bumpedAt||a.createdAt||"")?-1:1).slice(0,40);
+      const loose=DB.feed.filter(x=>x.type==="news"&&!x.sourceMeetId&&!isDraft(x)).sort((a,b)=>(b.bumpedAt||b.createdAt||"")<(a.bumpedAt||a.createdAt||"")?-1:1).slice(0,40);
       return `<div class="f meet-article"><p class="tag-group-label">${f.label}</p>
         <label class="checkbox-f"><input type="checkbox" id="meetArticleOn"> Also post a news article about this gala</label>
         <p class="hint" style="margin:0">The article is what goes in Club News and on the homepage slideshow — the gala doesn't get a slide of its own.</p>
@@ -1227,14 +1261,19 @@ function showForm(sec,id,forcedType){
   }).join("");
   const titleLabel=isFeed?FEED_TYPE_META[type].label:SECTION_META[sec].name;
   const canPreview=isFeed&&(type==="news"||type==="social"||type==="training");
+  /* Drafts (migration 038): a new post, or one that's still a draft. A live post can't go back to
+     being a draft -- Delete takes it down. */
+  const draftable=isFeed&&feedDraftsReady&&(!id||isDraft(it));
   const formTarget=id?document.getElementById("editSlot-"+id):$("#formSlot");
   formTarget.innerHTML=`<form class="stack" id="adminForm" style="margin-top:10px">
     <div class="form-title">${id?"Edit item":"Add new"} — ${titleLabel}</div>
     ${canPreview?`<button type="button" class="btn small ghost" id="previewBtn" style="justify-self:start">Preview as article page</button>`:""}
     ${fields}
     ${isFeed?`<input type="hidden" name="heroCard" id="heroCardInput" value="${esc(it.heroCard||"")}">`:""}
-    <div style="display:flex;gap:10px"><button class="btn" type="submit">${id?"Save & publish":"Publish"}</button>
-    <button class="btn ghost" type="button" id="cancelForm">Cancel</button></div></form>`;
+    <div class="form-actions"><button class="btn" type="submit">${id&&!draftable?"Save & publish":"Publish"}</button>
+    ${draftable?`<button class="btn ghost" type="submit" data-as-draft>${id?"Save draft":"Save as draft"}</button>`:""}
+    <button class="btn ghost" type="button" id="cancelForm">Cancel</button></div>
+    ${draftable?`<p class="hint" style="margin:0">A draft isn't on the site and doesn't go for approval — other club accounts can see it under Drafts. Publish when it's ready.</p>`:""}</form>`;
   formTarget.scrollIntoView({behavior:"smooth",block:"nearest"});
   const pickedTags=()=>[...formTarget.querySelectorAll("[data-tagpick]:checked")].map(i=>i.value);
   /* "+ Add tag" makes a new club tag on the spot and ticks it, so nobody has to leave a half-written
@@ -1621,8 +1660,12 @@ function showForm(sec,id,forcedType){
     showArticlePreview(liveData);
   });
   $("#cancelForm").addEventListener("click",()=>{formTarget.innerHTML="";editingId=null;});
+  /* Which button sent the form: e.submitter, or (older browsers) the last one clicked */
+  let draftClicked=false;
+  formTarget.querySelectorAll('#adminForm button[type="submit"]').forEach(b=>b.addEventListener("click",()=>{draftClicked=b.hasAttribute("data-as-draft");}));
   $("#adminForm").addEventListener("submit",async e=>{
     e.preventDefault();
+    const asDraft=draftable&&(e.submitter?e.submitter.hasAttribute("data-as-draft"):draftClicked);
     const data=Object.fromEntries(new FormData(e.target).entries());
     /* FormData omits an unchecked checkbox entirely, so read those straight off the inputs. */
     SCHEMAS[schemaKey].filter(f=>f.type==="checkbox").forEach(f=>{data[f.k]=formTarget.querySelector(`[name="${f.k}"]`).checked;});
@@ -1692,7 +1735,7 @@ function showForm(sec,id,forcedType){
       data.key=uniq;
       data.bg=NEW_DEFAULT_GRADIENTS[DB.newsDefaults.length%NEW_DEFAULT_GRADIENTS.length];
     }
-    if(articleUpd&&!articleUpd.checked&&meetSnapshot()!==meetAsOpened
+    if(!asDraft&&articleUpd&&!articleUpd.checked&&meetSnapshot()!==meetAsOpened
       &&confirm(`You've changed this gala, but haven't chosen to update its news article.\n\nPost an update? The article gets a note at the top saying what's changed, and goes back to the top of Club News and the homepage slideshow.\n\nOK = yes, add an update (you'll write it before saving)\nCancel = no, just save the gala`)){
       articleUpd.checked=true;
       $("#meetArticleFields").hidden=false;
@@ -1703,8 +1746,10 @@ function showForm(sec,id,forcedType){
       return;
     }
     let article=null,articleUpdate=null;
-    const linkArticle=isFeed?+($("#meetArticleLink")?.value||0):0;
-    if(isFeed&&($("#meetArticleOn")?.checked||$("#meetArticleUpd")?.checked)){
+    /* A draft gala doesn't post, update or link its article: that happens when it's published. */
+    const articleAsked=isFeed&&!!($("#meetArticleOn")?.checked||$("#meetArticleUpd")?.checked||+($("#meetArticleLink")?.value||0));
+    const linkArticle=isFeed&&!asDraft?+($("#meetArticleLink")?.value||0):0;
+    if(isFeed&&!asDraft&&($("#meetArticleOn")?.checked||$("#meetArticleUpd")?.checked)){
       const title=$("#meetArticleTitle").value.trim(),blurb=$("#meetArticleBlurb").value.trim();
       if(!title||!blurb){toast("The news article needs a headline and a summary");$(title?"#meetArticleBlurb":"#meetArticleTitle").focus();return;}
       if($("#meetArticleOn")?.checked)article={title,blurb,body:meetArticleHtml($("#meetArticleBody").value)};
@@ -1720,12 +1765,12 @@ function showForm(sec,id,forcedType){
          (migration 026) and of the homepage slideshow (027); it keeps its id, so links still work. */
       data.bumpedAt=it.bumpedAt;
       data.pinUntil=it.pinUntil;
-      if(feedBumpColReady&&(type==="news"||type==="training")&&publishedOn(it)<isoToday()
+      if(!asDraft&&!isDraft(it)&&feedBumpColReady&&(type==="news"||type==="training")&&publishedOn(it)<isoToday()
         &&confirm(`You've edited "${data.title||it.title}".\n\nBump it to the top, like a fresh post? It goes to the top of Club News and of the homepage slideshow. Links to it will still work.\n\nOK = bump it to the top\nCancel = leave it where it is`))
         data.bumpedAt=new Date().toISOString();
     }
-    const submit=e.target.querySelector('button[type="submit"]');
-    submit.disabled=true;
+    const submits=[...e.target.querySelectorAll('button[type="submit"]')];
+    submits.forEach(b=>b.disabled=true);
     /* The gala's article is posted, updated or linked by the database (migrations 029, 033),
        since a Meets Secretary may write galas but not news. */
     const articleFailed=(error,migration,what)=>/function|schema cache/i.test(error.message||"")
@@ -1748,8 +1793,8 @@ function showForm(sec,id,forcedType){
       return held()?"Saved — the gala goes live once another member approves it; its article is linked"
         :"Saved — the article and the gala now link to each other";
     }:null;
-    await publishItem(sec,id,data,afterSave);
-    submit.disabled=false;
+    await publishItem(sec,id,data,afterSave,isFeed&&reviewReady()?{draft:asDraft,articleAsked}:undefined);
+    submits.forEach(b=>b.disabled=false);
   });
 }
 
@@ -2522,7 +2567,8 @@ async function start(){
   adminSection=session.role.sections[0];
   /* clear out anything binned over 7 days ago (migration 025; harmless if not run yet) */
   await sb.rpc("purge_recycle_bin").then(()=>{},()=>{});
-  try{await Promise.all([loadContent(),checkFeedLateCols()]);}
+  try{await Promise.all([loadContent(),checkFeedLateCols(),
+    sb.rpc("feed_drafts_ready").then(r=>{feedDraftsReady=r.data===true;},()=>{})]);}
   catch(e){return renderLogin(`Couldn't load the club content: ${e.message}`);}
   renderAdminShell();
 }

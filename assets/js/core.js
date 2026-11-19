@@ -236,7 +236,8 @@ async function loadContent(){
   });
   /* Binned items (migration 025) only ever appear in the members' area recycle bin. */
   DB.bin=DB.feed.filter(it=>it.deletedAt);
-  DB.feed=DB.feed.filter(it=>!it.deletedAt&&(showPendingFeed||it.review!=="pending"));
+  /* Drafts (migration 038) never leave the members' area either. */
+  DB.feed=DB.feed.filter(it=>!it.deletedAt&&(showPendingFeed||(it.review!=="pending"&&it.review!=="draft")));
 }
 
 /* Join Us enquiries are emailed (send-enquiry.php) and never stored. Earlier drafts kept them
