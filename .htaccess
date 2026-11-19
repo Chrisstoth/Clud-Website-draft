@@ -51,6 +51,12 @@ ErrorDocument 404 /404.html
   <Files "sw.js">
     Header set Cache-Control "no-cache"
   </Files>
+  # Pages: browsers must check for a newer copy every time (a quick "not changed" answer when
+  # nothing has), so nobody runs an old page after an update. Stylesheets, scripts and images
+  # carry ?v= numbers instead and are still cached.
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
 </IfModule>
 
 AddType application/manifest+json .webmanifest
