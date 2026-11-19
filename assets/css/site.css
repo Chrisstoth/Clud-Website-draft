@@ -1460,6 +1460,7 @@ footer.site .foot-base a:hover{color:var(--ember)}
 .admin-group.waiting{--g:var(--flame)}
 .admin-group.upcoming{--g:var(--ok)}
 .admin-group.past{--g:#64748b}
+.admin-group.templates{--g:#0e7490}
 #itemList>.admin-group:first-child,.admin-filter+.admin-group{margin-top:8px}
 .admin-group-note,.admin-group-empty{color:var(--muted);font-size:.86rem;margin:-4px 0 12px}
 .admin-past{margin-top:34px}

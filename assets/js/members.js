@@ -375,6 +375,28 @@ const isDraft=it=>it.review==="draft";
 /* Set at sign-in. Until 038 has run, the database would publish a Webmaster's "draft" (and send
    anyone else's for approval), so there's no "Save as draft" button until it's there. */
 let feedDraftsReady=false;
+/* Templates (migration 039): ready-written posts ("Pool closed") to start a new one from. null
+   until the table is there. Only posts, not galas, and never with dates: those are filled in
+   each time. A template is never on the site and never goes for approval. */
+const TEMPLATE_TYPES=["news","social","training"];
+let feedTemplates=null;
+/* The Club Feed's Templates group starts folded away, like Past items. */
+let tplOpen=false;
+const tplFromRow=r=>({id:r.id,name:r.name,type:r.type,data:r.data||{},updatedBy:r.updated_by||"",updatedAt:r.updated_at||""});
+async function loadTemplates(){
+  const {data,error}=await sb.from("feed_templates").select("*").order("name");
+  feedTemplates=error?null:data.map(tplFromRow);
+}
+/* What a template keeps of a post: its form's fields, less the dates (and the type, kept apart). */
+function templateData(type,data){
+  const keep=[...SCHEMAS[type].map(f=>f.k).filter(k=>k!=="start"&&k!=="end"),"heroCard"];
+  const out={};
+  for(const k of keep){const v=data[k];if(v!==undefined&&v!==null&&v!==""&&!(Array.isArray(v)&&!v.length))out[k]=v;}
+  return out;
+}
+const myTemplates=()=>(feedTemplates||[]).filter(t=>session.role.feedTypes.includes(t.type)&&TEMPLATE_TYPES.includes(t.type));
+/* "[day, date]" and the like, left in from a template */
+const leftoverBlanks=text=>[...new Set(String(text||"").match(/\[[^\]\n]{1,60}\]/g)||[])];
 /* every row carries a review state once migration 024 has run */
 const reviewReady=()=>DB.feed.some(it=>it.review);
 const mySubmission=it=>(it.submittedBy||"").toLowerCase()===session.email.toLowerCase();
@@ -687,11 +709,11 @@ function renderAdminSection(){
     <div style="margin-bottom:18px"><button class="btn small" id="addNew">+ Add new</button></div>
     <div id="itemList">${listHtml}</div>
     <div id="formSlot"></div>
-    ${sec==="feed"?recycleBinHtml():""}`;
+    ${sec==="feed"?`<div id="tplHolder">${templatesHtml()}</div>${recycleBinHtml()}`:""}`;
   $("#addNew").addEventListener("click",()=>{
     document.querySelectorAll(".edit-slot").forEach(s=>s.innerHTML="");
     editingId=null;
-    if(sec==="feed"&&role.feedTypes.length>1)showFeedTypeChooser();
+    if(sec==="feed"&&(role.feedTypes.length>1||myTemplates().length))showFeedTypeChooser();
     else showForm(sec,null,sec==="feed"?role.feedTypes[0]:undefined);
   });
   main.addEventListener("click",e=>{
@@ -741,6 +763,29 @@ function renderAdminSection(){
     const up=e.target.closest("[data-move-up]"),down=e.target.closest("[data-move-down]");
     if(up&&!up.disabled){moveItem(sec,+up.dataset.moveUp,-1);return;}
     if(down&&!down.disabled){moveItem(sec,+down.dataset.moveDown,1);return;}
+    /* Templates (migration 039) */
+    const tu=e.target.closest("[data-tpl-use]");
+    if(tu){useTemplate(+tu.dataset.tplUse);return;}
+    const te=e.target.closest("[data-tpl-edit]");
+    if(te){
+      const tid=+te.dataset.tplEdit,wasOpen=!!document.getElementById("tplSlot-"+tid)?.innerHTML.trim();
+      document.querySelectorAll(".edit-slot").forEach(s=>s.innerHTML="");
+      const t=(feedTemplates||[]).find(x=>x.id===tid);
+      if(!wasOpen&&t)editTemplate(t);
+      return;
+    }
+    const td=e.target.closest("[data-tpl-del]");
+    if(td){deleteTemplate(+td.dataset.tplDel);return;}
+    const tn=e.target.closest("[data-tpl-new],[data-tpl-new-type]");
+    if(tn){
+      const types=role.feedTypes.filter(t=>TEMPLATE_TYPES.includes(t));
+      const type=tn.dataset.tplNewType||(types.length===1?types[0]:"");
+      if(type)return editTemplate({name:"",type,data:{}});
+      document.querySelectorAll(".edit-slot").forEach(s=>s.innerHTML="");
+      $("#tplNewSlot").innerHTML=`<div class="card" style="margin-top:10px"><div class="form-title">What kind of post is the template for?</div>
+        <div class="role-pick" style="margin-top:12px">${types.map(t=>`<button type="button" data-tpl-new-type="${t}"><span>${FEED_TYPE_META[t].label}</span><span aria-hidden="true">→</span></button>`).join("")}</div></div>`;
+      return;
+    }
     const ap=e.target.closest("[data-approve]");
     if(ap){ap.disabled=true;approveItem(+ap.dataset.approve);return;}
     const rs=e.target.closest("[data-restore]");
@@ -759,10 +804,11 @@ function renderAdminSection(){
   });
   /* "toggle" doesn't bubble, so listen on the way down */
   main.addEventListener("toggle",e=>{
-    if(e.target.id!=="pastItems")return;
-    pastOpen=e.target.open;
+    if(e.target.id==="tplItems")tplOpen=e.target.open;
+    else if(e.target.id==="pastItems")pastOpen=e.target.open;
+    else return;
     const hint=e.target.querySelector(".admin-past-hint");
-    if(hint)hint.textContent=pastOpen?"Hide":"Show";
+    if(hint)hint.textContent=e.target.open?"Hide":"Show";
   },true);
 }
 
@@ -846,6 +892,51 @@ async function purgeItem(id){
   renderAdminShell();
   toast("Deleted permanently");
 }
+/* The Club Feed's Templates group (migration 039): folded away under the list, like Past items.
+   Returns what goes inside #tplHolder, so it can be redrawn without closing a post being written. */
+function templatesHtml(){
+  const types=session.role.feedTypes.filter(t=>TEMPLATE_TYPES.includes(t));
+  if(!types.length)return "";
+  const list=myTemplates();
+  const head=`<h3 class="admin-group templates"><span aria-hidden="true">📋</span>Templates<span class="admin-group-n">${list.length}</span></h3>`;
+  const inner=!feedTemplates
+    ?`<div class="admin-note">Templates need a one-off database update first: the webmaster needs to run <code>supabase/migrations/039_feed_templates.sql</code> in the Supabase SQL Editor.</div>`
+    :`<p class="admin-group-note">Ready-written posts for things that come up again and again, like a pool closure. <strong>Use</strong> one to start a new post with it already filled in — add the date, change anything in [square brackets], and publish as usual. Templates are never on the site. To make one from a post you're writing, press <strong>Save as template</strong> under it.</p>
+      ${list.map(t=>`<div class="item-block" data-tpl-block="${t.id}">
+        <div class="item-row"><div><div class="t">${esc(t.name)}</div>
+          <div class="s">${esc(FEED_TYPE_META[t.type].label)}${t.updatedBy?` · last saved by ${esc(t.updatedBy)}`:""}${t.updatedAt?` on ${esc(fmtDate(isoDay(new Date(t.updatedAt))))}`:""}</div></div>
+        <div class="acts"><button class="btn small" data-tpl-use="${t.id}">Use</button>
+          <button class="btn small ghost" data-tpl-edit="${t.id}">Edit</button>
+          <button class="btn small dangerous" data-tpl-del="${t.id}">Delete</button></div></div>
+        <div class="edit-slot" id="tplSlot-${t.id}"></div></div>`).join("")||`<p class="admin-group-empty">No templates yet.</p>`}
+      <div style="margin-top:12px"><button type="button" class="btn small ghost" data-tpl-new>+ New template</button></div>
+      <div class="edit-slot" id="tplNewSlot"></div>`;
+  return `<details class="admin-past" id="tplItems"${tplOpen?" open":""}>
+    <summary>${head}<span class="admin-past-hint">${tplOpen?"Hide":"Show"}</span></summary>${inner}</details>`;
+}
+function redrawTemplates(){const h=$("#tplHolder");if(h)h.innerHTML=templatesHtml();}
+function useTemplate(tid){
+  const t=(feedTemplates||[]).find(x=>x.id===tid);
+  if(!t)return;
+  document.querySelectorAll(".edit-slot").forEach(s=>s.innerHTML="");
+  editingId=null;
+  showForm("feed",null,t.type,{use:t});
+}
+function editTemplate(t){
+  document.querySelectorAll(".edit-slot").forEach(s=>s.innerHTML="");
+  $("#formSlot").innerHTML="";
+  editingId=null;
+  showForm("feed",null,t.type,{edit:t});
+}
+async function deleteTemplate(tid){
+  const t=(feedTemplates||[]).find(x=>x.id===tid);
+  if(!t||!confirm(`Delete the "${t.name}" template? Posts already made from it aren't affected. This can't be undone.`))return;
+  const {error}=await sb.from("feed_templates").delete().eq("id",tid);
+  if(error)return toast(saveErrorMessage(error));
+  await loadTemplates();
+  redrawTemplates();
+  toast("Template deleted");
+}
 function recycleBinHtml(){
   const bin=[...(DB.bin||[])].sort((a,b)=>b.deletedAt.localeCompare(a.deletedAt));
   if(!bin.length)return "";
@@ -882,7 +973,11 @@ function showFeedTypeChooser(){
     <div class="form-title">What are you adding?</div>
     <div class="role-pick" id="feedTypePick" style="margin-top:12px">
       ${role.feedTypes.map(t=>`<button data-type="${t}"><span>${FEED_TYPE_META[t].label}</span><span aria-hidden="true">→</span></button>`).join("")}
-    </div></div>`;
+    </div>
+    ${myTemplates().length?`<div class="form-title" style="margin-top:22px">Or start from a template</div>
+    <div class="role-pick" style="margin-top:12px">
+      ${myTemplates().map(t=>`<button type="button" data-tpl-use="${t.id}"><span>📋 ${esc(t.name)} <span style="color:var(--muted);font-weight:500">· ${esc(FEED_TYPE_META[t.type].short)}</span></span><span aria-hidden="true">→</span></button>`).join("")}
+    </div>`:""}</div>`;
   $("#formSlot").scrollIntoView({behavior:"smooth",block:"start"});
   $("#feedTypePick").addEventListener("click",e=>{
     const b=e.target.closest("button[data-type]");if(!b)return;
@@ -1064,11 +1159,16 @@ function meetArticleDraft(g){
 const meetArticleHtml=text=>String(text||"").split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean)
   .map(p=>`<p>${esc(p).replace(/\n/g,"<br>")}</p>`).join("");
 const tagPickHtml=(t,on)=>`<label class="checkbox-f squad-pick"><input type="checkbox" data-tagpick value="${esc(t.ref)}" ${on?"checked":""}> ${esc(t.name)}</label>`;
-function showForm(sec,id,forcedType){
+/* tpl (feed only, migration 039): {use:template} starts a new post filled in from a template;
+   {edit:template} edits the template itself (a new one has no id) -- the same form, less the
+   dates, plus a name, saved to feed_templates instead of the feed. */
+function showForm(sec,id,forcedType,tpl){
   editingId=id;
   if(sec==="squads")return showSquadForm(id);
   const isFeed=sec==="feed";
-  let it=id?(isFeed?DB.feed.find(x=>x.id===id):DB[sec].find(x=>x.id===id)):(isFeed?{type:forcedType}:{});
+  const tplEdit=tpl?.edit||null,tplUse=tpl?.use||null;
+  let it=id?(isFeed?DB.feed.find(x=>x.id===id):DB[sec].find(x=>x.id===id))
+    :(isFeed?{...structuredClone((tplEdit||tplUse)?.data||{}),type:forcedType}:{});
   const type=isFeed?(it.type||forcedType):null;
   /* A training change from before the details editor kept its details as plain text ("note"):
      bring them into the details box, line breaks intact, ready to tidy into headings and bullets.
@@ -1081,7 +1181,8 @@ function showForm(sec,id,forcedType){
   /* Coach and committee photos are drawn as plain square headshots, not through the framing
      helpers, so framing is only offered where it actually takes effect. */
   const canFrame=isFeed||sec==="newsDefaults";
-  const fields=SCHEMAS[schemaKey].map(f=>{
+  /* a template has no dates: they're filled in each time it's used */
+  const fields=SCHEMAS[schemaKey].filter(f=>!(tplEdit&&(f.k==="start"||f.k==="end"))).map(f=>{
     const val=esc(it[f.k]??"");
     if(f.type==="textarea")return `<label class="f">${f.label}<textarea name="${f.k}" rows="3" ${f.req?"required":""}>${val}</textarea></label>`;
     if(f.type==="checkbox"){
@@ -1263,17 +1364,30 @@ function showForm(sec,id,forcedType){
   const canPreview=isFeed&&(type==="news"||type==="social"||type==="training");
   /* Drafts (migration 038): a new post, or one that's still a draft. A live post can't go back to
      being a draft -- Delete takes it down. */
-  const draftable=isFeed&&feedDraftsReady&&(!id||isDraft(it));
-  const formTarget=id?document.getElementById("editSlot-"+id):$("#formSlot");
+  const draftable=isFeed&&feedDraftsReady&&!tplEdit&&(!id||isDraft(it));
+  /* "Save as template" on any post (not a gala) once migration 039 has run */
+  const templatable=isFeed&&!tplEdit&&!!feedTemplates&&TEMPLATE_TYPES.includes(type);
+  const formTarget=tplEdit?(tplEdit.id?document.getElementById("tplSlot-"+tplEdit.id):$("#tplNewSlot"))
+    :id?document.getElementById("editSlot-"+id):$("#formSlot");
+  const formTitle=tplEdit?`${tplEdit.id?"Edit template":"New template"} — ${titleLabel}`
+    :tplUse?`Add new — ${titleLabel} <span style="color:var(--muted);font-weight:600">· from the “${esc(tplUse.name)}” template</span>`
+    :`${id?"Edit item":"Add new"} — ${titleLabel}`;
   formTarget.innerHTML=`<form class="stack" id="adminForm" style="margin-top:10px">
-    <div class="form-title">${id?"Edit item":"Add new"} — ${titleLabel}</div>
+    <div class="form-title">${formTitle}</div>
+    ${tplEdit?`<label class="f">Template name (only seen in the members' area, e.g. Pool closed)<input type="text" name="tplName" value="${esc(tplEdit.name||"")}" maxlength="80" required></label>
+      <p class="hint" style="margin:-6px 0 0">Write it the way the post usually goes. There are no dates here — they're filled in each time it's used. Put anything that changes each time in [square brackets], like [day, date] or [pool]: whoever uses it gets a reminder if any are left when they publish.</p>`:""}
+    ${tplUse?`<p class="hint" style="margin:0;color:var(--text)">Fill in the date${leftoverBlanks(JSON.stringify(tplUse.data)).length?" and change anything in [square brackets]":""}, check the rest, then publish as usual. Changes here don't alter the template.</p>`:""}
     ${canPreview?`<button type="button" class="btn small ghost" id="previewBtn" style="justify-self:start">Preview as article page</button>`:""}
     ${fields}
     ${isFeed?`<input type="hidden" name="heroCard" id="heroCardInput" value="${esc(it.heroCard||"")}">`:""}
-    <div class="form-actions"><button class="btn" type="submit">${id&&!draftable?"Save & publish":"Publish"}</button>
-    ${draftable?`<button class="btn ghost" type="submit" data-as-draft>${id?"Save draft":"Save as draft"}</button>`:""}
+    <div class="form-actions">${tplEdit?`<button class="btn" type="submit">Save template</button>`
+      :`<button class="btn" type="submit">${id&&!draftable?"Save & publish":"Publish"}</button>
+    ${draftable?`<button class="btn ghost" type="submit" data-as-draft>${id?"Save draft":"Save as draft"}</button>`:""}`}
+    ${templatable?`<button class="btn ghost" type="button" id="saveAsTplBtn" title="Keep a copy of this post (without its dates) to start future posts from">Save as template</button>`:""}
     <button class="btn ghost" type="button" id="cancelForm">Cancel</button></div>
     ${draftable?`<p class="hint" style="margin:0">A draft isn't on the site and doesn't go for approval — other club accounts can see it under Drafts. Publish when it's ready.</p>`:""}</form>`;
+  /* a template can be saved half-written: only its name is a must */
+  if(tplEdit)formTarget.querySelectorAll("#adminForm [required]").forEach(i=>{if(i.name!=="tplName")i.required=false;});
   formTarget.scrollIntoView({behavior:"smooth",block:"nearest"});
   const pickedTags=()=>[...formTarget.querySelectorAll("[data-tagpick]:checked")].map(i=>i.value);
   /* "+ Add tag" makes a new club tag on the spot and ticks it, so nobody has to leave a half-written
@@ -1663,13 +1777,89 @@ function showForm(sec,id,forcedType){
   /* Which button sent the form: e.submitter, or (older browsers) the last one clicked */
   let draftClicked=false;
   formTarget.querySelectorAll('#adminForm button[type="submit"]').forEach(b=>b.addEventListener("click",()=>{draftClicked=b.hasAttribute("data-as-draft");}));
-  $("#adminForm").addEventListener("submit",async e=>{
-    e.preventDefault();
-    const asDraft=draftable&&(e.submitter?e.submitter.hasAttribute("data-as-draft"):draftClicked);
-    const data=Object.fromEntries(new FormData(e.target).entries());
+  /* Everything on the form, as the item's fields -- for publishing, and for Save as template.
+     Returns null (having said why) if something needs fixing first. */
+  const gather=()=>{
+    const form=formTarget.querySelector("#adminForm");
+    const data=Object.fromEntries(new FormData(form).entries());
     /* FormData omits an unchecked checkbox entirely, so read those straight off the inputs. */
     SCHEMAS[schemaKey].filter(f=>f.type==="checkbox").forEach(f=>{data[f.k]=formTarget.querySelector(`[name="${f.k}"]`).checked;});
     if(SCHEMAS[schemaKey].some(f=>f.type==="tagpicks"))data.topics=pickedTags();
+    if(isFeed)data.type=type;
+    if(galleryField)data.photos=galleryPhotos;
+    if(docLinkRows){
+      /* The row inputs carry data-k rather than name, so FormData skips them; gather them here.
+         A row with no name, text or link is just dropped; one with words but no link is a mistake. */
+      const rowEls=[...docLinkRows.querySelectorAll("[data-doclink]")];
+      const links=rowEls.map(r=>{const o={};r.querySelectorAll("[data-k]").forEach(i=>o[i.dataset.k]=i.value.trim());return o;});
+      const bad=links.findIndex(l=>!l.url&&(l.label||l.text));
+      if(bad>-1){toast(docLinkRows.hasAttribute("data-attach")?"Each attachment needs its file — upload the PDF, or remove that line":"Each document or link needs its link (URL) — or remove that line");rowEls[bad].querySelector('[data-k="url"]').focus();return null;}
+      data.docLinks=links.filter(l=>l.url);
+    }
+    if(raceDayPicks){
+      /* only days still inside the dates count; ticking every day is the same as ticking none */
+      const days=[...raceDayPicks.querySelectorAll("[data-raceday]")];
+      const ticked=days.filter(i=>i.checked).map(i=>i.dataset.raceday);
+      data.raceDays=ticked.length&&ticked.length<days.length?ticked:null;
+      if(!feedLateColsReady){delete data.raceDays;delete data.homepageMode;}
+    }
+    if(heroSetsField){
+      const own=Object.fromEntries(["hd","hp"].filter(heroUsed).map(k=>[k,heroSets[k]]));
+      data.heroPhotos=Object.keys(own).length?own:null;
+    }
+    if(rteEditor)data.body=guideDoc?sanitizeGuideHtml(rteEditor.innerHTML):sanitizeArticleHtml(rteEditor.innerHTML);
+    if(galleryField&&galleryPhotos.length)data.img=galleryPhotos[0];
+    return data;
+  };
+  /* Saves a template (migration 039): a new one, or tplId's. Then redraws the Templates group. */
+  const storeTemplate=async(tplId,name,data)=>{
+    const row={name,type,data:templateData(type,data)};
+    const q=sb.from("feed_templates");
+    const {error}=tplId?await q.update(row).eq("id",tplId):await q.insert(row);
+    if(error){toast(saveErrorMessage(error));return false;}
+    await loadTemplates();
+    return true;
+  };
+  $("#saveAsTplBtn")?.addEventListener("click",async e=>{
+    const data=gather();
+    if(!data)return;
+    const name=(prompt("Name the template — only seen in the members' area (e.g. Pool closed).\n\nIt keeps everything on this form except the dates. Tip: put anything that changes each time in [square brackets] first, so it's easy to spot.",data.title||"")||"").trim();
+    if(!name)return;
+    const clash=feedTemplates.find(t=>t.type===type&&t.name.toLowerCase()===name.toLowerCase());
+    if(clash&&!confirm(`There's already a template called "${clash.name}".\n\nOK = replace it with this one\nCancel = keep the old one`))return;
+    const btn=e.currentTarget;
+    btn.disabled=true;
+    const ok=await storeTemplate(clash?.id,name,data);
+    btn.disabled=false;
+    if(!ok)return;
+    redrawTemplates();
+    toast(`Saved as the “${name}” template — it's offered under + Add new. This post hasn't been published.`);
+  });
+  $("#adminForm").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const asDraft=draftable&&(e.submitter?e.submitter.hasAttribute("data-as-draft"):draftClicked);
+    const data=gather();
+    if(!data)return;
+    if(tplEdit){
+      const name=(data.tplName||"").trim();
+      if(!name){toast("Give the template a name");return formTarget.querySelector('[name="tplName"]').focus();}
+      const clash=feedTemplates.find(t=>t.id!==tplEdit.id&&t.type===type&&t.name.toLowerCase()===name.toLowerCase());
+      if(clash){toast(`There's already a template called "${clash.name}" — pick another name`);return formTarget.querySelector('[name="tplName"]').focus();}
+      const submit=e.target.querySelector('button[type="submit"]');
+      submit.disabled=true;
+      const ok=await storeTemplate(tplEdit.id,name,data);
+      submit.disabled=false;
+      if(!ok)return;
+      tplOpen=true;
+      redrawTemplates();
+      toast(tplEdit.id?"Template saved":"Template added — it's offered under + Add new");
+      return;
+    }
+    /* "[day, date]" and the like, left from a template */
+    if(isFeed&&!asDraft&&TEMPLATE_TYPES.includes(type)){
+      const blanks=leftoverBlanks([data.title,data.blurb,rteEditor?.textContent].join("\n"));
+      if(blanks.length&&!confirm(`This still has ${blanks.length===1?"a bit":"bits"} in square brackets, from a template, that ${blanks.length===1?"looks":"look"} like ${blanks.length===1?"it needs":"they need"} filling in:\n\n${blanks.join("\n")}\n\nOK = publish it as it is\nCancel = go back and change ${blanks.length===1?"it":"them"}`))return;
+    }
     if(sec==="topics"){
       data.name=(data.name||"").trim();
       const clash=newsTagList().find(t=>t.name.toLowerCase()===data.name.toLowerCase()&&t.ref!=="t:"+id);
@@ -1694,29 +1884,6 @@ function showForm(sec,id,forcedType){
       data.skills=(data.skillsRaw||"").split("\n").map(s=>s.trim()).filter(Boolean);delete data.skillsRaw;
       data.duties=(data.dutiesRaw||"").split("\n").map(s=>s.trim()).filter(Boolean);delete data.dutiesRaw;
     }
-    if(isFeed)data.type=type;
-    if(galleryField)data.photos=galleryPhotos;
-    if(docLinkRows){
-      /* The row inputs carry data-k rather than name, so FormData skips them; gather them here.
-         A row with no name, text or link is just dropped; one with words but no link is a mistake. */
-      const rowEls=[...docLinkRows.querySelectorAll("[data-doclink]")];
-      const links=rowEls.map(r=>{const o={};r.querySelectorAll("[data-k]").forEach(i=>o[i.dataset.k]=i.value.trim());return o;});
-      const bad=links.findIndex(l=>!l.url&&(l.label||l.text));
-      if(bad>-1){toast(docLinkRows.hasAttribute("data-attach")?"Each attachment needs its file — upload the PDF, or remove that line":"Each document or link needs its link (URL) — or remove that line");rowEls[bad].querySelector('[data-k="url"]').focus();return;}
-      data.docLinks=links.filter(l=>l.url);
-    }
-    if(raceDayPicks){
-      /* only days still inside the dates count; ticking every day is the same as ticking none */
-      const days=[...raceDayPicks.querySelectorAll("[data-raceday]")];
-      const ticked=days.filter(i=>i.checked).map(i=>i.dataset.raceday);
-      data.raceDays=ticked.length&&ticked.length<days.length?ticked:null;
-      if(!feedLateColsReady){delete data.raceDays;delete data.homepageMode;}
-    }
-    if(heroSetsField){
-      const own=Object.fromEntries(["hd","hp"].filter(heroUsed).map(k=>[k,heroSets[k]]));
-      data.heroPhotos=Object.keys(own).length?own:null;
-    }
-    if(rteEditor)data.body=guideDoc?sanitizeGuideHtml(rteEditor.innerHTML):sanitizeArticleHtml(rteEditor.innerHTML);
     if(sec==="guides"){
       data.title=(data.title||"").trim();
       if(!rteEditor.textContent.trim()){toast("The guide is empty — write something, or delete the guide instead");return;}
@@ -1728,7 +1895,6 @@ function showForm(sec,id,forcedType){
         data.sortOrder=DB.guides.length?Math.max(...DB.guides.map(g=>g.sortOrder))+1:0;
       }
     }
-    if(galleryField&&galleryPhotos.length)data.img=galleryPhotos[0];
     if(!id&&sec==="newsDefaults"){
       const base=slugify(data.label)||"category";
       let uniq=base,n=2;while(DB.newsDefaults.some(x=>x.key===uniq))uniq=`${base}-${n++}`;
@@ -2121,6 +2287,7 @@ function photoUses(name){
   for(const it of DB.coaches)if(has(it))uses.push(`Coach: ${it.name}`);
   for(const it of DB.committee)if(has(it))uses.push(`Committee: ${it.title}`);
   for(const it of DB.newsDefaults)if(has(it))uses.push(`Default news picture: ${it.label}`);
+  for(const t of feedTemplates||[])if(has(t))uses.push(`Template: ${t.name}`);
   if(DB.welfare.some(has))uses.push("Welfare & Safeguarding page");
   for(const k of ["squads","roles"])if(DB[k].some(has))uses.push(SECTION_META[k].name);
   return uses;
@@ -2148,16 +2315,22 @@ async function showImagesSection(){
   const store=sb.storage.from("site-images");
   const photos=files.map(f=>({name:f.name,url:store.getPublicUrl(f.name).data.publicUrl,day:fmtDate((f.created_at||"").slice(0,10)),uses:photoUses(f.name)}));
   let unusedOnly=false;
-  main.innerHTML=`<h2>${name}</h2>
-    <div class="admin-note">Every photo uploaded to the site, newest first. Deleting one removes it for good — anywhere it's still used will show a gap instead, so check the <b>Used in</b> list first.</div>
-    <div id="imgManager"></div>`;
-  const box=$("#imgManager");
+  main.innerHTML=`<div id="imgSection"><h2>${name}</h2>
+    <div class="admin-note">Every photo uploaded to the site, newest first. <b>Import photos</b> adds pictures to the photo library without putting them in a post — they're then ready to pick with <em>Choose from library</em> on any post, coach or committee picture. You can also drag photos onto this page. Deleting one removes it for good — anywhere it's still used will show a gap instead, so check the <b>Used in</b> list first.</div>
+    <div id="imgManager"></div></div>`;
+  const box=$("#imgManager"),section=$("#imgSection");
+  let importing="";
   const render=()=>{
     const unused=photos.filter(p=>!p.uses.length).length;
     const shown=unusedOnly?photos.filter(p=>!p.uses.length):photos;
     box.innerHTML=`<div class="img-manage-bar">
         <span class="hint" style="margin:0">${photos.length} photo${photos.length===1?"":"s"} · ${unused} not used anywhere</span>
         <label class="f checkbox-f"><input type="checkbox" id="imgUnusedOnly"${unusedOnly?" checked":""}> Only show unused photos</label>
+        <span style="display:flex;align-items:center;gap:10px">
+          ${importing?`<span class="hint" style="margin:0">${esc(importing)}</span>`:""}
+          <button type="button" class="btn small" id="imgImportBtn"${importing?" disabled":""}>Import photos</button>
+          <input type="file" id="imgImportFile" accept="image/*" multiple hidden>
+        </span>
       </div>
       ${shown.length?`<div class="img-manage-grid">${shown.map(p=>`<div class="img-manage-card">
           <a href="${esc(p.url)}" target="_blank" rel="noopener" class="img-manage-thumb"><img src="${esc(p.url)}" alt="" loading="lazy"></a>
@@ -2170,8 +2343,42 @@ async function showImagesSection(){
       :`<p style="color:var(--muted)">${photos.length?"Every photo is in use.":"No photos have been uploaded yet."}</p>`}`;
   };
   render();
-  box.addEventListener("change",e=>{if(e.target.id==="imgUnusedOnly"){unusedOnly=e.target.checked;render();}});
+  /* Import: straight into the image store (compressed, like every other upload), nothing else.
+     Each new photo goes to the top of the list as "Not used anywhere" until a post picks it. */
+  const importPhotos=async files=>{
+    files=[...files].filter(f=>f.type.startsWith("image/"));
+    if(!files.length||importing)return;
+    let added=0,failed=0;
+    for(let i=0;i<files.length;i++){
+      importing=`Importing ${i+1} of ${files.length}…`;
+      render();
+      try{
+        const url=await uploadImage(files[i]);
+        photos.unshift({name:url.split("/").pop(),url,day:fmtDate(new Date().toISOString().slice(0,10)),uses:[]});
+        added++;
+      }catch(err){
+        failed++;
+        console.error(err);
+      }
+      if(adminSection!=="images")return;
+    }
+    importing="";
+    unusedOnly=false;
+    render();
+    toast(failed?`${added} imported, ${failed} couldn't be uploaded`:`${added} photo${added===1?"":"s"} added to the library`);
+  };
+  box.addEventListener("change",e=>{
+    if(e.target.id==="imgUnusedOnly"){unusedOnly=e.target.checked;render();}
+    if(e.target.id==="imgImportFile"){importPhotos(e.target.files);e.target.value="";}
+  });
+  section.addEventListener("dragover",e=>{if([...e.dataTransfer.types].includes("Files"))e.preventDefault();});
+  section.addEventListener("drop",e=>{
+    if(!e.dataTransfer.files.length)return;
+    e.preventDefault();
+    importPhotos(e.dataTransfer.files);
+  });
   box.addEventListener("click",async e=>{
+    if(e.target.id==="imgImportBtn")return $("#imgImportFile").click();
     const btn=e.target.closest("[data-img-del]");if(!btn)return;
     const photo=photos.find(p=>p.name===btn.dataset.imgDel);
     const warning=photo.uses.length
@@ -2568,7 +2775,8 @@ async function start(){
   /* clear out anything binned over 7 days ago (migration 025; harmless if not run yet) */
   await sb.rpc("purge_recycle_bin").then(()=>{},()=>{});
   try{await Promise.all([loadContent(),checkFeedLateCols(),
-    sb.rpc("feed_drafts_ready").then(r=>{feedDraftsReady=r.data===true;},()=>{})]);}
+    sb.rpc("feed_drafts_ready").then(r=>{feedDraftsReady=r.data===true;},()=>{}),
+    loadTemplates().catch(()=>{feedTemplates=null;})]);}
   catch(e){return renderLogin(`Couldn't load the club content: ${e.message}`);}
   renderAdminShell();
 }
